@@ -108,11 +108,12 @@ export function useCarouselPhysics({ items, activeId, onChange }) {
   const dragProps = useMemo(
     () => ({
       drag: 'x',
-      dragConstraints: { left: 0, right: 0 },
+      dragConstraints: { left: -300, right: 300 },
       dragElastic,
+      dragMomentum: false,
       onDrag,
       onDragEnd,
-      style: { touchAction: 'pan-y' },
+      style: { touchAction: 'none' },
       transition: motionTokens.spring.soft,
     }),
     [onDrag, onDragEnd],

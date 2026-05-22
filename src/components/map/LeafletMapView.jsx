@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -21,6 +21,7 @@ import { FigureMarker } from './FigureMarker'
 import { UserLocationDot } from './UserLocationDot'
 import { NearFigureOverlay } from './NearFigureOverlay'
 import { MapGpsStatus } from './MapGpsStatus'
+import { GpsDiagnosticPanel } from './GpsDiagnosticPanel'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -60,35 +61,47 @@ function MapInstanceBridge({ mapRef }) {
   return null
 }
 
-function MapFlyController({ position, zoom, reducedMotion }) {
+function MapFlyController({ position, zoom, reducedMotion, recenterTick = 0 }) {
   const map = useMap()
-  const hasCenteredRef = useRef(false)
-  const lastPosRef = useRef(null)
+  const lastCenteredRef = useRef(null)
+  const lastAccuracyRef = useRef(null)
+  const prevRecenterTickRef = useRef(0)
 
   useEffect(() => {
     if (!position) return
 
-    const { lat, lng } = position
-    const prev = lastPosRef.current
-
-    if (
+    const { lat, lng, accuracy } = position
+    const prev = lastCenteredRef.current
+    const isFirst = !prev
+    const moved =
       prev &&
-      Math.abs(prev.lat - lat) < 0.00001 &&
-      Math.abs(prev.lng - lng) < 0.00001
-    ) {
-      return
-    }
+      (Math.abs(prev.lat - lat) > 0.00004 || Math.abs(prev.lng - lng) > 0.00004)
+    const accuracyImproved =
+      accuracy != null &&
+      lastAccuracyRef.current != null &&
+      accuracy < lastAccuracyRef.current - 5
+    const manualRecenter = recenterTick > prevRecenterTickRef.current
 
-    lastPosRef.current = { lat, lng }
+    if (manualRecenter) prevRecenterTickRef.current = recenterTick
 
-    if (!hasCenteredRef.current) {
-      hasCenteredRef.current = true
+    if (!isFirst && !moved && !accuracyImproved && !manualRecenter) return
+
+    lastCenteredRef.current = { lat, lng }
+    if (accuracy != null) lastAccuracyRef.current = accuracy
+
+    if (isFirst || manualRecenter) {
       map.flyTo([lat, lng], zoom, {
         animate: !reducedMotion,
         duration: reducedMotion ? 0 : 1.1,
       })
+      return
     }
-  }, [map, position, reducedMotion, zoom])
+
+    map.panTo([lat, lng], {
+      animate: !reducedMotion,
+      duration: reducedMotion ? 0 : 0.55,
+    })
+  }, [map, position, reducedMotion, zoom, recenterTick])
 
   return null
 }
@@ -198,8 +211,11 @@ function LeafletMapViewInner({
   onOpenCamera,
 }) {
   const mapRef = useRef(null)
+  const [recenterTick, setRecenterTick] = useState(0)
   const {
+    mapPosition,
     position,
+    trustedPosition,
     proximityPosition,
     hasUsablePosition,
     error,
@@ -229,13 +245,14 @@ function LeafletMapViewInner({
   }, [onOpenCamera])
 
   const handleRecenter = useCallback(() => {
-    if (!mapRef.current || !position) return
+    if (!mapRef.current || !mapPosition) return
 
-    mapRef.current.flyTo([position.lat, position.lng], USER_ZOOM, {
+    mapRef.current.flyTo([mapPosition.lat, mapPosition.lng], USER_ZOOM, {
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : 0.7,
     })
-  }, [position, reducedMotion])
+    setRecenterTick((tick) => tick + 1)
+  }, [mapPosition, reducedMotion])
 
   useEffect(() => {
     onNearFigureChange?.(nearFigure ?? null)
@@ -253,20 +270,20 @@ function LeafletMapViewInner({
 
   const showGpsBanner =
     !error &&
-    !position &&
+    !mapPosition &&
     (gpsPhase === 'searching' || isLoading || showSoftWarning)
 
   const showRefiningBanner =
     !error &&
-    position &&
+    mapPosition &&
     (gpsPhase === 'refining' ||
       qualityState === 'refining' ||
       showSoftWarning)
 
   const gpsBannerLabel = showSoftWarning
     ? 'Señal débil — seguimos buscando…'
-    : position?.accuracy
-      ? `${gpsStatusLabel} (~${Math.round(position.accuracy)}m)`
+    : mapPosition?.accuracy
+      ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
       : gpsStatusLabel
 
   const showHardError = error && errorType === 'denied'
@@ -290,18 +307,19 @@ function LeafletMapViewInner({
           <MapInstanceBridge mapRef={mapRef} />
           <MapResizeHandler />
           <MapFlyController
-            position={position}
+            position={mapPosition}
             zoom={USER_ZOOM}
             reducedMotion={reducedMotion}
+            recenterTick={recenterTick}
           />
           <FigureMarkersLayer
             figures={figures}
             nearFigureIds={nearFigureIdsRef.current}
           />
-          {position && (
+          {mapPosition && (
             <UserLocationMarker
-              position={position}
-              isCoarse={!hasUsablePosition}
+              position={mapPosition}
+              isCoarse={!trustedPosition || !hasUsablePosition}
             />
           )}
         </MapContainer>
@@ -352,7 +370,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {position && (
+      {mapPosition && (
         <button
           type="button"
           onClick={handleRecenter}
@@ -362,6 +380,12 @@ function LeafletMapViewInner({
           <FaLocationCrosshairs size={18} />
         </button>
       )}
+
+      <GpsDiagnosticPanel
+        onRetry={requestPermission}
+        onRecenter={handleRecenter}
+        hasMapPosition={Boolean(mapPosition)}
+      />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">
         {isNearFigure && (

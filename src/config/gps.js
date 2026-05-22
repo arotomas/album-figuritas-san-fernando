@@ -1,5 +1,8 @@
 /** Configuración GPS — optimizada para mobile urbano / caminando */
 
+/** Diagnóstico temporal en producción: badge en mapa + logs en consola */
+export const DEBUG_GPS = true
+
 /** Fase 1: vista rápida de zona (Wi‑Fi/red). Nunca proximidad ni captura. */
 export const GPS_FAST_OPTIONS = {
   enableHighAccuracy: false,

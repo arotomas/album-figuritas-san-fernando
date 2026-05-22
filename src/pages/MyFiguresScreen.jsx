@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6'
 import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
 import { AlbumBackground } from '../components/album/AlbumBackground'
 import { AlbumProgress } from '../components/album/AlbumProgress'
@@ -37,7 +38,7 @@ export function MyFiguresScreen() {
     [activeId, setLastViewedFigure],
   )
 
-  const { activeIndex, dragX, dragProps, getStackStyle } = useCarouselPhysics({
+  const { activeIndex, dragX, dragProps, getStackStyle, goNext, goPrev } = useCarouselPhysics({
     items: figures,
     activeId,
     onChange: handleSelect,
@@ -82,6 +83,26 @@ export function MyFiguresScreen() {
 
         {/* Featured stack */}
         <div className="relative mt-5 flex flex-1 flex-col justify-center px-6">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={activeIndex <= 0}
+            aria-label="Figurita anterior"
+            className="pointer-events-auto absolute left-0 top-1/2 z-30 flex h-11 w-11 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-white/90 text-ink shadow-md disabled:pointer-events-none disabled:opacity-30 active:scale-95"
+          >
+            <FaChevronLeft size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={activeIndex >= figures.length - 1}
+            aria-label="Figurita siguiente"
+            className="pointer-events-auto absolute right-0 top-1/2 z-30 flex h-11 w-11 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-white/90 text-ink shadow-md disabled:pointer-events-none disabled:opacity-30 active:scale-95"
+          >
+            <FaChevronRight size={16} />
+          </button>
+
           <div
             className="relative mx-auto w-full max-w-[320px]"
             style={{ perspective: album.featured.perspective, minHeight: 420 }}
@@ -126,7 +147,7 @@ export function MyFiguresScreen() {
               transition={album.transition.fade}
               className={`${albumClasses.hint} mt-3 text-center`}
             >
-              Deslizá para pasar cartas · {activeIndex + 1} de {figures.length}
+              Deslizá o usá las flechas · {activeIndex + 1} de {figures.length}
             </m.p>
           </AnimatePresence>
         </div>

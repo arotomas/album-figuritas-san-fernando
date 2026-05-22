@@ -1,4 +1,15 @@
+import { isWithinSanFernandoArea } from '../config/gps'
+
 const STORAGE_KEY = 'figuritas-last-known-pos'
+const MAX_AGE_MS = 30 * 60 * 1000
+
+function isValidCached(parsed) {
+  if (!parsed || parsed.lat == null || parsed.lng == null) return false
+  if (!isWithinSanFernandoArea(parsed.lat, parsed.lng)) return false
+  const age = Date.now() - (parsed.timestamp ?? 0)
+  if (parsed.timestamp && age > MAX_AGE_MS) return false
+  return true
+}
 
 export function loadLastKnownPosition() {
   if (typeof sessionStorage === 'undefined') return null
@@ -7,15 +18,24 @@ export function loadLastKnownPosition() {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (parsed?.lat == null || parsed?.lng == null) return null
+    if (!isValidCached(parsed)) {
+      sessionStorage.removeItem(STORAGE_KEY)
+      return null
+    }
     return parsed
   } catch {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // ignore
+    }
     return null
   }
 }
 
 export function saveLastKnownPosition(position) {
   if (typeof sessionStorage === 'undefined' || !position) return
+  if (!isWithinSanFernandoArea(position.lat, position.lng)) return
 
   try {
     sessionStorage.setItem(
@@ -29,5 +49,14 @@ export function saveLastKnownPosition(position) {
     )
   } catch {
     // quota / private mode
+  }
+}
+
+export function clearLastKnownPosition() {
+  if (typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // ignore
   }
 }
