@@ -1,0 +1,429 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-surface: #f5f5f3;
+  --color-ink: #111113;
+  --color-muted: #8b8b95;
+  --color-border: #e8e8ea;
+  --color-progress: #84cc16;
+  --color-warm-white: #faf9f7;
+  --color-charcoal: #1a1a1e;
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-warm-white);
+    color: var(--color-ink);
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-body {
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+    max-width: 480px;
+    margin-inline: auto;
+  }
+
+  .map-container .mapboxgl-canvas {
+    outline: none;
+  }
+
+  .map-container {
+    filter: saturate(0.75) brightness(0.88) contrast(1.05);
+  }
+
+  .map-container .mapboxgl-ctrl-bottom-left {
+    opacity: 0.5;
+  }
+
+  .capture-screen {
+    touch-action: none;
+    user-select: none;
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    .landscape-blocker {
+      display: flex !important;
+    }
+  }
+
+  .gpu-layer {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  .map-skeleton-pulse {
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-pulse {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .figure-float {
+    animation: figure-float 2.8s ease-in-out infinite;
+  }
+
+  .figure-pulse {
+    animation: figure-pulse 0.8s ease-in-out infinite;
+  }
+
+  .figure-pulse-ring {
+    animation: pulse-ring 1.2s ease-out infinite;
+  }
+
+  .user-dot-pulse {
+    animation: user-dot 1.5s ease-in-out infinite;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.35s ease-out;
+  }
+
+  @keyframes figure-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes figure-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes pulse-ring {
+    0% {
+      transform: translateY(-50%) scale(1);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translateY(-50%) scale(1.8);
+      opacity: 0;
+    }
+  }
+
+  @keyframes user-dot {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.12);
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Premium card effects */
+  .card-texture {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  .shine-sweep div {
+    animation: shine-sweep 2.2s ease-in-out 0.6s 1;
+  }
+
+  @keyframes shine-sweep {
+    from {
+      transform: translateX(-130%) skewX(-12deg);
+    }
+    to {
+      transform: translateX(230%) skewX(-12deg);
+    }
+  }
+
+  .photo-hidden {
+    transform: scale(1.15);
+    filter: brightness(0.3) blur(4px);
+    opacity: 0;
+  }
+
+  .photo-revealed {
+    animation: photo-reveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes photo-reveal {
+    from {
+      transform: scale(1.12);
+      filter: brightness(2) blur(2px);
+      opacity: 0.5;
+    }
+    to {
+      transform: scale(1);
+      filter: brightness(1) blur(0);
+      opacity: 1;
+    }
+  }
+
+  .particle-float {
+    animation: particle-rise 2.8s ease-out infinite;
+  }
+
+  @keyframes particle-rise {
+    0% {
+      transform: translateY(0) scale(1);
+      opacity: 0;
+    }
+    20% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translateY(-80px) scale(0.3);
+      opacity: 0;
+    }
+  }
+
+  .legendary-aura {
+    animation: aura-pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes aura-pulse {
+    0%,
+    100% {
+      opacity: 0.5;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+  }
+
+  /* Album premium effects */
+  .album-bg-glow {
+    animation: album-bg-breathe 8s ease-in-out infinite;
+  }
+
+  @keyframes album-bg-breathe {
+    0%,
+    100% {
+      opacity: 0.18;
+    }
+    50% {
+      opacity: 0.28;
+    }
+  }
+
+  .album-progress-shine {
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.45) 50%,
+      transparent 65%
+    );
+    animation: album-progress-glint 3.5s ease-in-out infinite;
+  }
+
+  @keyframes album-progress-glint {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.75;
+    }
+  }
+
+  .album-holographic {
+    background: linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(167, 139, 250, 0.12) 25%,
+      rgba(34, 211, 238, 0.1) 50%,
+      rgba(251, 191, 36, 0.08) 75%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200% 200%;
+    animation: album-holo-shift 6s ease-in-out infinite;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes album-holo-shift {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .album-locked-shimmer {
+    background: linear-gradient(
+      110deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.08) 50%,
+      transparent 60%
+    );
+    animation: album-locked-shimmer 5s ease-in-out infinite;
+  }
+
+  @keyframes album-locked-shimmer {
+    0% {
+      transform: translateX(-120%) skewX(-8deg);
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(120%) skewX(-8deg);
+      opacity: 0;
+    }
+  }
+
+  .album-locked-veil {
+    background: linear-gradient(
+      180deg,
+      rgba(10, 10, 11, 0.55) 0%,
+      rgba(10, 10, 11, 0.72) 100%
+    );
+  }
+
+  .new-badge-pulse {
+    animation: new-badge-breathe 2.4s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(163, 230, 53, 0.25);
+  }
+
+  @keyframes new-badge-breathe {
+    0%,
+    100% {
+      box-shadow: 0 0 8px rgba(163, 230, 53, 0.15);
+    }
+    50% {
+      box-shadow: 0 0 16px rgba(163, 230, 53, 0.35);
+    }
+  }
+
+  .album-carousel-dim {
+    opacity: 0.85;
+  }
+
+  .figure-float-r1 { animation: figure-float 3s ease-in-out infinite; }
+  .figure-float-r2 { animation: figure-float 2.8s ease-in-out infinite; }
+  .figure-float-r3 { animation: figure-float 2.6s ease-in-out infinite; }
+  .figure-float-r4 { animation: figure-float 2.4s ease-in-out infinite; }
+
+  .figure-pulse-premium {
+    animation: figure-pulse-premium 1s ease-in-out infinite;
+  }
+
+  @keyframes figure-pulse-premium {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.08);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .map-skeleton-pulse,
+    .figure-float,
+    .figure-float-r1,
+    .figure-float-r2,
+    .figure-float-r3,
+    .figure-float-r4,
+    .figure-pulse,
+    .figure-pulse-premium,
+    .figure-pulse-ring,
+    .user-dot-pulse,
+    .animate-slide-up,
+    .shine-sweep div,
+    .photo-revealed,
+    .particle-float,
+    .legendary-aura,
+    .album-bg-glow,
+    .album-progress-shine,
+    .album-holographic,
+    .album-locked-shimmer,
+    .new-badge-pulse {
+      animation: none !important;
+    }
+
+    .photo-hidden {
+      opacity: 1;
+      filter: none;
+      transform: none;
+    }
+
+    .gpu-layer {
+      will-change: auto;
+    }
+  }
+}
