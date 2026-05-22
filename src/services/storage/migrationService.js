@@ -1,6 +1,7 @@
 import { STORAGE_VERSION } from '../../config/persistence'
 import { mockFigures, TOTAL_FIGURES } from '../../data/mockFigures'
 import { computeAlbumStatus } from '../../store/albumUtils'
+import { persistLog } from '../../utils/persistLog'
 
 /**
  * Fusiona figuritas persistidas con el template mock (coords, rareza, etc.).
@@ -52,36 +53,41 @@ export function migratePersistedState(raw) {
     return null
   }
 
-  const version = raw.version ?? 0
-  let state = { ...raw.state }
+  try {
+    const version = raw.version ?? 0
+    let state = { ...(raw.state ?? raw) }
 
-  if (version < 1) {
-    state = {
-      ...state,
-      figures: mergeFiguresWithTemplate(state.figures),
+    if (version < 1) {
+      state = {
+        ...state,
+        figures: mergeFiguresWithTemplate(state.figures),
+      }
     }
-  }
 
-  const figures = stripOversizedPhotos(
-    mergeFiguresWithTemplate(state.figures ?? []),
-  )
+    const figures = stripOversizedPhotos(
+      mergeFiguresWithTemplate(state.figures ?? []),
+    )
 
-  const obtenidas = figures.filter((f) => f.obtenida).length
+    const obtenidas = figures.filter((f) => f.obtenida).length
 
-  return {
-    version: STORAGE_VERSION,
-    state: {
-      ...state,
-      figures,
-      albumStatus:
-        state.albumStatus ??
-        computeAlbumStatus(figures, state.lastViewedFigureId),
-      lastObtenidaFigureId: state.lastObtenidaFigureId ?? null,
-      lastViewedFigureId: state.lastViewedFigureId ?? null,
-      lastSavedAt: state.lastSavedAt ?? null,
-      progressSnapshot: obtenidas,
-      totalFigures: TOTAL_FIGURES,
-    },
+    return {
+      version: STORAGE_VERSION,
+      state: {
+        ...state,
+        figures,
+        albumStatus:
+          state.albumStatus ??
+          computeAlbumStatus(figures, state.lastViewedFigureId),
+        lastObtenidaFigureId: state.lastObtenidaFigureId ?? null,
+        lastViewedFigureId: state.lastViewedFigureId ?? null,
+        lastSavedAt: state.lastSavedAt ?? null,
+        progressSnapshot: obtenidas,
+        totalFigures: TOTAL_FIGURES,
+      },
+    }
+  } catch (error) {
+    persistLog.persistWarn('migratePersistedState failed', error)
+    return null
   }
 }
 

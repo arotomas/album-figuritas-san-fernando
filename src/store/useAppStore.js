@@ -12,6 +12,9 @@ import {
   migratePersistedState,
 } from '../services/storage/migrationService'
 import { computeAlbumStatus } from './albumUtils'
+import { persistLog } from '../utils/persistLog'
+
+const zustandStorage = createJSONStorage(() => createZustandStorage())
 
 const createInitialFigures = () =>
   mockFigures.map((figure) => ({
@@ -184,36 +187,75 @@ export const useAppStore = create(
     {
       name: STORAGE_KEY,
       version: STORAGE_VERSION,
-      storage: createJSONStorage(() => createZustandStorage()),
+      storage: zustandStorage,
       partialize: (state) => buildPersistedSnapshot(state),
       migrate: (persistedState, version) => {
-        const migrated = migratePersistedState({
-          version,
-          state: persistedState,
-        })
-        return migrated?.state ?? persistedState
-      },
-      merge: (persistedState, currentState) => {
-        if (!persistedState) return currentState
-
-        const figures = mergeFiguresWithTemplate(persistedState.figures)
-
-        return {
-          ...currentState,
-          ...persistedState,
-          figures,
-          albumStatus:
-            persistedState.albumStatus ??
-            computeAlbumStatus(figures, persistedState.lastViewedFigureId),
-          _hasHydrated: true,
+        try {
+          persistLog.persist('migrate', { from: version })
+          const migrated = migratePersistedState({
+            version,
+            state: persistedState,
+          })
+          return migrated?.state ?? persistedState
+        } catch (error) {
+          persistLog.persistWarn('migrate failed — keeping raw state', error)
+          return persistedState
         }
       },
-      onRehydrateStorage: () => () => {
-        useAppStore.getState().setHasHydrated(true)
+      merge: (persistedState, currentState) => {
+        try {
+          if (!persistedState) {
+            persistLog.hydration('empty storage — using defaults')
+            return { ...currentState, _hasHydrated: true }
+          }
+
+          const figures = mergeFiguresWithTemplate(persistedState.figures)
+
+          return {
+            ...currentState,
+            ...persistedState,
+            figures,
+            albumStatus:
+              persistedState.albumStatus ??
+              computeAlbumStatus(figures, persistedState.lastViewedFigureId),
+            _hasHydrated: true,
+          }
+        } catch (error) {
+          persistLog.persistWarn('merge failed — using defaults', error)
+          return { ...currentState, _hasHydrated: true }
+        }
+      },
+      onRehydrateStorage: () => {
+        persistLog.hydration('start')
+        return (_state, error) => {
+          if (error) {
+            persistLog.hydrationWarn('rehydrate error — clearing corrupt storage', error)
+            try {
+              storageService.clearAll()
+            } catch {
+              // ignore
+            }
+          } else {
+            persistLog.hydration('rehydrate complete')
+          }
+          useAppStore.getState().setHasHydrated(true)
+        }
       },
     },
   ),
 )
+
+// Suscribir antes del primer render de React (evita race con onFinishHydration)
+if (typeof window !== 'undefined') {
+  useAppStore.persist.onFinishHydration(() => {
+    persistLog.hydration('onFinishHydration (module)')
+    useAppStore.getState().setHasHydrated(true)
+  })
+
+  if (useAppStore.persist.hasHydrated()) {
+    useAppStore.getState().setHasHydrated(true)
+  }
+}
 
 export const selectProgress = (state) =>
   state.figures.filter((figure) => figure.obtenida).length
