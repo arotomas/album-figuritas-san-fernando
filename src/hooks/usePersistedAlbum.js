@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
+import { storageService } from '../services/storage/storageService'
 import { HYDRATION_TIMEOUT_MS, persistLog } from '../utils/persistLog'
 
 function isPersistReady() {
@@ -60,6 +61,12 @@ export function usePersistedAlbum() {
       persistLog.hydrationWarn(
         `timeout ${HYDRATION_TIMEOUT_MS}ms — entering with defaults`,
       )
+      try {
+        storageService.clearAll()
+        useAppStore.persist.clearStorage()
+      } catch {
+        // ignore storage cleanup errors
+      }
       finish('timeout-fallback')
     }, HYDRATION_TIMEOUT_MS)
 

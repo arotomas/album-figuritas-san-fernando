@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockFigures, TOTAL_FIGURES } from '../data/mockFigures'
 import {
   ALBUM_STATUS,
+  PERSISTED_FIELDS,
   STORAGE_KEY,
   STORAGE_VERSION,
 } from '../config/persistence'
@@ -10,6 +11,7 @@ import { createZustandStorage, storageService } from '../services/storage/storag
 import {
   mergeFiguresWithTemplate,
   migratePersistedState,
+  sanitizePersistedState,
 } from '../services/storage/migrationService'
 import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
@@ -27,9 +29,37 @@ const createInitialFigures = () =>
     obtenidaEn: null,
   }))
 
+function pickPersistedFields(source) {
+  const picked = {}
+  for (const key of PERSISTED_FIELDS) {
+    if (source && Object.prototype.hasOwnProperty.call(source, key)) {
+      picked[key] = source[key]
+    }
+  }
+  return picked
+}
+
+function resetStoreToDefaults() {
+  useAppStore.setState({
+    figures: createInitialFigures(),
+    albumStatus: ALBUM_STATUS.EN_PROGRESO,
+    lastObtenidaFigureId: null,
+    lastViewedFigureId: null,
+    lastSavedAt: null,
+    isAuthenticated: false,
+    user: null,
+    hasSeenSplash: false,
+    nearFigure: null,
+    devTestFigure: null,
+    _hasHydrated: true,
+  })
+}
+
 function buildPersistedSnapshot(state) {
+  const figures = Array.isArray(state.figures) ? state.figures : createInitialFigures()
+
   return {
-    figures: state.figures.map(
+    figures: figures.map(
       ({ id, obtenida, foto, fotoSizeBytes, obtenidaEn, slug }) => ({
         id,
         slug,
@@ -50,7 +80,7 @@ function buildPersistedSnapshot(state) {
 }
 
 function applyFigureUpdate(state, figureId, patch) {
-  const figures = state.figures.map((figure) =>
+  const figures = (Array.isArray(state.figures) ? state.figures : []).map((figure) =>
     figure.id === figureId ? { ...figure, ...patch } : figure,
   )
 
@@ -257,25 +287,39 @@ export const useAppStore = create(
       },
       merge: (persistedState, currentState) => {
         try {
-          if (!persistedState) {
-            persistLog.hydration('empty storage — using defaults')
-            return { ...currentState, _hasHydrated: true }
+          const sanitized = sanitizePersistedState(persistedState)
+          if (!sanitized) {
+            persistLog.hydration('empty or invalid storage — using defaults')
+            return {
+              ...currentState,
+              nearFigure: null,
+              devTestFigure: null,
+              _hasHydrated: true,
+            }
           }
 
-          const figures = mergeFiguresWithTemplate(persistedState.figures)
+          const figures = mergeFiguresWithTemplate(sanitized.figures)
+          const persistedFields = pickPersistedFields(sanitized)
 
           return {
             ...currentState,
-            ...persistedState,
+            ...persistedFields,
             figures,
             albumStatus:
-              persistedState.albumStatus ??
-              computeAlbumStatus(figures, persistedState.lastViewedFigureId),
+              persistedFields.albumStatus ??
+              computeAlbumStatus(figures, persistedFields.lastViewedFigureId),
+            nearFigure: null,
+            devTestFigure: null,
             _hasHydrated: true,
           }
         } catch (error) {
           persistLog.persistWarn('merge failed — using defaults', error)
-          return { ...currentState, _hasHydrated: true }
+          return {
+            ...currentState,
+            nearFigure: null,
+            devTestFigure: null,
+            _hasHydrated: true,
+          }
         }
       },
       onRehydrateStorage: () => {
@@ -285,13 +329,15 @@ export const useAppStore = create(
             persistLog.hydrationWarn('rehydrate error — clearing corrupt storage', error)
             try {
               storageService.clearAll()
+              useAppStore.persist.clearStorage()
+              resetStoreToDefaults()
             } catch {
-              // ignore
+              useAppStore.getState().setHasHydrated(true)
             }
           } else {
             persistLog.hydration('rehydrate complete')
+            useAppStore.getState().setHasHydrated(true)
           }
-          useAppStore.getState().setHasHydrated(true)
         }
       },
     },
@@ -311,12 +357,18 @@ if (typeof window !== 'undefined') {
 }
 
 export const selectProgress = (state) =>
-  state.figures.filter((figure) => figure.obtenida).length
+  (Array.isArray(state.figures) ? state.figures : []).filter(
+    (figure) => figure.obtenida,
+  ).length
 
 export const selectObtenidasFigures = (state) =>
-  state.figures.filter((figure) => figure.obtenida)
+  (Array.isArray(state.figures) ? state.figures : []).filter(
+    (figure) => figure.obtenida,
+  )
 
 export const selectPendientesFigures = (state) =>
-  state.figures.filter((figure) => !figure.obtenida)
+  (Array.isArray(state.figures) ? state.figures : []).filter(
+    (figure) => !figure.obtenida,
+  )
 
 export { TOTAL_FIGURES, ALBUM_STATUS }

@@ -17,6 +17,11 @@ import {
 import { mockFigures } from '../../data/mockFigures'
 
 export function QAOverlay() {
+  if (!import.meta.env.DEV) return null
+  return <QAOverlayDev />
+}
+
+function QAOverlayDev() {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [snapshot, setSnapshot] = useState(null)
@@ -47,8 +52,6 @@ export function QAOverlay() {
     setMemory(readMemoryDiagnostics())
     setFps(await measureFpsSample(900))
   }, [])
-
-  if (!import.meta.env.DEV) return null
 
   const toggleFlag = (key) => setQaFlag(key, !qaFlags[key])
 

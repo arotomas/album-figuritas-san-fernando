@@ -2,7 +2,8 @@ import { ALBUM_STATUS } from '../config/persistence'
 import { TOTAL_FIGURES } from '../data/mockFigures'
 
 export function computeAlbumStatus(figures, lastViewedFigureId = null) {
-  const obtenidas = figures.filter((figure) => figure.obtenida).length
+  const list = Array.isArray(figures) ? figures : []
+  const obtenidas = list.filter((figure) => figure.obtenida).length
 
   if (obtenidas >= TOTAL_FIGURES) {
     return lastViewedFigureId
@@ -14,5 +15,6 @@ export function computeAlbumStatus(figures, lastViewedFigureId = null) {
 }
 
 export function getObtenidasCount(figures) {
-  return figures.filter((figure) => figure.obtenida).length
+  return (Array.isArray(figures) ? figures : []).filter((figure) => figure.obtenida)
+    .length
 }

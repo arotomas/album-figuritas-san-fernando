@@ -60,6 +60,7 @@ export function readViewportMetrics() {
   const root = document.documentElement
   const style = getComputedStyle(root)
   const safe = readSafeAreaInsets()
+  const isStandalone = isStandaloneMode()
 
   return {
     appHeight: style.getPropertyValue('--app-height').trim(),
@@ -69,10 +70,10 @@ export function readViewportMetrics() {
     dvh100: readUnitHeight('dvh'),
     svh100: readUnitHeight('svh'),
     lvh100: readUnitHeight('lvh'),
-    standalone: isStandaloneMode(),
+    standalone: isStandalone,
     keyboardOpen: root.classList.contains('keyboard-open'),
     safeArea: safe,
-    displayMode: standalone ? 'standalone' : 'browser',
+    displayMode: isStandalone ? 'standalone' : 'browser',
   }
 }
 

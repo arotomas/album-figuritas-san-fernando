@@ -23,8 +23,16 @@ export const storageService = {
 
     try {
       const value = localStorage.getItem(key)
+      if (value == null) return null
       if (isCorruptPayload(value)) {
         persistLog.storageWarn('corrupt payload removed', key)
+        localStorage.removeItem(key)
+        return null
+      }
+      try {
+        JSON.parse(value)
+      } catch {
+        persistLog.storageWarn('invalid JSON removed', key)
         localStorage.removeItem(key)
         return null
       }
