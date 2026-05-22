@@ -31,6 +31,8 @@ export function getGpsErrorLabel(errorType) {
       return 'Sin geolocation'
     case 'watch_error':
       return 'Error watchPosition'
+    case 'approximate':
+      return 'Ubicación aproximada (>80m)'
     default:
       return errorType ?? null
   }

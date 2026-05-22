@@ -36,6 +36,7 @@ export function loadLastKnownPosition() {
 export function saveLastKnownPosition(position) {
   if (typeof sessionStorage === 'undefined' || !position) return
   if (!isWithinSanFernandoArea(position.lat, position.lng)) return
+  if (position.accuracy > 80) return
 
   try {
     sessionStorage.setItem(

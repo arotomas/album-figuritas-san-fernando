@@ -3,21 +3,20 @@
 /** Diagnóstico temporal en producción: badge en mapa + logs en consola */
 export const DEBUG_GPS = true
 
-/** Fase 1: vista rápida de zona (Wi‑Fi/red). Nunca proximidad ni captura. */
-export const GPS_FAST_OPTIONS = {
-  enableHighAccuracy: false,
-  maximumAge: 5_000,
-  timeout: 8_000,
-}
-
-export const GPS_FAST_MAX_AGE_MS = GPS_FAST_OPTIONS.maximumAge
-
-/** Fase 2: refinamiento GPS real — sin caché vieja */
-export const GPS_REFINE_OPTIONS = {
+/** Opciones únicas: alta precisión, sin caché del SO */
+export const GPS_HIGH_ACCURACY_OPTIONS = {
   enableHighAccuracy: true,
   maximumAge: 0,
   timeout: 15_000,
 }
+
+/** @deprecated usar GPS_HIGH_ACCURACY_OPTIONS */
+export const GPS_REFINE_OPTIONS = GPS_HIGH_ACCURACY_OPTIONS
+
+/** @deprecated ya no se usa fix rápido en arranque */
+export const GPS_FAST_OPTIONS = GPS_HIGH_ACCURACY_OPTIONS
+
+export const GPS_FAST_MAX_AGE_MS = 0
 
 /** Throttle de updates después del primer fix confiable */
 export const GPS_UPDATE_INTERVAL_MS = 1_000
@@ -121,3 +120,11 @@ export function canUseCapture(position) {
       position.accuracy <= GPS_CAPTURE_MAX_ACCURACY_M,
   )
 }
+
+export function getApproximateLocationMessage(accuracyMeters) {
+  const meters = Math.round(accuracyMeters ?? 0)
+  return `Tu celular está dando ubicación aproximada (±${meters}m). Activá Ubicación precisa para Chrome y tocá Reintentar.`
+}
+
+export const GPS_PRECISE_LOCATION_HELP =
+  'En Android: mantené presionado Chrome > Información de la app > Permisos > Ubicación > activar Ubicación precisa.'

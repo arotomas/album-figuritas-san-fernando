@@ -11,6 +11,7 @@ import {
   TILE_URL,
   USER_ZOOM,
 } from '../../config/map'
+import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
@@ -228,6 +229,9 @@ function LeafletMapViewInner({
     showSoftWarning,
     permission,
     geolocationAvailable,
+    approximateMessage,
+    showPreciseLocationHelp,
+    retryPreciseLocation,
     requestSingleFix,
     startTracking,
     stopTracking,
@@ -307,6 +311,8 @@ function LeafletMapViewInner({
       ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
       : gpsStatusLabel
 
+  const showApproximateBanner = Boolean(approximateMessage) && errorType !== 'denied'
+
   const showHardError = error && errorType === 'denied'
 
   return (
@@ -362,6 +368,24 @@ function LeafletMapViewInner({
         />
       )}
 
+      {showApproximateBanner && (
+        <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-amber-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
+          <p className="text-sm leading-relaxed text-amber-100">{approximateMessage}</p>
+          {showPreciseLocationHelp && (
+            <p className="mt-2 text-left text-[11px] leading-relaxed text-amber-200/90">
+              {GPS_PRECISE_LOCATION_HELP}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={retryPreciseLocation}
+            className="mt-3 min-h-[44px] w-full rounded-lg border border-amber-400/40 bg-amber-950/50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-amber-100 active:scale-[0.98]"
+          >
+            Reintentar ubicación precisa
+          </button>
+        </div>
+      )}
+
       {showHardError && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500] rounded-xl bg-red-950/90 px-4 py-3 text-center">
           <p className="text-sm text-red-200">{error}</p>
@@ -370,23 +394,23 @@ function LeafletMapViewInner({
           </p>
           <button
             type="button"
-            onClick={startTracking}
+            onClick={retryPreciseLocation}
             className="mt-2 min-h-[44px] text-xs font-bold uppercase text-white underline"
           >
-            Reintentar ubicación
+            Reintentar ubicación precisa
           </button>
         </div>
       )}
 
-      {error && !showHardError && (
+      {error && !showHardError && !showApproximateBanner && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500]">
           <MapGpsStatus label={error} phase="warn" />
           <button
             type="button"
-            onClick={startTracking}
+            onClick={retryPreciseLocation}
             className="pointer-events-auto mx-auto mt-2 block text-xs font-medium text-white/70 underline"
           >
-            Reintentar ubicación
+            Reintentar ubicación precisa
           </button>
         </div>
       )}
@@ -407,6 +431,7 @@ function LeafletMapViewInner({
         permission={permission}
         trustedPosition={trustedPosition}
         onRequestSingleFix={requestSingleFix}
+        onRetryPrecise={retryPreciseLocation}
         onStartTracking={startTracking}
         onStopTracking={stopTracking}
         onRecenter={handleRecenter}

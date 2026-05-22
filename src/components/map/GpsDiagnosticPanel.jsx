@@ -37,6 +37,7 @@ function GpsDiagnosticPanelInner({
   permission,
   trustedPosition,
   onRequestSingleFix,
+  onRetryPrecise,
   onStartTracking,
   onStopTracking,
   onRecenter,
@@ -176,6 +177,13 @@ function GpsDiagnosticPanelInner({
           </Section>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onRetryPrecise}
+              className="col-span-2 min-h-[40px] rounded-lg border border-amber-400/40 bg-amber-950/50 px-2 py-2 font-sans text-[10px] font-semibold text-amber-100 active:scale-[0.98]"
+            >
+              Reintentar ubicación precisa
+            </button>
             <button
               type="button"
               onClick={onRequestSingleFix}
