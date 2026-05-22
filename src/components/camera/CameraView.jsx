@@ -13,6 +13,8 @@ export function CameraView({
   isReady,
   isCapturing,
   useNativeFallback = false,
+  inCaptureRange = false,
+  distanceMeters = null,
   onCapture,
   onFileSelected,
   onClose,
@@ -82,9 +84,13 @@ export function CameraView({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="mt-6 text-center text-sm text-white/70"
+              className="mt-6 max-w-xs px-6 text-center text-sm text-white/70"
             >
-              Mantenete quieto mientras validamos tu ubicación…
+              {inCaptureRange
+                ? 'Sacá una foto del lugar para desbloquear la figurita.'
+                : distanceMeters != null
+                  ? `Acercate al punto (~${Math.round(distanceMeters)}m).`
+                  : 'Esperando ubicación para habilitar la captura…'}
             </motion.p>
           )}
         </AnimatePresence>

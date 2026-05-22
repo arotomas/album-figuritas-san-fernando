@@ -39,7 +39,7 @@ export function CaptureFlow() {
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
 
   const {
-    position,
+    mapPosition,
     proximityPosition,
     gpsStatusLabel,
     error: geoError,
@@ -65,11 +65,14 @@ export function CaptureFlow() {
     gpsProgress,
     gpsAccuracy,
     isReady,
+    inCaptureRange,
+    isApproximateGps,
+    distanceMeters,
     showRewardComplete,
     complete,
   } = useCaptureFlow({
     figure: nearFigure,
-    position: proximityPosition,
+    position: proximityPosition ?? mapPosition,
     onObtainFigure: handleObtain,
   })
 
@@ -167,7 +170,7 @@ export function CaptureFlow() {
     (camera.status === 'error' && !camera.useNativeFallback)
 
   const needsSignalUi =
-    geoSignalIssue && !position && !geoLoading && !cameraDenied
+    geoSignalIssue && !mapPosition && !geoLoading && !cameraDenied
 
   useEffect(() => {
     if (needsPermissionUi || needsSignalUi) {
@@ -242,6 +245,8 @@ export function CaptureFlow() {
           isReady={isReady}
           isCapturing={isCapturing}
           useNativeFallback={camera.useNativeFallback}
+          inCaptureRange={inCaptureRange}
+          distanceMeters={distanceMeters}
           onCapture={capture}
           onFileSelected={captureFromFile}
           onClose={handleClose}
@@ -254,16 +259,28 @@ export function CaptureFlow() {
         </div>
       )}
 
-      {position && !proximityPosition && (
+      {isApproximateGps && inCaptureRange && (
         <div className="safe-top pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
           <p className="rounded-full bg-black/75 px-4 py-2 text-xs text-amber-100/90">
-            {gpsStatusLabel}
-            {position.accuracy ? ` (~${Math.round(position.accuracy)}m)` : ''}
+            Tu ubicación es aproximada. La foto será usada como comprobante.
           </p>
         </div>
       )}
 
-      {geoLoading && !position && (
+      {!inCaptureRange && mapPosition && (
+        <div className="safe-top pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
+          <p className="rounded-full bg-black/75 px-4 py-2 text-xs text-white/85">
+            {gpsStatusLabel}
+            {distanceMeters != null
+              ? ` · ~${Math.round(distanceMeters)}m del punto`
+              : mapPosition.accuracy
+                ? ` (~${Math.round(mapPosition.accuracy)}m precisión)`
+                : ''}
+          </p>
+        </div>
+      )}
+
+      {geoLoading && !mapPosition && (
         <div className="safe-top safe-bottom pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
           <p className="rounded-full bg-black/70 px-4 py-2 text-xs text-white/80">
             Validando ubicación…

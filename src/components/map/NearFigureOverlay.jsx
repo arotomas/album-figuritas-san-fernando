@@ -16,7 +16,7 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-charcoal/95">
         <div className="border-b border-white/8 px-4 py-3.5">
           <p className={`${typeClasses.label} text-center text-lime-400`}>
-            📸 Abrí la cámara para conseguir esta figurita
+            Estás cerca. Sacá una foto del lugar para desbloquear la figurita.
           </p>
           <p className="mt-1.5 text-center font-body text-xs text-white/50">
             {nearFigure.nombre} · a {formatDistance(nearFigure.distanceMeters)}

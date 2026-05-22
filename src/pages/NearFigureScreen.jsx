@@ -61,7 +61,9 @@ export function NearFigureScreen() {
           </PremiumButton>
         </div>
 
-        <p className="mt-4 text-sm text-muted">para conseguir esta figurita</p>
+        <p className="mt-4 text-sm text-muted">
+          Sacá una foto del lugar para desbloquear la figurita.
+        </p>
       </div>
 
       <ProgressBar />

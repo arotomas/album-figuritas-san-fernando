@@ -60,13 +60,14 @@ function buildPersistedSnapshot(state) {
 
   return {
     figures: figures.map(
-      ({ id, obtenida, foto, fotoSizeBytes, obtenidaEn, slug }) => ({
+      ({ id, obtenida, foto, fotoSizeBytes, obtenidaEn, slug, captureMeta }) => ({
         id,
         slug,
         obtenida,
         foto,
         fotoSizeBytes,
         obtenidaEn,
+        captureMeta,
       }),
     ),
     albumStatus: state.albumStatus,
@@ -134,8 +135,13 @@ export const useAppStore = create(
           applyFigureUpdate(state, figureId, { obtenida: true }),
         ),
 
-      obtainFigureWithPhoto: (figureId, { foto, fotoSizeBytes, obtenidaEn }) => {
+      obtainFigureWithPhoto: (figureId, { foto, fotoSizeBytes, obtenidaEn, captureRecord }) => {
         return set((state) => {
+          if (!foto || !storageService.isPhotoWithinLimit(fotoSizeBytes)) {
+            persistLog.persist('obtain blocked — photo required or too large', figureId)
+            return state
+          }
+
           let realFigureId = figureId
           if (String(figureId).startsWith('dev-')) {
             realFigureId =
@@ -156,13 +162,9 @@ export const useAppStore = create(
           const patch = {
             obtenida: true,
             obtenidaEn,
-            ...(foto && storageService.isPhotoWithinLimit(fotoSizeBytes)
-              ? { foto, fotoSizeBytes }
-              : {}),
-          }
-
-          if (foto && !storageService.isPhotoWithinLimit(fotoSizeBytes)) {
-            console.warn('[ALBUM] Foto demasiado grande, no se persiste.')
+            foto,
+            fotoSizeBytes,
+            ...(captureRecord ? { captureMeta: captureRecord } : {}),
           }
 
           persistLog.persist('figure obtained', realFigureId)

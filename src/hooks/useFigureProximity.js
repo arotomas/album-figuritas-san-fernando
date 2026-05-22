@@ -6,7 +6,7 @@ import {
 } from '../config/ux'
 
 /**
- * Proximidad con histéresis: entra a 25m, sale a 35m — evita flicker en el borde.
+ * Proximidad con histéresis: entra a 250m, sale a 280m — evita flicker en el borde.
  */
 export function useFigureProximity(
   userPosition,

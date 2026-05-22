@@ -27,8 +27,11 @@ export const GPS_ACCEPT_MAX_ACCURACY_M = 80
 /** Proximidad de figuritas — solo bajo este umbral */
 export const GPS_PROXIMITY_MAX_ACCURACY_M = 50
 
-/** Captura — useGpsStability exige estabilidad bajo este umbral */
+/** Captura legacy / diagnóstico — ya no bloquea gameplay (foto obligatoria) */
 export const GPS_CAPTURE_MAX_ACCURACY_M = 30
+
+/** Por encima de este umbral se advierte que la ubicación es aproximada */
+export const GPS_APPROXIMATE_CAPTURE_WARNING_M = GPS_ACCEPT_MAX_ACCURACY_M
 
 /** @deprecated alias — usar GPS_ACCEPT_MAX_ACCURACY_M */
 export const GPS_USABLE_ACCURACY_M = GPS_ACCEPT_MAX_ACCURACY_M
@@ -131,6 +134,15 @@ export function canUseProximity(position) {
   return Boolean(
     position &&
       position.accuracy <= GPS_PROXIMITY_MAX_ACCURACY_M,
+  )
+}
+
+/** Posición usable para proximidad/captura flexible (cualquier fix con coords) */
+export function canUseCaptureProximity(position) {
+  return Boolean(
+    position &&
+      Number.isFinite(position.lat) &&
+      Number.isFinite(position.lng),
   )
 }
 

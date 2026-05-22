@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCamera } from './useCamera'
-import { useGpsStability } from './useGpsStability'
 import { captureFrameFromVideo, loadImageFromFile } from '../utils/camera'
 import { compressImage } from '../utils/imageCompression'
 import { vibrateCapture, vibrateReady, vibrateUnlock } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
-import { PROXIMITY_EXIT_METERS } from '../config/ux'
+import { CAPTURE_MAX_DISTANCE_METERS } from '../config/ux'
+import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
+import {
+  buildCaptureRecord,
+  processCaptureForUnlock,
+} from '../services/captureService'
 import { getQaState, setQaFlag } from '../utils/diagnostics'
 import { captureLog, albumLog, rewardLog } from '../utils/devLog'
 
@@ -18,12 +22,16 @@ export const CAPTURE_PHASES = {
   DONE: 'done',
 }
 
+function getDistanceToFigure(position, figure) {
+  if (!position || !figure) return null
+  return getDistanceMeters(position.lat, position.lng, figure.lat, figure.lng)
+}
+
 /**
- * Orquesta el flujo completo: cámara → validación GPS → captura → compresión → recompensa.
+ * Orquesta el flujo: cámara → proximidad flexible → foto obligatoria → recompensa.
  */
 export function useCaptureFlow({ figure, position, onObtainFigure }) {
   const camera = useCamera()
-  const { isStable, progress: gpsProgress, accuracy } = useGpsStability(position)
 
   const [phase, setPhase] = useState(CAPTURE_PHASES.CAMERA)
   const [compressedPhoto, setCompressedPhoto] = useState(null)
@@ -36,25 +44,40 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     phaseRef.current = phase
   }, [phase])
 
+  const distanceMeters = useMemo(
+    () => getDistanceToFigure(position, figure),
+    [figure, position],
+  )
+
+  const inCaptureRange =
+    distanceMeters != null && distanceMeters <= CAPTURE_MAX_DISTANCE_METERS
+
+  const isApproximateGps =
+    position?.accuracy != null &&
+    position.accuracy > GPS_APPROXIMATE_CAPTURE_WARNING_M
+
+  const gpsProgress = useMemo(() => {
+    if (!position || distanceMeters == null) return 0
+    if (inCaptureRange) return 1
+    return Math.max(0, 1 - distanceMeters / CAPTURE_MAX_DISTANCE_METERS)
+  }, [distanceMeters, inCaptureRange, position])
+
   const isReady =
     (camera.isReady || camera.useNativeFallback) &&
-    isStable &&
+    inCaptureRange &&
     phase === CAPTURE_PHASES.CAMERA
 
   const validateDistance = useCallback(() => {
-    if (!position || !figure) return true
+    if (!position || !figure) {
+      setCaptureError('Esperá a que el GPS confirme tu ubicación.')
+      return false
+    }
 
-    const distanceMeters = getDistanceMeters(
-      position.lat,
-      position.lng,
-      figure.lat,
-      figure.lng,
-    )
-
-    if (distanceMeters > PROXIMITY_EXIT_METERS) {
+    const currentDistance = getDistanceToFigure(position, figure)
+    if (currentDistance == null || currentDistance > CAPTURE_MAX_DISTANCE_METERS) {
       captureLog.warn('blocked — too far', {
         figureId: figure.id,
-        distanceMeters: Math.round(distanceMeters),
+        distanceMeters: currentDistance != null ? Math.round(currentDistance) : null,
       })
       setCaptureError('Estás lejos del punto. Acercate para capturar.')
       return false
@@ -71,13 +94,21 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
       }
     }
 
-    if (!isStable && !isReady) {
+    if (!isReady) {
       hasVibratedReadyRef.current = false
     }
-  }, [isReady, isStable, figure?.id])
+  }, [isReady, figure?.id])
 
   const runObtainAndReward = useCallback(
     (photoPayload) => {
+      if (!photoPayload?.foto) {
+        captureLog.warn('blocked — photo required', { figureId: figure?.id })
+        setCaptureError('Tenés que sacar una foto para desbloquear la figurita.')
+        setPhase(CAPTURE_PHASES.CAMERA)
+        capturingRef.current = false
+        return
+      }
+
       albumLog.info('saving figure', { figureId: figure?.id })
       onObtainFigure?.(figure.id, photoPayload)
       camera.stop()
@@ -89,44 +120,81 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
   const processCanvas = useCallback(
     async (canvas) => {
+      if (!position || !figure) {
+        throw new Error('Ubicación no disponible para registrar la captura.')
+      }
+
       setPhase(CAPTURE_PHASES.COMPRESSING)
       const compressed = await compressImage(canvas, {
         maxWidth: 960,
         quality: 0.68,
       })
 
+      if (!compressed?.dataUrl) {
+        throw new Error('No pudimos procesar la foto.')
+      }
+
       setCompressedPhoto(compressed.dataUrl)
       captureLog.info('capture compressed', { bytes: compressed.sizeBytes })
+
+      const distanceToFigure = getDistanceToFigure(position, figure)
+      const captureRecord = buildCaptureRecord({
+        figureId: figure.id,
+        lat: position.lat,
+        lng: position.lng,
+        accuracy: position.accuracy,
+        distanceToFigure,
+        photoUrl: compressed.dataUrl,
+        createdAt: Date.now(),
+      })
+
+      const validatedCapture = await processCaptureForUnlock(captureRecord)
 
       runObtainAndReward({
         foto: compressed.dataUrl,
         fotoSizeBytes: compressed.sizeBytes,
         obtenidaEn: Date.now(),
+        captureRecord: validatedCapture,
       })
     },
-    [runObtainAndReward],
+    [figure, position, runObtainAndReward],
   )
 
   useEffect(() => {
     if (!import.meta.env.DEV || !getQaState().simulateCaptureSuccess) return
     if (!figure || !position || phase !== CAPTURE_PHASES.CAMERA) return
-    if (!camera.isReady || !isStable) return
+    if (!camera.isReady || !inCaptureRange) return
 
     setQaFlag('simulateCaptureSuccess', false)
     captureLog.info('QA simulate capture success')
+
+    const distanceToFigure = getDistanceToFigure(position, figure)
+    const qaPhoto =
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IGZpbGw9IiMzMzMiLz48L3N2Zz4='
+
     runObtainAndReward({
-      foto: null,
-      fotoSizeBytes: 0,
+      foto: qaPhoto,
+      fotoSizeBytes: qaPhoto.length,
       obtenidaEn: Date.now(),
+      captureRecord: {
+        figureId: figure.id,
+        lat: position.lat,
+        lng: position.lng,
+        accuracy: position.accuracy,
+        distanceToFigure,
+        photoUrl: qaPhoto,
+        createdAt: Date.now(),
+        validationStatus: 'approved',
+      },
     })
-  }, [camera.isReady, figure, isStable, phase, position, runObtainAndReward])
+  }, [camera.isReady, figure, inCaptureRange, phase, position, runObtainAndReward])
 
   const capture = useCallback(async () => {
     if (capturingRef.current || phaseRef.current !== CAPTURE_PHASES.CAMERA) {
       return
     }
 
-    if (!isStable || !figure) return
+    if (!inCaptureRange || !figure) return
 
     if (camera.useNativeFallback) {
       camera.openNativePicker()
@@ -152,11 +220,11 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
       setCaptureError(err.message || 'Error al capturar la foto.')
       setPhase(CAPTURE_PHASES.CAMERA)
     }
-  }, [camera, figure, isStable, processCanvas, validateDistance])
+  }, [camera, figure, inCaptureRange, processCanvas, validateDistance])
 
   const captureFromFile = useCallback(
     async (file) => {
-      if (capturingRef.current || !file || !figure || !isStable) return
+      if (capturingRef.current || !file || !figure || !inCaptureRange) return
       if (!validateDistance()) return
 
       capturingRef.current = true
@@ -175,7 +243,7 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
         setPhase(CAPTURE_PHASES.CAMERA)
       }
     },
-    [figure, isStable, processCanvas, validateDistance],
+    [figure, inCaptureRange, processCanvas, validateDistance],
   )
 
   const showRewardComplete = useCallback(() => {
@@ -193,9 +261,11 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     phase,
     camera,
     gpsProgress,
-    isStable,
+    inCaptureRange,
+    isApproximateGps,
     isReady,
-    gpsAccuracy: accuracy,
+    gpsAccuracy: position?.accuracy ?? null,
+    distanceMeters,
     compressedPhoto,
     captureError,
     capture,

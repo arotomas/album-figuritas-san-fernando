@@ -64,6 +64,7 @@ export function mergeFiguresWithTemplate(storedFigures) {
       foto: stored.foto ?? null,
       fotoSizeBytes: stored.fotoSizeBytes ?? null,
       obtenidaEn: stored.obtenidaEn ?? null,
+      captureMeta: stored.captureMeta ?? null,
     }
   })
 }

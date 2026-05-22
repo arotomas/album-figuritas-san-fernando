@@ -21,6 +21,7 @@ import {
   GPS_NO_FIX_MESSAGE,
   DEBUG_GPS,
   canUseProximity,
+  canUseCaptureProximity,
   getAccuracyTier,
   getApproximateLocationMessage,
   getGpsPhase,
@@ -864,7 +865,7 @@ export function useGeolocation(options = {}) {
   }, [])
 
   const mapPosition = position ?? previewPosition
-  const proximityPosition = canUseProximity(position) ? position : null
+  const proximityPosition = canUseCaptureProximity(mapPosition) ? mapPosition : null
   const hasUsablePosition = Boolean(proximityPosition)
   const showPreciseLocationHelp =
     permission === 'granted' &&
