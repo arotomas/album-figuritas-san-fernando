@@ -1,4 +1,6 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
+import { syncQaModeFromUrl, isQaModeEnabled } from './utils/qaMode'
 import { LazyMotion, domAnimation } from 'framer-motion'
 import { AppRoutes } from './routes'
 import { HydrationScreen } from './components/layout/HydrationScreen'
@@ -7,9 +9,23 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QAOverlay } from './components/qa/QAOverlay'
 import { AppSkeleton } from './components/performance/AppSkeleton'
 import { usePersistedAlbum } from './hooks/usePersistedAlbum'
+import { useAppStore } from './store/useAppStore'
+import { isDevMode } from './utils/devMode'
 
 function App() {
   const { hasHydrated } = usePersistedAlbum()
+  const location = useLocation()
+  const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
+
+  useEffect(() => {
+    syncQaModeFromUrl(`${location.pathname}${location.search}`)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (!isQaModeEnabled(`${location.pathname}${location.search}`) && !isDevMode()) {
+      clearQaTestFigure()
+    }
+  }, [clearQaTestFigure, location.pathname, location.search])
 
   if (!hasHydrated) {
     return (

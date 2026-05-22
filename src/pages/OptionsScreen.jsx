@@ -5,8 +5,9 @@ import { useAuth } from '../hooks/useAuth'
 import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
 import { isWpConfigured } from '../services/api'
 import { getCurrentPosition } from '../services/geoService'
-import { GPS_REFINE_OPTIONS } from '../config/gps'
+import { GPS_HIGH_ACCURACY_OPTIONS } from '../config/gps'
 import { isDevMode } from '../utils/devMode'
+import { useQaMode } from '../utils/qaMode'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -17,39 +18,45 @@ const STATUS_LABELS = {
 export function OptionsScreen() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { isQaActive, showQaTools, withQa } = useQaMode()
   const resetProgress = useAppStore((state) => state.resetProgress)
-  const setDevTestFigureNear = useAppStore((state) => state.setDevTestFigureNear)
-  const clearDevTestFigure = useAppStore((state) => state.clearDevTestFigure)
-  const devTestFigure = useAppStore((state) => state.devTestFigure)
+  const setQaTestFigureNear = useAppStore((state) => state.setQaTestFigureNear)
+  const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
+  const qaTestFigure = useAppStore((state) => state.qaTestFigure)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastSavedAt = useAppStore((state) => state.lastSavedAt)
   const progress = useAppStore(selectProgress)
-  const [devMessage, setDevMessage] = useState(null)
-  const [devLoading, setDevLoading] = useState(false)
+  const [qaMessage, setQaMessage] = useState(null)
+  const [qaLoading, setQaLoading] = useState(false)
 
-  const handleCreateDevFigure = async () => {
-    setDevMessage(null)
-    setDevLoading(true)
+  const handleCreateQaFigure = async () => {
+    setQaMessage(null)
+    setQaLoading(true)
 
     try {
-      const geo = await getCurrentPosition(GPS_REFINE_OPTIONS)
-      const ok = setDevTestFigureNear(
+      const geo = await getCurrentPosition(GPS_HIGH_ACCURACY_OPTIONS)
+      const ok = setQaTestFigureNear(
         geo.coords.latitude,
         geo.coords.longitude,
       )
 
       if (!ok) {
-        setDevMessage('No hay figuritas pendientes para probar.')
+        setQaMessage('No hay figuritas pendientes para probar o el modo QA no está activo.')
         return
       }
 
-      setDevMessage('Figurita de prueba creada cerca tuyo. Andá al mapa.')
-      navigate('/map')
+      setQaMessage('Figurita QA creada a ~5–10m. Andá al mapa.')
+      navigate(withQa('/map'))
     } catch {
-      setDevMessage('No pudimos obtener tu ubicación. Revisá permisos GPS.')
+      setQaMessage('No pudimos obtener tu ubicación. Revisá permisos GPS.')
     } finally {
-      setDevLoading(false)
+      setQaLoading(false)
     }
+  }
+
+  const handleClearQaFigure = () => {
+    clearQaTestFigure()
+    setQaMessage('Figurita QA eliminada.')
   }
 
   return (
@@ -95,33 +102,54 @@ export function OptionsScreen() {
         </div>
       </div>
 
-      {isDevMode() && (
-        <div className="mt-6 space-y-3 rounded-2xl border border-amber-400/30 bg-amber-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
-            Modo prueba (dev)
+      {showQaTools && (
+        <div
+          className={`mt-6 space-y-3 rounded-2xl border p-5 ${
+            isQaActive
+              ? 'border-cyan-400/40 bg-cyan-50'
+              : 'border-amber-400/30 bg-amber-50'
+          }`}
+        >
+          <p
+            className={`text-xs font-bold uppercase tracking-wide ${
+              isQaActive ? 'text-cyan-900' : 'text-amber-800'
+            }`}
+          >
+            {isQaActive ? 'Modo QA temporal' : 'Modo prueba (dev)'}
           </p>
-          <p className="text-sm text-amber-900/80">
-            Crea una figurita temporal a ~25m de tu ubicación para probar GPS,
-            proximidad, cámara y álbum.
+          <p className={`text-sm ${isQaActive ? 'text-cyan-950/80' : 'text-amber-900/80'}`}>
+            Crea una figurita temporal a 5–10m de tu ubicación. Flujo real:
+            proximidad → cámara → foto → desbloqueo. Solo memoria — no backend.
           </p>
-          {devTestFigure && (
-            <p className="text-xs text-amber-800">
-              Activa: {devTestFigure.nombre}
+          {isQaActive && (
+            <p className="text-xs text-cyan-800/90">
+              Activado con{' '}
+              <code className="rounded bg-cyan-100 px-1">?qa=1</code> en esta sesión.
             </p>
           )}
-          {devMessage && (
-            <p className="text-xs text-amber-900">{devMessage}</p>
+          {!isQaActive && isDevMode() && (
+            <p className="text-xs text-amber-800/90">Disponible en entorno de desarrollo.</p>
+          )}
+          {qaTestFigure && (
+            <p className={`text-xs ${isQaActive ? 'text-cyan-900' : 'text-amber-800'}`}>
+              Activa: {qaTestFigure.nombre}
+            </p>
+          )}
+          {qaMessage && (
+            <p className={`text-xs ${isQaActive ? 'text-cyan-950' : 'text-amber-900'}`}>
+              {qaMessage}
+            </p>
           )}
           <Button
             variant="outline"
-            disabled={devLoading}
-            onClick={handleCreateDevFigure}
+            disabled={qaLoading}
+            onClick={handleCreateQaFigure}
           >
-            {devLoading ? 'Obteniendo ubicación…' : 'Crear figurita de prueba cerca mío'}
+            {qaLoading ? 'Obteniendo ubicación…' : 'Crear figurita de prueba cerca mío'}
           </Button>
-          {devTestFigure && (
-            <Button variant="ghost" onClick={() => clearDevTestFigure()}>
-              Quitar figurita de prueba
+          {qaTestFigure && (
+            <Button variant="ghost" onClick={handleClearQaFigure}>
+              Eliminar figurita QA
             </Button>
           )}
         </div>

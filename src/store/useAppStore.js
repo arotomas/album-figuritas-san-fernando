@@ -16,7 +16,9 @@ import {
 import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
 import { offsetCoordinates } from '../utils/geoOffset'
-import { isDevMode } from '../utils/devMode'
+import { canUseTestFigure } from '../utils/qaMode'
+
+export const QA_TEST_FIGURE_ID_PREFIX = 'qa-'
 
 const zustandStorage = createJSONStorage(() => createZustandStorage())
 
@@ -50,7 +52,7 @@ function resetStoreToDefaults() {
     user: null,
     hasSeenSplash: false,
     nearFigure: null,
-    devTestFigure: null,
+    qaTestFigure: null,
     _hasHydrated: true,
   })
 }
@@ -100,9 +102,9 @@ export const useAppStore = create(
       isAuthenticated: false,
       user: null,
       figures: createInitialFigures(),
-      nearFigure: null,
-      devTestFigure: null,
-      hasSeenSplash: false,
+    nearFigure: null,
+    qaTestFigure: null,
+    hasSeenSplash: false,
       albumStatus: ALBUM_STATUS.EN_PROGRESO,
       lastObtenidaFigureId: null,
       lastViewedFigureId: null,
@@ -143,10 +145,11 @@ export const useAppStore = create(
           }
 
           let realFigureId = figureId
-          if (String(figureId).startsWith('dev-')) {
+          const figureKey = String(figureId)
+          if (figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')) {
             realFigureId =
-              state.devTestFigure?.targetFigureId ??
-              Number(String(figureId).replace('dev-', ''))
+              state.qaTestFigure?.targetFigureId ??
+              Number(figureKey.replace(/^(qa-|dev-)/, ''))
           }
 
           const existing = state.figures.find((f) => f.id === realFigureId)
@@ -154,7 +157,7 @@ export const useAppStore = create(
             persistLog.persist('obtain skipped — already obtained', realFigureId)
             return {
               ...state,
-              devTestFigure: null,
+              qaTestFigure: null,
               nearFigure: null,
             }
           }
@@ -171,41 +174,49 @@ export const useAppStore = create(
           return {
             ...applyFigureUpdate(state, realFigureId, patch),
             nearFigure: null,
-            devTestFigure: null,
+            qaTestFigure: null,
           }
         })
       },
 
       setNearFigure: (figure) => set({ nearFigure: figure }),
 
-      setDevTestFigureNear: (userLat, userLng) => {
-        if (!isDevMode()) return false
+      setQaTestFigureNear: (userLat, userLng) => {
+        if (!canUseTestFigure()) return false
 
         const pending = get().figures.find((figure) => !figure.obtenida)
         if (!pending) return false
 
-        const distance = 20 + Math.random() * 10
+        const distance = 5 + Math.random() * 5
         const bearing = Math.random() * 360
         const coords = offsetCoordinates(userLat, userLng, distance, bearing)
 
         set({
-          devTestFigure: {
-            ...pending,
+          qaTestFigure: {
             targetFigureId: pending.id,
-            id: `dev-${pending.id}`,
+            id: `${QA_TEST_FIGURE_ID_PREFIX}${pending.id}`,
             lat: coords.lat,
             lng: coords.lng,
-            isDevTest: true,
-            nombre: `[Prueba] ${pending.nombre}`,
-            emoji: pending.emoji ?? '🧪',
-            description: 'Figurita temporal de prueba (solo dev).',
+            isQaTest: true,
+            rareza: 'común',
+            nombre: '[QA] Figurita de prueba',
+            emoji: '📍',
+            slug: 'qa-test',
+            description: 'Figurita temporal QA — solo memoria, no backend.',
           },
         })
 
         return true
       },
 
-      clearDevTestFigure: () => set({ devTestFigure: null }),
+      clearQaTestFigure: () => set({ qaTestFigure: null }),
+
+      /** @deprecated alias */
+      setDevTestFigureNear: (userLat, userLng) =>
+        get().setQaTestFigureNear(userLat, userLng),
+
+      /** @deprecated alias */
+      clearDevTestFigure: () => get().clearQaTestFigure(),
 
       setLastViewedFigure: (figureId) =>
         set((state) => {
@@ -230,7 +241,7 @@ export const useAppStore = create(
           lastViewedFigureId: null,
           lastSavedAt: Date.now(),
           nearFigure: null,
-          devTestFigure: null,
+          qaTestFigure: null,
         }),
 
       unlockAllFigures: () =>
@@ -262,7 +273,7 @@ export const useAppStore = create(
           user: null,
           hasSeenSplash: false,
           nearFigure: null,
-          devTestFigure: null,
+          qaTestFigure: null,
         })
       },
 
@@ -295,7 +306,7 @@ export const useAppStore = create(
             return {
               ...currentState,
               nearFigure: null,
-              devTestFigure: null,
+              qaTestFigure: null,
               _hasHydrated: true,
             }
           }
@@ -311,7 +322,7 @@ export const useAppStore = create(
               persistedFields.albumStatus ??
               computeAlbumStatus(figures, persistedFields.lastViewedFigureId),
             nearFigure: null,
-            devTestFigure: null,
+            qaTestFigure: null,
             _hasHydrated: true,
           }
         } catch (error) {
@@ -319,7 +330,7 @@ export const useAppStore = create(
           return {
             ...currentState,
             nearFigure: null,
-            devTestFigure: null,
+            qaTestFigure: null,
             _hasHydrated: true,
           }
         }

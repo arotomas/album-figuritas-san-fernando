@@ -1,21 +1,16 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LazyMap } from '../components/performance/LazyMap'
 import { ProgressBar } from '../components/ProgressBar'
+import { useQaTestFigure } from '../hooks/useQaTestFigure'
 import { useAppStore } from '../store/useAppStore'
-import { isDevMode } from '../utils/devMode'
 
 export function MapScreen() {
   const navigate = useNavigate()
   const figures = useAppStore((state) => state.figures)
-  const devTestFigure = useAppStore((state) => state.devTestFigure)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
-
-  const mapFigures = useMemo(() => {
-    if (!isDevMode() || !devTestFigure) return figures
-    return [...figures, { ...devTestFigure, obtenida: false }]
-  }, [figures, devTestFigure])
+  const { mapFigures } = useQaTestFigure()
 
   const handleNearFigureChange = useCallback((figure) => {
     setNearFigure(figure)

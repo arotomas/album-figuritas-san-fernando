@@ -4,18 +4,31 @@ import { RarityBadge } from '../ui/RarityBadge'
 import { prefersReducedMotion } from '../../utils/performance'
 
 function FigureMarkerInner({ figure, isNear, isPulsing }) {
+  const isQaTest = Boolean(figure.isQaTest)
   const rarity = getRarity(figure.rareza)
   const obtained = figure.obtenida
   const reduced = prefersReducedMotion()
   const floatClass = !reduced ? `figure-float-r${rarity.tier}` : ''
   const pulseClass = isPulsing && !reduced ? 'figure-pulse-premium' : ''
 
+  const cardClass = isQaTest
+    ? `relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b from-cyan-900 to-cyan-950 border-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.45)] ${
+        obtained ? 'opacity-65 saturate-[0.45]' : ''
+      } ${isNear && !obtained ? 'ring-2 ring-cyan-300/80' : ''}`
+    : `relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b ${rarity.tailwind.gradient} ${rarity.tailwind.border} ${!obtained ? rarity.tailwind.glow : ''} ${
+        obtained ? 'opacity-65 saturate-[0.45]' : ''
+      } ${isNear && !obtained ? `ring-2 ${rarity.tailwind.ring}` : ''}`
+
+  const glowColor = isQaTest ? 'rgba(34,211,238,0.55)' : rarity.colors.glow
+  const accentClass = isQaTest ? 'bg-cyan-400' : rarity.tailwind.accent
+  const pointerColor = isQaTest ? '#22d3ee' : rarity.colors.secondary
+
   return (
     <div className={`relative flex flex-col items-center ${floatClass} ${pulseClass}`}>
       {isPulsing && !reduced && (
         <span
           className="figure-pulse-ring absolute top-1/2 h-16 w-16 -translate-y-1/2 rounded-full"
-          style={{ background: rarity.colors.glow }}
+          style={{ background: glowColor }}
         />
       )}
 
@@ -23,17 +36,13 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
       {!obtained && (
         <div
           className="absolute -bottom-1 h-3 w-12 rounded-full blur-md"
-          style={{ background: rarity.colors.glow, opacity: 0.6 }}
+          style={{ background: glowColor, opacity: 0.6 }}
           aria-hidden
         />
       )}
 
-      <div
-        className={`relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b ${rarity.tailwind.gradient} ${rarity.tailwind.border} ${!obtained ? rarity.tailwind.glow : ''} ${
-          obtained ? 'opacity-65 saturate-[0.45]' : ''
-        } ${isNear && !obtained ? `ring-2 ${rarity.tailwind.ring}` : ''}`}
-      >
-        <div className={`h-0.5 w-full ${rarity.tailwind.accent}`} />
+      <div className={cardClass}>
+        <div className={`h-0.5 w-full ${accentClass}`} />
 
         <div className="flex items-center justify-center py-3 text-2xl">
           {obtained ? '✓' : figure.emoji}
@@ -59,7 +68,7 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
 
       <div
         className="mt-0.5 h-0 w-0 border-x-[6px] border-t-[8px] border-x-transparent"
-        style={{ borderTopColor: rarity.colors.secondary }}
+        style={{ borderTopColor: pointerColor }}
       />
     </div>
   )

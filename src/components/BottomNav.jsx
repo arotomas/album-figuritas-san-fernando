@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { NavLink } from 'react-router-dom'
 import { FaMapMarkedAlt, FaImages, FaCog } from 'react-icons/fa'
+import { useQaMode } from '../utils/qaMode'
 
 const tabs = [
   { to: '/my-figures', label: 'Mis figuritas', icon: FaImages },
@@ -9,13 +10,15 @@ const tabs = [
 ]
 
 function BottomNavInner() {
+  const { withQa } = useQaMode()
+
   return (
     <nav className="bottom-nav safe-bottom safe-x z-20 shrink-0 border-t border-border bg-white/95 backdrop-blur-md">
       <div className="grid grid-cols-3">
         {tabs.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
-            to={to}
+            to={withQa(to)}
             className={({ isActive }) =>
               `flex min-h-[52px] flex-col items-center justify-center gap-1 px-2 py-1.5 transition-colors ${
                 isActive ? 'text-ink' : 'text-muted'
