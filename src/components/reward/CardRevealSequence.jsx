@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { m } from 'framer-motion'
 import { getRarity } from '../../theme/rarity'
 import { motion as motionTokens } from '../../theme/motion'
@@ -6,6 +6,7 @@ import { typeClasses } from '../../theme/typography'
 import { ParticleLayer } from '../ui/ParticleLayer'
 import { PremiumRewardCard } from './PremiumRewardCard'
 import { prefersReducedMotion } from '../../utils/performance'
+import { rewardLog } from '../../utils/devLog'
 
 const PHASES = {
   ENTER: 'enter',
@@ -20,8 +21,14 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const [phase, setPhase] = useState(PHASES.ENTER)
   const rarity = getRarity(figure.rareza)
   const reduced = prefersReducedMotion()
+  const onCompleteRef = useRef(onComplete)
 
   useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
+  useEffect(() => {
+    rewardLog.info('reveal started', { figureId: figure?.id })
     const timings = reduced
       ? { enter: 200, flip: 400, reveal: 600, shine: 800, info: 1200, done: 2000 }
       : { enter: 400, flip: 900, reveal: 1600, shine: 2200, info: 2800, done: 4200 }
@@ -32,16 +39,19 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
       setTimeout(() => setPhase(PHASES.SHINE), timings.reveal),
       setTimeout(() => setPhase(PHASES.INFO), timings.shine),
       setTimeout(() => setPhase(PHASES.DONE), timings.info),
-      setTimeout(() => onComplete?.(), timings.done),
+      setTimeout(() => {
+        rewardLog.info('reveal finished', { figureId: figure?.id })
+        onCompleteRef.current?.()
+      }, timings.done),
     ]
 
     return () => timers.forEach(clearTimeout)
-  }, [onComplete, reduced])
+  }, [figure?.id, reduced])
 
   const photoRevealed = phase !== PHASES.ENTER && phase !== PHASES.FLIP
 
   return (
-    <div className="safe-top safe-bottom relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-6">
+    <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-6">
       {/* Cinematic vignette */}
       <div
         className="pointer-events-none absolute inset-0"

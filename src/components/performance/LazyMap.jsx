@@ -7,10 +7,12 @@ const LeafletMapView = lazy(() =>
   })),
 )
 
-export function LazyMap(props) {
+export function LazyMap({ className = '', ...props }) {
   return (
-    <Suspense fallback={<MapSkeleton />}>
-      <LeafletMapView {...props} />
-    </Suspense>
+    <div className="relative h-full min-h-0 w-full flex-1">
+      <Suspense fallback={<MapSkeleton />}>
+        <LeafletMapView {...props} className={`h-full w-full ${className}`.trim()} />
+      </Suspense>
+    </div>
   )
 }

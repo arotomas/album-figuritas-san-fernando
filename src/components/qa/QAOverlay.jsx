@@ -5,6 +5,8 @@ import { useAppStore, selectProgress, TOTAL_FIGURES } from '../../store/useAppSt
 import { storageService } from '../../services/storage/storageService'
 import { STORAGE_KEY } from '../../config/persistence'
 import { PerformanceDebugPanel } from '../performance/PerformanceDebugPanel'
+import { useViewportMetrics } from '../../hooks/useViewport'
+import { useGpsDiagnostics } from '../../hooks/useGpsDiagnostics'
 import {
   getQaState,
   setQaFlag,
@@ -22,6 +24,8 @@ export function QAOverlay() {
   const [fps, setFps] = useState(null)
   const [memory, setMemory] = useState(null)
   const [qaFlags, setQaFlags] = useState(getQaState())
+  const viewport = useViewportMetrics()
+  const gps = useGpsDiagnostics()
 
   const resetProgress = useAppStore((state) => state.resetProgress)
   const unlockAllFigures = useAppStore((state) => state.unlockAllFigures)
@@ -56,6 +60,53 @@ export function QAOverlay() {
       accuracy: 8,
       timestamp: Date.now(),
     })
+  }
+
+  const getNextPendingFigure = () => {
+    const storeFigures = useAppStore.getState().figures
+    const pending = storeFigures.find((f) => !f.obtenida)
+    if (!pending) return null
+    return mockFigures.find((m) => m.id === pending.id) ?? pending
+  }
+
+  const handleForceProximity = () => {
+    const figure = getNextPendingFigure()
+    if (!figure) return
+    setQaFlag('mockPosition', {
+      lat: figure.lat,
+      lng: figure.lng,
+      accuracy: 8,
+      timestamp: Date.now(),
+    })
+    setNearFigure({ ...figure, distanceMeters: 8 })
+    navigate('/map')
+  }
+
+  const handleOpenCaptureDev = () => {
+    const figure = getNextPendingFigure()
+    if (!figure) return
+    setQaFlag('mockPosition', {
+      lat: figure.lat,
+      lng: figure.lng,
+      accuracy: 8,
+      timestamp: Date.now(),
+    })
+    setNearFigure({ ...figure, distanceMeters: 8 })
+    navigate('/capture')
+  }
+
+  const handleSimulateCaptureFlow = () => {
+    const figure = getNextPendingFigure()
+    if (!figure) return
+    setQaFlag('mockPosition', {
+      lat: figure.lat,
+      lng: figure.lng,
+      accuracy: 8,
+      timestamp: Date.now(),
+    })
+    setNearFigure({ ...figure, distanceMeters: 8 })
+    setQaFlag('simulateCaptureSuccess', true)
+    navigate('/capture')
   }
 
   const handleOpenReward = () => {
@@ -113,6 +164,64 @@ export function QAOverlay() {
                 </p>
               )}
 
+              {gps && (
+                <div className="mt-4 rounded-xl bg-black/40 p-3 text-[10px] leading-relaxed text-zinc-300">
+                  <p className="mb-1 font-bold uppercase tracking-wide text-sky-400/90">
+                    GPS
+                  </p>
+                  <p>
+                    lat/lng:{' '}
+                    {gps.lat != null
+                      ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`
+                      : '—'}
+                  </p>
+                  <p>accuracy: {gps.accuracy != null ? `${Math.round(gps.accuracy)}m` : '—'}</p>
+                  <p>fix age: {gps.ageMs != null ? `${Math.round(gps.ageMs)}ms` : '—'}</p>
+                  <p>satellites: n/d (Web API)</p>
+                  <p>
+                    state:{' '}
+                    {gps.quality === 'capture_ready'
+                      ? 'stable'
+                      : gps.quality === 'proximity'
+                        ? 'refining'
+                        : gps.quality === 'refining'
+                          ? 'coarse'
+                          : gps.quality ?? '—'}
+                  </p>
+                  <p>updates: {gps.updates ?? 0} · discards: {gps.discards ?? 0}</p>
+                  {gps.lastDiscarded && (
+                    <p className="text-amber-300/90">
+                      last discard: {gps.lastDiscarded.reason} (
+                      {gps.lastDiscarded.accuracy != null
+                        ? `${Math.round(gps.lastDiscarded.accuracy)}m`
+                        : '—'}
+                      )
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {viewport && (
+                <div className="mt-4 rounded-xl bg-black/40 p-3 text-[10px] leading-relaxed text-zinc-300">
+                  <p className="mb-1 font-bold uppercase tracking-wide text-lime-400/90">
+                    Viewport
+                  </p>
+                  <p>--app-height: {viewport.appHeight || '—'}</p>
+                  <p>innerHeight: {viewport.innerHeight}px</p>
+                  <p>visualViewport: {viewport.visualViewportHeight ?? '—'}px</p>
+                  <p>offsetTop: {viewport.visualViewportOffsetTop}px</p>
+                  <p>100dvh: {viewport.dvh100 ?? '—'}</p>
+                  <p>100svh: {viewport.svh100 ?? '—'}</p>
+                  <p>100lvh: {viewport.lvh100 ?? '—'}</p>
+                  <p>
+                    safe: T{viewport.safeArea.top} B{viewport.safeArea.bottom} L
+                    {viewport.safeArea.left} R{viewport.safeArea.right}
+                  </p>
+                  <p>display: {viewport.displayMode}</p>
+                  <p>keyboard: {viewport.keyboardOpen ? 'open' : 'closed'}</p>
+                </div>
+              )}
+
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <QaToggle
                   label="Simular offline"
@@ -127,12 +236,19 @@ export function QAOverlay() {
               </div>
 
               <div className="mt-4 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+                  Core loop (dev)
+                </p>
+                <QaAction onClick={handleForceProximity}>Forzar proximidad</QaAction>
+                <QaAction onClick={handleOpenCaptureDev}>Abrir cámara (con figurita)</QaAction>
+                <QaAction onClick={handleSimulateCaptureFlow}>
+                  Simular captura → reward
+                </QaAction>
                 <QaAction onClick={handleMockGps}>GPS en Catedral (mock)</QaAction>
                 <QaAction onClick={() => setQaFlag('mockPosition', null)}>Quitar GPS mock</QaAction>
                 <QaAction onClick={resetQaFlags}>Reset flags QA</QaAction>
                 <QaAction onClick={runDiagnostics}>Medir FPS / memoria</QaAction>
-                <QaAction onClick={handleOpenReward}>Ir a álbum (mock unlock)</QaAction>
-                <QaAction onClick={() => navigate('/capture')}>Abrir /capture</QaAction>
+                <QaAction onClick={handleOpenReward}>Guardar figurita (sin animación)</QaAction>
               </div>
 
               {(fps != null || memory) && (

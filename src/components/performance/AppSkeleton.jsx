@@ -19,7 +19,7 @@ export function MapSkeleton({ message = 'Cargando mapa…' }) {
 
 export function CameraSkeleton() {
   return (
-    <div className="safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center bg-black">
+    <div className="safe-top safe-bottom flex h-full flex-col items-center justify-center bg-black">
       <div className="map-skeleton-pulse mb-6 h-20 w-20 rounded-full border-4 border-zinc-800 bg-zinc-900" />
       <p className="text-sm text-zinc-400">Preparando cámara…</p>
     </div>
@@ -28,7 +28,7 @@ export function CameraSkeleton() {
 
 export function PageSkeleton() {
   return (
-    <div className="flex min-h-[50dvh] flex-col items-center justify-center px-8">
+    <div className="flex h-full flex-col items-center justify-center px-8">
       <div className="map-skeleton-pulse h-12 w-12 rounded-xl bg-border" />
       <p className="mt-4 text-sm text-muted">Cargando…</p>
     </div>
@@ -37,7 +37,7 @@ export function PageSkeleton() {
 
 export function AppSkeleton() {
   return (
-    <div className="safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center bg-white">
+    <div className="safe-top safe-bottom flex h-full flex-col items-center justify-center bg-white">
       <div className="map-skeleton-pulse h-16 w-16 rounded-2xl bg-ink/90" />
       <p className="mt-4 text-sm text-muted">Iniciando app…</p>
     </div>

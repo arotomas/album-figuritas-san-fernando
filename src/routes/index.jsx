@@ -33,7 +33,8 @@ function LazyPage({ children }) {
 
 export function AppRoutes() {
   return (
-    <Routes>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <Routes>
       <Route
         path="/"
         element={
@@ -109,6 +110,7 @@ export function AppRoutes() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </div>
   )
 }

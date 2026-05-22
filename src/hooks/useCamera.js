@@ -9,18 +9,21 @@ import {
 import { getQaState } from '../utils/diagnostics'
 import { useAppLifecycle } from './useAppLifecycle'
 import { cleanupMediaStream } from '../utils/cleanup'
+import { captureLog } from '../utils/devLog'
 
 /**
  * Hook reutilizable para cámara trasera vía MediaDevices API.
- * Detiene streams previos, limpia al desmontar y recupera desde background.
+ * Fallback: input nativo capture="environment" en mobile.
  */
 export function useCamera() {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const startingRef = useRef(false)
+  const fileInputRef = useRef(null)
 
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
+  const [useNativeFallback, setUseNativeFallback] = useState(false)
   const statusRef = useRef('idle')
 
   useEffect(() => {
@@ -44,9 +47,17 @@ export function useCamera() {
 
   const stop = useCallback(() => {
     cleanupMediaStream(streamRef, videoRef)
-    setStatus('idle')
+    setStatus((current) => (current === 'denied' ? 'denied' : 'idle'))
     startingRef.current = false
   }, [])
+
+  const enableNativeFallback = useCallback(() => {
+    captureLog.info('using native camera fallback')
+    setUseNativeFallback(true)
+    setStatus('native')
+    setError(null)
+    stop()
+  }, [stop])
 
   const start = useCallback(async () => {
     if (startingRef.current) return
@@ -55,18 +66,19 @@ export function useCamera() {
     if (getQaState().forcePermissionDenied) {
       setStatus('denied')
       setError('PERMISSION_DENIED')
+      setUseNativeFallback(false)
       startingRef.current = false
       return
     }
 
     if (!isCameraSupported()) {
-      setStatus('error')
-      setError('CAMERA_UNSUPPORTED')
+      enableNativeFallback()
       startingRef.current = false
       return
     }
 
     stop()
+    setUseNativeFallback(false)
     setStatus('loading')
     setError(null)
 
@@ -79,14 +91,14 @@ export function useCamera() {
       if (isPermissionDeniedError(err)) {
         setStatus('denied')
         setError('PERMISSION_DENIED')
+        setUseNativeFallback(false)
       } else {
-        setStatus('error')
-        setError(err.message || 'No se pudo abrir la cámara.')
+        enableNativeFallback()
       }
     } finally {
       startingRef.current = false
     }
-  }, [attachToVideo, stop])
+  }, [attachToVideo, enableNativeFallback, stop])
 
   const wasActiveRef = useRef(false)
 
@@ -97,7 +109,7 @@ export function useCamera() {
       stop()
     },
     onVisible: () => {
-      if (wasActiveRef.current) {
+      if (wasActiveRef.current && !useNativeFallback) {
         start()
       }
     },
@@ -110,15 +122,22 @@ export function useCamera() {
     }
   }, [])
 
+  const openNativePicker = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
   return {
     videoRef: videoCallbackRef,
+    fileInputRef,
     getVideoElement: () => videoRef.current,
     status,
     error,
-    isReady: status === 'active',
+    useNativeFallback,
+    isReady: status === 'active' || status === 'native',
     isDenied: status === 'denied',
     isLoading: status === 'loading',
     start,
     stop,
+    openNativePicker,
   }
 }

@@ -1,5 +1,9 @@
 import { LazyCamera } from '../components/performance/LazyCamera'
 
 export function CaptureScreen() {
-  return <LazyCamera />
+  return (
+    <div className="screen-full overflow-hidden bg-black">
+      <LazyCamera />
+    </div>
+  )
 }

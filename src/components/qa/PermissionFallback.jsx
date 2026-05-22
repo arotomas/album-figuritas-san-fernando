@@ -19,7 +19,7 @@ export function PermissionFallback({
   const geoIsSignal = geoErrorType === 'timeout' || geoErrorType === 'unavailable'
 
   return (
-    <div className="safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center bg-zinc-950 px-8 text-center">
+    <div className="safe-top safe-bottom flex h-full flex-col items-center justify-center bg-zinc-950 px-8 text-center">
       <div className="max-w-sm animate-slide-up">
         <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-zinc-900">
           <div className="relative">

@@ -13,6 +13,8 @@ import {
 } from '../services/storage/migrationService'
 import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
+import { offsetCoordinates } from '../utils/geoOffset'
+import { isDevMode } from '../utils/devMode'
 
 const zustandStorage = createJSONStorage(() => createZustandStorage())
 
@@ -68,6 +70,7 @@ export const useAppStore = create(
       user: null,
       figures: createInitialFigures(),
       nearFigure: null,
+      devTestFigure: null,
       hasSeenSplash: false,
       albumStatus: ALBUM_STATUS.EN_PROGRESO,
       lastObtenidaFigureId: null,
@@ -102,27 +105,75 @@ export const useAppStore = create(
         ),
 
       obtainFigureWithPhoto: (figureId, { foto, fotoSizeBytes, obtenidaEn }) => {
-        if (foto && !storageService.isPhotoWithinLimit(fotoSizeBytes)) {
-          console.warn('[album] Foto demasiado grande, no se persiste.')
-          return set((state) =>
-            applyFigureUpdate(state, figureId, {
-              obtenida: true,
-              obtenidaEn,
-            }),
-          )
-        }
+        return set((state) => {
+          let realFigureId = figureId
+          if (String(figureId).startsWith('dev-')) {
+            realFigureId =
+              state.devTestFigure?.targetFigureId ??
+              Number(String(figureId).replace('dev-', ''))
+          }
 
-        return set((state) =>
-          applyFigureUpdate(state, figureId, {
+          const existing = state.figures.find((f) => f.id === realFigureId)
+          if (existing?.obtenida) {
+            persistLog.persist('obtain skipped — already obtained', realFigureId)
+            return {
+              ...state,
+              devTestFigure: null,
+              nearFigure: null,
+            }
+          }
+
+          const patch = {
             obtenida: true,
-            foto,
-            fotoSizeBytes,
             obtenidaEn,
-          }),
-        )
+            ...(foto && storageService.isPhotoWithinLimit(fotoSizeBytes)
+              ? { foto, fotoSizeBytes }
+              : {}),
+          }
+
+          if (foto && !storageService.isPhotoWithinLimit(fotoSizeBytes)) {
+            console.warn('[ALBUM] Foto demasiado grande, no se persiste.')
+          }
+
+          persistLog.persist('figure obtained', realFigureId)
+          return {
+            ...applyFigureUpdate(state, realFigureId, patch),
+            nearFigure: null,
+            devTestFigure: null,
+          }
+        })
       },
 
       setNearFigure: (figure) => set({ nearFigure: figure }),
+
+      setDevTestFigureNear: (userLat, userLng) => {
+        if (!isDevMode()) return false
+
+        const pending = get().figures.find((figure) => !figure.obtenida)
+        if (!pending) return false
+
+        const distance = 20 + Math.random() * 10
+        const bearing = Math.random() * 360
+        const coords = offsetCoordinates(userLat, userLng, distance, bearing)
+
+        set({
+          devTestFigure: {
+            ...pending,
+            targetFigureId: pending.id,
+            id: `dev-${pending.id}`,
+            lat: coords.lat,
+            lng: coords.lng,
+            isDevTest: true,
+            nombre: `[Prueba] ${pending.nombre}`,
+            emoji: pending.emoji ?? '🧪',
+            description: 'Figurita temporal de prueba (solo dev).',
+          },
+        })
+
+        return true
+      },
+
+      clearDevTestFigure: () => set({ devTestFigure: null }),
 
       setLastViewedFigure: (figureId) =>
         set((state) => {
@@ -147,6 +198,7 @@ export const useAppStore = create(
           lastViewedFigureId: null,
           lastSavedAt: Date.now(),
           nearFigure: null,
+          devTestFigure: null,
         }),
 
       unlockAllFigures: () =>
@@ -178,6 +230,7 @@ export const useAppStore = create(
           user: null,
           hasSeenSplash: false,
           nearFigure: null,
+          devTestFigure: null,
         })
       },
 

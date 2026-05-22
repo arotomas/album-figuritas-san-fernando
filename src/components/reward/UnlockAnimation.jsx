@@ -1,20 +1,31 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { m } from 'framer-motion'
 import { useAppStore, selectProgress, TOTAL_FIGURES } from '../../store/useAppStore'
 import { motion as motionTokens } from '../../theme/motion'
 import { typeClasses } from '../../theme/typography'
 import { ParticleLayer } from '../ui/ParticleLayer'
+import { rewardLog } from '../../utils/devLog'
 
 export function UnlockAnimation({ onComplete }) {
   const progress = useAppStore(selectProgress)
+  const onCompleteRef = useRef(onComplete)
 
   useEffect(() => {
-    const timer = setTimeout(onComplete, 3000)
-    return () => clearTimeout(timer)
+    onCompleteRef.current = onComplete
   }, [onComplete])
 
+  useEffect(() => {
+    rewardLog.info('unlock animation started')
+    const timer = setTimeout(() => {
+      rewardLog.info('unlock animation finished')
+      onCompleteRef.current?.()
+    }, 3000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
-    <div className="safe-top safe-bottom relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8 text-center">
+    <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8 text-center">
       <ParticleLayer rareza="épica" intensity={0.5} />
 
       <m.div

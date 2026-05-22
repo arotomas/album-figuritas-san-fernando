@@ -14,13 +14,13 @@ import {
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
-import { useOfflineStatus } from '../../hooks/useOfflineStatus'
 import { VIBRATION_NEAR_COOLDOWN_MS } from '../../config/ux'
 import { vibrateNearFigure } from '../../utils/vibration'
 import { prefersReducedMotion } from '../../utils/performance'
 import { FigureMarker } from './FigureMarker'
 import { UserLocationDot } from './UserLocationDot'
 import { NearFigureOverlay } from './NearFigureOverlay'
+import { MapGpsStatus } from './MapGpsStatus'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -28,8 +28,23 @@ function MapResizeHandler() {
   const map = useMap()
 
   useEffect(() => {
-    const timer = setTimeout(() => map.invalidateSize(), 100)
-    return () => clearTimeout(timer)
+    const invalidate = () => {
+      requestAnimationFrame(() => map.invalidateSize({ animate: false }))
+    }
+
+    invalidate()
+    const timer = setTimeout(invalidate, 120)
+
+    window.visualViewport?.addEventListener('resize', invalidate)
+    window.addEventListener('viewport-update', invalidate)
+    window.addEventListener('orientationchange', invalidate)
+
+    return () => {
+      clearTimeout(timer)
+      window.visualViewport?.removeEventListener('resize', invalidate)
+      window.removeEventListener('viewport-update', invalidate)
+      window.removeEventListener('orientationchange', invalidate)
+    }
   }, [map])
 
   return null
@@ -78,7 +93,7 @@ function MapFlyController({ position, zoom, reducedMotion }) {
   return null
 }
 
-function UserLocationMarker({ position }) {
+function UserLocationMarker({ position, isCoarse = false }) {
   const map = useMap()
   const markerRef = useRef(null)
   const rootRef = useRef(null)
@@ -109,8 +124,10 @@ function UserLocationMarker({ position }) {
     if (!position || !markerRef.current || !rootRef.current) return
 
     markerRef.current.setLatLng([position.lat, position.lng])
-    rootRef.current.render(<UserLocationDot accuracy={position.accuracy} />)
-  }, [position])
+    rootRef.current.render(
+      <UserLocationDot accuracy={position.accuracy} isCoarse={isCoarse} />,
+    )
+  }, [position, isCoarse])
 
   return null
 }
@@ -181,11 +198,23 @@ function LeafletMapViewInner({
   onOpenCamera,
 }) {
   const mapRef = useRef(null)
-  const { position, error, errorType, isLoading, requestPermission } = useGeolocation()
-  const { isOffline } = useOfflineStatus()
-  const debouncedPosition = useDebouncedLocation(position, 900)
+  const {
+    position,
+    proximityPosition,
+    hasUsablePosition,
+    error,
+    errorType,
+    isLoading,
+    gpsPhase,
+    gpsStatusLabel,
+    qualityState,
+    showSoftWarning,
+    requestPermission,
+  } = useGeolocation()
+
+  const debouncedProximity = useDebouncedLocation(proximityPosition, 900)
   const { nearFigure, isNearFigure, nearFigures } = useFigureProximity(
-    debouncedPosition,
+    debouncedProximity,
     figures,
   )
 
@@ -222,15 +251,35 @@ function LeafletMapViewInner({
     }
   }, [nearFigure, onNearFigureChange])
 
+  const showGpsBanner =
+    !error &&
+    !position &&
+    (gpsPhase === 'searching' || isLoading || showSoftWarning)
+
+  const showRefiningBanner =
+    !error &&
+    position &&
+    (gpsPhase === 'refining' ||
+      qualityState === 'refining' ||
+      showSoftWarning)
+
+  const gpsBannerLabel = showSoftWarning
+    ? 'Señal débil — seguimos buscando…'
+    : position?.accuracy
+      ? `${gpsStatusLabel} (~${Math.round(position.accuracy)}m)`
+      : gpsStatusLabel
+
+  const showHardError = error && errorType === 'denied'
+
   return (
-    <div className={`relative overflow-hidden ${className}`}>
-      <div className="map-container gpu-layer absolute inset-0">
+    <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
+      <div className="map-container gpu-layer absolute inset-0 h-full w-full">
         <MapContainer
           center={DEFAULT_CENTER}
           zoom={DEFAULT_ZOOM}
           zoomControl={false}
           attributionControl
-          className="h-full w-full"
+          className="!h-full !w-full"
           preferCanvas
         >
           <TileLayer
@@ -249,36 +298,56 @@ function LeafletMapViewInner({
             figures={figures}
             nearFigureIds={nearFigureIdsRef.current}
           />
-          {position && <UserLocationMarker position={position} />}
+          {position && (
+            <UserLocationMarker
+              position={position}
+              isCoarse={!hasUsablePosition}
+            />
+          )}
         </MapContainer>
 
         <div className="map-vignette pointer-events-none absolute inset-0 z-[400]" aria-hidden />
       </div>
 
-      {isLoading && !position && !error && (
-        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-zinc-900/90">
-          <p className="map-skeleton-pulse text-sm font-medium text-white">
-            {isOffline
-              ? 'Cargando mapa (sin conexión puede tardar)…'
-              : 'Obteniendo tu ubicación…'}
-          </p>
-        </div>
+      {showGpsBanner && (
+        <MapGpsStatus
+          label={gpsBannerLabel}
+          phase={showSoftWarning ? 'warn' : 'searching'}
+        />
       )}
 
-      {error && (
-        <div className="safe-top absolute inset-x-4 top-4 z-[500] rounded-xl bg-red-950/90 px-4 py-3 text-center">
+      {showRefiningBanner && (
+        <MapGpsStatus
+          label={gpsBannerLabel}
+          phase={showSoftWarning ? 'warn' : 'refining'}
+        />
+      )}
+
+      {showHardError && (
+        <div className="safe-top absolute inset-x-4 top-16 z-[500] rounded-xl bg-red-950/90 px-4 py-3 text-center">
           <p className="text-sm text-red-200">{error}</p>
-          {errorType === 'denied' && (
-            <p className="mt-1 text-xs text-red-300/80">
-              Habilitalo en ajustes del navegador si lo rechazaste antes.
-            </p>
-          )}
+          <p className="mt-1 text-xs text-red-300/80">
+            Habilitalo en ajustes del navegador si lo rechazaste antes.
+          </p>
           <button
             type="button"
             onClick={requestPermission}
             className="mt-2 min-h-[44px] text-xs font-bold uppercase text-white underline"
           >
-            Reintentar
+            Reintentar ubicación
+          </button>
+        </div>
+      )}
+
+      {error && !showHardError && (
+        <div className="safe-top absolute inset-x-4 top-16 z-[500]">
+          <MapGpsStatus label={error} phase="warn" />
+          <button
+            type="button"
+            onClick={requestPermission}
+            className="pointer-events-auto mx-auto mt-2 block text-xs font-medium text-white/70 underline"
+          >
+            Reintentar ubicación
           </button>
         </div>
       )}

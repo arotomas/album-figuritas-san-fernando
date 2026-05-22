@@ -2,6 +2,7 @@ const qaState = {
   simulateOffline: false,
   mockPosition: null,
   forcePermissionDenied: false,
+  simulateCaptureSuccess: false,
 }
 
 const listeners = new Set()
@@ -27,6 +28,7 @@ export function resetQaFlags() {
   qaState.simulateOffline = false
   qaState.mockPosition = null
   qaState.forcePermissionDenied = false
+  qaState.simulateCaptureSuccess = false
   notifyQaChange()
 }
 

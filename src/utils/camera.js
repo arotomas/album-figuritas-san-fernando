@@ -46,6 +46,35 @@ export function captureFrameFromVideo(video) {
   return canvas
 }
 
+export function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('FILE_MISSING'))
+      return
+    }
+
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const context = canvas.getContext('2d')
+      context.drawImage(img, 0, 0)
+      URL.revokeObjectURL(url)
+      resolve(canvas)
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('IMAGE_LOAD_FAILED'))
+    }
+
+    img.src = url
+  })
+}
+
 export function attachStreamToVideo(video, stream) {
   if (!video || !stream) return Promise.resolve()
 

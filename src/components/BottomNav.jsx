@@ -10,14 +10,14 @@ const tabs = [
 
 function BottomNavInner() {
   return (
-    <nav className="safe-bottom border-t border-border bg-white">
+    <nav className="bottom-nav safe-bottom safe-x z-20 shrink-0 border-t border-border bg-white/95 backdrop-blur-md">
       <div className="grid grid-cols-3">
         {tabs.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex min-h-[52px] flex-col items-center justify-center gap-1 px-2 py-2 transition-colors ${
+              `flex min-h-[52px] flex-col items-center justify-center gap-1 px-2 py-1.5 transition-colors ${
                 isActive ? 'text-ink' : 'text-muted'
               }`
             }
@@ -32,7 +32,7 @@ function BottomNavInner() {
                 >
                   <Icon size={18} />
                 </span>
-                <span className="text-[11px] font-medium">{label}</span>
+                <span className="text-[11px] font-medium leading-none">{label}</span>
               </>
             )}
           </NavLink>

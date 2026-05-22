@@ -1,6 +1,6 @@
 export function HydrationScreen() {
   return (
-    <div className="safe-top safe-bottom relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8">
+    <div className="screen-full safe-top safe-bottom safe-x relative flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8">
       <div
         className="pointer-events-none absolute inset-0"
         style={{

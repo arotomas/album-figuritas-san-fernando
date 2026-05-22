@@ -25,15 +25,15 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-warm-white px-8 py-10">
-      <Logo size="lg" className="mb-12 mt-4" />
+    <div className="flex min-h-0 flex-1 flex-col justify-between px-8 py-10">
+      <Logo size="lg" className="mb-8 mt-2 shrink-0" />
 
       <motion.form
         variants={staggerContainer}
         initial="initial"
         animate="animate"
         onSubmit={handleSubmit}
-        className="mx-auto flex w-full max-w-sm flex-1 flex-col gap-6"
+        className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6"
       >
         <motion.div variants={staggerItem}>
           <Input
@@ -74,7 +74,7 @@ export function LoginScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="mx-auto w-full max-w-sm pb-4"
+        className="mx-auto w-full max-w-sm shrink-0 pb-2"
       >
         <p className="mb-4 text-center text-sm text-muted">Ingresar con:</p>
         <div className="flex items-center justify-center gap-6">

@@ -27,7 +27,7 @@ export class AppErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="safe-top safe-bottom flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0b] px-8 text-center">
+        <div className="screen-full safe-top safe-bottom safe-x flex flex-col items-center justify-center bg-[#0a0a0b] px-8 text-center">
           <p className="font-display text-xl font-bold text-warm-white">
             Algo salió mal
           </p>

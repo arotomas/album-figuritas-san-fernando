@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 /**
  * Suaviza updates de GPS para proximidad y markers.
  * El primer fix es inmediato; los siguientes se debouncen.
+ * Limpia cuando la señal confiable desaparece.
  */
 export function useDebouncedLocation(position, delayMs = 900) {
   const [debounced, setDebounced] = useState(position)
@@ -10,7 +11,12 @@ export function useDebouncedLocation(position, delayMs = 900) {
   const isFirstRef = useRef(true)
 
   useEffect(() => {
-    if (!position) return
+    if (!position) {
+      isFirstRef.current = true
+      clearTimeout(timerRef.current)
+      setDebounced(null)
+      return
+    }
 
     if (isFirstRef.current) {
       isFirstRef.current = false

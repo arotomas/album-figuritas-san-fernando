@@ -11,7 +11,7 @@ export function SplashScreen() {
   const navigate = useNavigate()
 
   return (
-    <div className="safe-top safe-bottom relative flex min-h-dvh flex-col items-center justify-between overflow-hidden bg-warm-white px-8 py-10">
+    <div className="screen-full safe-top safe-bottom safe-x relative flex flex-col items-center justify-between overflow-hidden bg-warm-white px-8 py-10">
       <div
         className="pointer-events-none absolute inset-0"
         style={{

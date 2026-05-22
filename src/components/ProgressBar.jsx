@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore, selectProgress, TOTAL_FIGURES } from '../store/useAppStore'
+import { mockFigures } from '../data/mockFigures'
 
 function ProgressBarInner({
   className = '',
@@ -9,6 +10,8 @@ function ProgressBarInner({
   variant = 'light',
 }) {
   const progress = useAppStore(selectProgress)
+  const figures = useAppStore((state) => state.figures)
+  const setNearFigure = useAppStore((state) => state.setNearFigure)
   const navigate = useNavigate()
 
   const isDark = variant === 'dark'
@@ -52,7 +55,13 @@ function ProgressBarInner({
       {showSimulateLink && progress < TOTAL_FIGURES && (
         <button
           type="button"
-          onClick={() => navigate('/near')}
+          onClick={() => {
+            const next = figures.find((f) => !f.obtenida)
+            if (!next) return
+            const template = mockFigures.find((m) => m.id === next.id) ?? next
+            setNearFigure({ ...template, ...next, distanceMeters: 12 })
+            navigate('/near')
+          }}
           className={`mt-3 w-full text-center text-xs underline-offset-2 hover:underline ${
             isDark ? 'text-zinc-400' : 'text-muted'
           }`}
