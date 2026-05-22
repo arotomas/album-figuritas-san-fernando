@@ -30,12 +30,18 @@ import {
   shouldReplacePosition,
 } from '../utils/gpsFilter'
 import { gpsLog } from '../utils/gpsLog'
-import { setGpsDiagnostics, getGpsDiagnostics } from '../utils/gpsDiagnostics'
+import {
+  patchGpsDiagnostics,
+  getGpsDiagnostics,
+} from '../utils/gpsDiagnostics'
 import {
   loadLastKnownPosition,
   saveLastKnownPosition,
   clearLastKnownPosition,
 } from '../utils/lastKnownPosition'
+
+const GEOLOCATION_AVAILABLE =
+  typeof navigator !== 'undefined' && Boolean(navigator.geolocation)
 
 function isAcceptedPosition(position) {
   if (!position) return false
@@ -118,9 +124,10 @@ export function useGeolocation(options = {}) {
       discards: discardCountRef.current,
     })
 
-    setGpsDiagnostics({
+    patchGpsDiagnostics({
       position: nextPosition,
       previewPosition: getGpsDiagnostics()?.previewPosition ?? null,
+      trustedPosition: nextPosition,
       phase,
       tier,
       quality,
@@ -132,17 +139,20 @@ export function useGeolocation(options = {}) {
       discards: discardCountRef.current,
       isRefining: refining,
       lastFixOutcome: 'accepted',
+      isLocationAccepted: true,
       lastRawReading: nextPosition,
       isWatching: Boolean(stopRef.current),
+      geolocationAvailable: GEOLOCATION_AVAILABLE,
       error: null,
       errorType: null,
       permission: permissionStatusRef.current?.state ?? null,
+      lastSavedPosition: loadLastKnownPosition(),
     })
   }, [])
 
   const applyPositionRef = useRef(null)
 
-  applyPositionRef.current = (nextPosition, { isFirstApply, source, phase }) => {
+  applyPositionRef.current = (nextPosition, { isFirstApply, source, phase, apiSource }) => {
     updateCountRef.current += 1
     setUpdateCount(updateCountRef.current)
 
@@ -167,39 +177,31 @@ export function useGeolocation(options = {}) {
     if (isFirstApply) {
       const elapsed = Date.now() - startTimeRef.current
       setTimeToFirstFixMs(elapsed)
-      gpsLog.accepted({
-        lat: nextPosition.lat,
-        lng: nextPosition.lng,
-        accuracy: nextPosition.accuracy,
-        timestamp: nextPosition.timestamp ?? Date.now(),
-        source,
-        phase,
-      })
       gpsLog.fix(`first accepted fix in ${elapsed}ms`, {
         accuracy: nextPosition.accuracy,
         lat: nextPosition.lat,
         lng: nextPosition.lng,
         source,
+        apiSource: apiSource ?? source,
         ageMs: nextPosition.ageMs,
         phase,
       })
     } else {
-      gpsLog.accepted({
-        lat: nextPosition.lat,
-        lng: nextPosition.lng,
-        accuracy: nextPosition.accuracy,
-        timestamp: nextPosition.timestamp ?? Date.now(),
-        source,
-        phase,
-      })
-      gpsLog.update({
+      gpsLog.updateMeta({
         n: updateCountRef.current,
         accuracy: nextPosition.accuracy,
         source,
+        apiSource: apiSource ?? source,
         ageMs: nextPosition.ageMs,
         phase,
       })
     }
+
+    gpsLog.accepted({
+      ...nextPosition,
+      apiSource: apiSource ?? source,
+      phase,
+    })
   }
 
   const recordDiscard = useCallback((next, reason, meta = {}) => {
@@ -216,66 +218,62 @@ export function useGeolocation(options = {}) {
     setLastDiscarded(payload)
     setLastFixOutcome('discarded')
     gpsLog.discarded({
-      lat: payload.lat,
-      lng: payload.lng,
-      accuracy: payload.accuracy,
-      timestamp: payload.timestamp,
+      ...next,
       reason,
-      source: meta.source,
+      apiSource: meta.apiSource,
       phase: meta.phase,
     })
-    setGpsDiagnostics({
-      ...getGpsDiagnostics(),
+    patchGpsDiagnostics({
       lastDiscarded: payload,
       lastFixOutcome: 'discarded',
+      isLocationAccepted: false,
       lastRawReading: next ?? getGpsDiagnostics()?.lastRawReading ?? null,
+      lastApiSource: meta.apiSource ?? getGpsDiagnostics()?.lastApiSource ?? null,
       discards: discardCountRef.current,
       isWatching: Boolean(stopRef.current),
+      lastSavedPosition: loadLastKnownPosition(),
     })
   }, [])
 
   const tryApplyFix = useCallback(
-    (geoPosition, { phase, maximumAge, isCoarsePhase = false }) => {
+    (geoPosition, { phase, maximumAge, isCoarsePhase = false, apiSource }) => {
       const next = normalizeGeoPosition(geoPosition, { phase })
       const source = estimateFixSource(geoPosition, { maximumAge })
 
       if (DEBUG_GPS || import.meta.env.DEV) {
         gpsLog.rawReading({
-          lat: next.lat,
-          lng: next.lng,
-          accuracy: next.accuracy,
-          timestamp: next.timestamp ?? Date.now(),
+          ...next,
+          apiSource,
           phase,
-          source,
         })
       }
 
       setLastRawReading(next)
-      setGpsDiagnostics({
-        ...getGpsDiagnostics(),
+      patchGpsDiagnostics({
         lastRawReading: next,
+        lastApiSource: apiSource,
         lat: next.lat,
         lng: next.lng,
         accuracy: next.accuracy,
+        altitudeAccuracy: next.altitudeAccuracy ?? null,
+        speed: next.speed ?? null,
+        heading: next.heading ?? null,
         isWatching: Boolean(stopRef.current),
+        geolocationAvailable: GEOLOCATION_AVAILABLE,
       })
 
       if (isWithinSanFernandoArea(next.lat, next.lng)) {
         setPreviewPosition(next)
-        setGpsDiagnostics({
-          ...getGpsDiagnostics(),
-          previewPosition: next,
-          lastRawReading: next,
-        })
+        patchGpsDiagnostics({ previewPosition: next, lastRawReading: next })
       }
 
       if (!isWithinSanFernandoArea(next.lat, next.lng)) {
-        recordDiscard(next, 'outside_bounds', { source, phase })
+        recordDiscard(next, 'outside_bounds', { source, phase, apiSource })
         return false
       }
 
       if (next.accuracy > GPS_ACCEPT_MAX_ACCURACY_M) {
-        recordDiscard(next, 'accuracy_too_poor', { source, phase })
+        recordDiscard(next, 'accuracy_too_poor', { source, phase, apiSource })
         return false
       }
 
@@ -286,7 +284,7 @@ export function useGeolocation(options = {}) {
       })
 
       if (rejectReason) {
-        recordDiscard(next, rejectReason, { source, phase })
+        recordDiscard(next, rejectReason, { source, phase, apiSource })
         return false
       }
 
@@ -299,6 +297,7 @@ export function useGeolocation(options = {}) {
           applyPositionRef.current?.(next, {
             isFirstApply: true,
             source,
+            apiSource,
             phase: 'coarse',
           })
         }
@@ -306,12 +305,12 @@ export function useGeolocation(options = {}) {
       }
 
       if (!shouldReplacePosition(current, next)) {
-        recordDiscard(next, 'worse_or_redundant', { source, phase })
+        recordDiscard(next, 'worse_or_redundant', { source, phase, apiSource })
         return false
       }
 
       if (current && isAbsurdJump(current, next)) {
-        recordDiscard(next, 'absurd_jump', { source, phase })
+        recordDiscard(next, 'absurd_jump', { source, phase, apiSource })
         return false
       }
 
@@ -321,6 +320,7 @@ export function useGeolocation(options = {}) {
       applyPositionRef.current?.(next, {
         isFirstApply: isFirst,
         source,
+        apiSource,
         phase: 'refined',
       })
       return true
@@ -334,6 +334,7 @@ export function useGeolocation(options = {}) {
         phase: 'refined',
         maximumAge: refineOptionsRef.current.maximumAge,
         isCoarsePhase: false,
+        apiSource: 'watchPosition',
       })
     }, GPS_UPDATE_INTERVAL_MS)
   }
@@ -379,8 +380,7 @@ export function useGeolocation(options = {}) {
         setError(classified.message)
         setErrorType('denied')
         setIsLoading(false)
-        setGpsDiagnostics({
-          ...getGpsDiagnostics(),
+        patchGpsDiagnostics({
           error: classified.message,
           errorType: 'denied',
           isWatching: Boolean(stopRef.current),
@@ -395,8 +395,7 @@ export function useGeolocation(options = {}) {
           setError('No pudimos mejorar la señal GPS. Usamos tu última ubicación.')
           setErrorType('timeout')
         }
-        setGpsDiagnostics({
-          ...getGpsDiagnostics(),
+        patchGpsDiagnostics({
           error: classified.type === 'timeout' ? 'Timeout GPS' : classified.message,
           errorType: classified.type === 'timeout' ? 'timeout' : 'watch_error',
           isWatching: Boolean(stopRef.current),
@@ -420,8 +419,7 @@ export function useGeolocation(options = {}) {
             : classified.message,
         )
         setErrorType(classified.type)
-        setGpsDiagnostics({
-          ...getGpsDiagnostics(),
+        patchGpsDiagnostics({
           error: classified.message,
           errorType: classified.type === 'timeout' ? 'timeout' : 'watch_error',
           isWatching: Boolean(stopRef.current),
@@ -448,8 +446,7 @@ export function useGeolocation(options = {}) {
         )
         setErrorType(classified.type)
         setIsLoading(false)
-        setGpsDiagnostics({
-          ...getGpsDiagnostics(),
+        patchGpsDiagnostics({
           error: classified.message,
           errorType: classified.type === 'timeout' ? 'timeout' : 'watch_error',
           isWatching: Boolean(stopRef.current),
@@ -465,6 +462,7 @@ export function useGeolocation(options = {}) {
         phase: 'coarse',
         maximumAge: fastOptionsRef.current.maximumAge,
         isCoarsePhase: true,
+        apiSource: 'getCurrentPosition',
       })
     },
     [tryApplyFix],
@@ -484,6 +482,7 @@ export function useGeolocation(options = {}) {
           phase: 'refined',
           maximumAge: refineOptionsRef.current.maximumAge,
           isCoarsePhase: false,
+          apiSource: 'watchPosition',
         })
         return
       }
@@ -505,7 +504,7 @@ export function useGeolocation(options = {}) {
       setError('Geolocalización no disponible en este dispositivo.')
       setErrorType('unavailable')
       setIsLoading(false)
-      setGpsDiagnostics({
+      patchGpsDiagnostics({
         ...getGpsDiagnostics(),
         error: 'Geolocalización no disponible',
         errorType: 'unavailable',
@@ -543,7 +542,7 @@ export function useGeolocation(options = {}) {
       refineOptionsRef.current,
     )
 
-    setGpsDiagnostics({
+    patchGpsDiagnostics({
       ...getGpsDiagnostics(),
       isWatching: true,
     })
@@ -557,7 +556,7 @@ export function useGeolocation(options = {}) {
 
   const handlePermissionChange = useCallback((event) => {
     setPermission(event.target.state)
-    setGpsDiagnostics({
+    patchGpsDiagnostics({
       ...getGpsDiagnostics(),
       permission: event.target.state,
     })
@@ -590,6 +589,33 @@ export function useGeolocation(options = {}) {
     startWatching()
   }, [handlePermissionChange, startWatching])
 
+  const requestSingleFix = useCallback(() => {
+    if (!GEOLOCATION_AVAILABLE) {
+      setError('Geolocalización no disponible en este dispositivo.')
+      setErrorType('unavailable')
+      patchGpsDiagnostics({
+        geolocationAvailable: false,
+        errorType: 'unavailable',
+      })
+      return
+    }
+
+    setIsLoading(true)
+    getCurrentPosition(refineOptionsRef.current)
+      .then((geoPosition) => {
+        tryApplyFix(geoPosition, {
+          phase: 'refined',
+          maximumAge: refineOptionsRef.current.maximumAge,
+          isCoarsePhase: false,
+          apiSource: 'getCurrentPosition',
+        })
+        setIsLoading(false)
+      })
+      .catch((geoError) => {
+        handleWatchError(geoError)
+      })
+  }, [handleWatchError, tryApplyFix])
+
   useGpsRecovery({ stopWatching, requestPermission })
 
   startWatchingRef.current = startWatching
@@ -606,25 +632,50 @@ export function useGeolocation(options = {}) {
   }, [position, isRefining, syncDerivedState])
 
   useEffect(() => {
-    setGpsDiagnostics({
-      ...getGpsDiagnostics(),
+    patchGpsDiagnostics({
       isLoading,
       permission,
       isWatching,
+      trustedPosition: position,
+      lastSavedPosition: loadLastKnownPosition(),
+      isLocationAccepted: lastFixOutcome === 'accepted',
+      geolocationAvailable: GEOLOCATION_AVAILABLE,
     })
-  }, [isLoading, permission, isWatching])
+  }, [isLoading, permission, isWatching, position, lastFixOutcome])
 
   useEffect(() => {
     if (initialCachedRef.current) {
       setPreviewPosition(initialCachedRef.current)
       syncDerivedState(initialCachedRef.current, true)
     }
-    setGpsDiagnostics({
-      ...getGpsDiagnostics(),
-      permission,
-      isLoading,
-      isWatching: false,
-    })
+
+    const queryPermission = async () => {
+      patchGpsDiagnostics({
+        geolocationAvailable: GEOLOCATION_AVAILABLE,
+        permission: 'unknown',
+        isLoading,
+        isWatching: false,
+        lastSavedPosition: loadLastKnownPosition(),
+      })
+
+      if (!navigator.permissions?.query) return
+
+      try {
+        permissionStatusRef.current?.removeEventListener?.(
+          'change',
+          handlePermissionChange,
+        )
+        const status = await navigator.permissions.query({ name: 'geolocation' })
+        permissionStatusRef.current = status
+        setPermission(status.state)
+        status.addEventListener('change', handlePermissionChange)
+        patchGpsDiagnostics({ permission: status.state })
+      } catch {
+        patchGpsDiagnostics({ permission: 'unknown' })
+      }
+    }
+
+    queryPermission()
     requestPermissionRef.current?.()
 
     const unsubQa = subscribeQaState(() => {
@@ -672,7 +723,11 @@ export function useGeolocation(options = {}) {
     showSoftWarning,
     permission,
     requestPermission,
+    requestSingleFix,
+    startTracking: startWatching,
+    stopTracking: stopWatching,
     stopWatching,
+    geolocationAvailable: GEOLOCATION_AVAILABLE,
     updateCount,
     timeToFirstFixMs,
     discardCount: discardCountRef.current,

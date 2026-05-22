@@ -21,45 +21,64 @@ function discardReasonText(reason, accuracy) {
   return reason ?? 'unknown'
 }
 
+function coordsPayload(reading) {
+  if (!reading) return null
+  return {
+    lat: reading.lat,
+    lng: reading.lng,
+    accuracy: reading.accuracy,
+    altitude: reading.altitude ?? null,
+    altitudeAccuracy: reading.altitudeAccuracy ?? null,
+    speed: reading.speed ?? null,
+    heading: reading.heading ?? null,
+    timestamp: reading.timestamp ?? null,
+  }
+}
+
 export const gpsLog = {
+  update({ apiSource, reading, outcome, reason, phase }) {
+    emit('info', 'update', {
+      source: apiSource,
+      coords: coordsPayload(reading),
+      accuracy: reading?.accuracy ?? null,
+      outcome,
+      reason: reason ?? null,
+      discardReason:
+        outcome === 'rejected'
+          ? discardReasonText(reason, reading?.accuracy)
+          : null,
+      phase: phase ?? null,
+    })
+  },
   rawReading(data) {
-    emit('info', 'reading', {
-      lat: data.lat,
-      lng: data.lng,
-      accuracy: data.accuracy,
-      timestamp: data.timestamp,
+    gpsLog.update({
+      apiSource: data.apiSource,
+      reading: data,
+      outcome: 'raw',
       phase: data.phase,
-      source: data.source,
     })
   },
   accepted(data) {
-    emit('info', 'accepted', {
+    gpsLog.update({
+      apiSource: data.apiSource,
+      reading: data,
       outcome: 'accepted',
-      lat: data.lat,
-      lng: data.lng,
-      accuracy: data.accuracy,
-      timestamp: data.timestamp,
-      source: data.source,
       phase: data.phase,
     })
   },
   discarded(data) {
-    emit('info', 'discarded', {
-      outcome: 'discarded',
-      lat: data.lat,
-      lng: data.lng,
-      accuracy: data.accuracy,
-      timestamp: data.timestamp,
+    gpsLog.update({
+      apiSource: data.apiSource,
+      reading: data,
+      outcome: 'rejected',
       reason: data.reason,
-      discardReason: discardReasonText(data.reason, data.accuracy),
-      source: data.source,
       phase: data.phase,
     })
   },
   fix: (...args) => {
     if (shouldLog()) console.info('[GPS]', ...args)
   },
-  update: (...args) => {
+  updateMeta: (...args) => {
     if (shouldLog()) console.info('[GPS]', ...args)
   },
   state: (...args) => {

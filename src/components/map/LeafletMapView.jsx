@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -22,6 +22,7 @@ import { UserLocationDot } from './UserLocationDot'
 import { NearFigureOverlay } from './NearFigureOverlay'
 import { MapGpsStatus } from './MapGpsStatus'
 import { GpsDiagnosticPanel } from './GpsDiagnosticPanel'
+import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -225,14 +226,34 @@ function LeafletMapViewInner({
     gpsStatusLabel,
     qualityState,
     showSoftWarning,
-    requestPermission,
+    permission,
+    geolocationAvailable,
+    requestSingleFix,
+    startTracking,
+    stopTracking,
   } = useGeolocation()
 
   const debouncedProximity = useDebouncedLocation(proximityPosition, 900)
-  const { nearFigure, isNearFigure, nearFigures } = useFigureProximity(
-    debouncedProximity,
-    figures,
+  const {
+    nearFigure,
+    isNearFigure,
+    nearFigures,
+    nearestFigure,
+    nearestDistance,
+  } = useFigureProximity(debouncedProximity, figures)
+
+  const rawNearest = useMemo(
+    () => findNearestPendingFigure(mapPosition, figures),
+    [mapPosition, figures],
   )
+
+  const proximityNearest = useMemo(() => {
+    if (!nearestFigure) return null
+    return {
+      figure: nearestFigure,
+      distanceMeters: nearestDistance,
+    }
+  }, [nearestFigure, nearestDistance])
 
   const nearFigureIdsRef = useRef(new Set())
   nearFigureIdsRef.current = new Set(nearFigures.map((f) => f.id))
@@ -349,7 +370,7 @@ function LeafletMapViewInner({
           </p>
           <button
             type="button"
-            onClick={requestPermission}
+            onClick={startTracking}
             className="mt-2 min-h-[44px] text-xs font-bold uppercase text-white underline"
           >
             Reintentar ubicación
@@ -362,7 +383,7 @@ function LeafletMapViewInner({
           <MapGpsStatus label={error} phase="warn" />
           <button
             type="button"
-            onClick={requestPermission}
+            onClick={startTracking}
             className="pointer-events-auto mx-auto mt-2 block text-xs font-medium text-white/70 underline"
           >
             Reintentar ubicación
@@ -382,9 +403,18 @@ function LeafletMapViewInner({
       )}
 
       <GpsDiagnosticPanel
-        onRetry={requestPermission}
+        geolocationAvailable={geolocationAvailable}
+        permission={permission}
+        trustedPosition={trustedPosition}
+        onRequestSingleFix={requestSingleFix}
+        onStartTracking={startTracking}
+        onStopTracking={stopTracking}
         onRecenter={handleRecenter}
         hasMapPosition={Boolean(mapPosition)}
+        proximityNearest={proximityNearest}
+        rawNearest={rawNearest}
+        isNearFigure={isNearFigure}
+        nearFigure={nearFigure}
       />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">

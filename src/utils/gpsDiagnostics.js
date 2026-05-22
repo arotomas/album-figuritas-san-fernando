@@ -1,8 +1,14 @@
-let snapshot = null
+let snapshot = {}
+
 const listeners = new Set()
 
 export function setGpsDiagnostics(data) {
-  snapshot = data
+  snapshot = data ?? {}
+  listeners.forEach((listener) => listener(snapshot))
+}
+
+export function patchGpsDiagnostics(patch) {
+  snapshot = { ...snapshot, ...patch }
   listeners.forEach((listener) => listener(snapshot))
 }
 
