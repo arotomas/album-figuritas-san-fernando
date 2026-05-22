@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CameraView } from '../components/camera'
+import { CameraAccessGate } from '../components/camera/CameraAccessGate'
 import { PermissionFallback } from '../components/qa/PermissionFallback'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useCaptureFlow, CAPTURE_PHASES } from '../hooks/useCaptureFlow'
@@ -77,7 +78,7 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
-    camera.start()
+    camera.initPermission()
     return () => {
       stopVibration()
       camera.stop()
@@ -104,10 +105,13 @@ export function CaptureFlow() {
       if (
         phase === CAPTURE_PHASES.CAMERA &&
         !camera.isReady &&
-        !camera.isLoading
+        !camera.isLoading &&
+        !camera.needsPrompt &&
+        !camera.isDenied &&
+        !camera.useNativeFallback
       ) {
         await delay(PERMISSION_RETRY_DELAY_MS)
-        camera.start()
+        camera.initPermission()
       }
     },
     onHidden: () => {
@@ -153,42 +157,58 @@ export function CaptureFlow() {
     navigate('/map', { replace: true })
   }, [complete, navigate])
 
-  const handleRetry = useCallback(async () => {
+  const handleRetryGeo = useCallback(async () => {
     requestPermission()
     await delay(PERMISSION_RETRY_DELAY_MS)
-    camera.start()
+    camera.initPermission()
   }, [camera, requestPermission])
 
-  const cameraDenied = camera.isDenied
-  const cameraError = camera.error
+  const handleOpenCamera = useCallback(() => {
+    camera.requestCamera()
+  }, [camera])
+
+  const handleUseNativeCamera = useCallback(() => {
+    camera.useNativeCamera()
+    camera.openNativePicker()
+  }, [camera])
+
   const geoPermissionDenied = geoErrorType === 'denied'
   const geoSignalIssue =
     geoErrorType === 'timeout' || geoErrorType === 'unavailable'
-  const needsPermissionUi =
-    cameraDenied ||
-    geoPermissionDenied ||
-    (camera.status === 'error' && !camera.useNativeFallback)
-
-  const needsSignalUi =
-    geoSignalIssue && !mapPosition && !geoLoading && !cameraDenied
-
-  useEffect(() => {
-    if (needsPermissionUi || needsSignalUi) {
-      camera.stop()
-    }
-  }, [needsPermissionUi, needsSignalUi, camera])
+  const needsGeoUi =
+    geoPermissionDenied || (geoSignalIssue && !mapPosition && !geoLoading)
 
   if (!nearFigure) return null
 
-  if (needsPermissionUi || needsSignalUi) {
+  if (needsGeoUi) {
     return (
       <PermissionFallback
-        cameraDenied={cameraDenied}
-        cameraError={cameraError}
+        cameraDenied={false}
         geoDenied={geoPermissionDenied}
         geoError={geoError}
         geoErrorType={geoErrorType}
-        onRetry={handleRetry}
+        onRetry={handleRetryGeo}
+        onBack={handleClose}
+      />
+    )
+  }
+
+  if (camera.needsPrompt) {
+    return (
+      <CameraAccessGate
+        variant="prompt"
+        onOpenCamera={handleOpenCamera}
+        onUseNative={handleUseNativeCamera}
+        onBack={handleClose}
+      />
+    )
+  }
+
+  if (camera.isDenied) {
+    return (
+      <CameraAccessGate
+        variant="denied"
+        onUseNative={handleUseNativeCamera}
         onBack={handleClose}
       />
     )
@@ -245,10 +265,12 @@ export function CaptureFlow() {
           isReady={isReady}
           isCapturing={isCapturing}
           useNativeFallback={camera.useNativeFallback}
+          showBlackPreviewFallback={camera.showBlackPreviewFallback}
           inCaptureRange={inCaptureRange}
           distanceMeters={distanceMeters}
           onCapture={capture}
           onFileSelected={captureFromFile}
+          onUseNativeCamera={handleUseNativeCamera}
           onClose={handleClose}
         />
       )}

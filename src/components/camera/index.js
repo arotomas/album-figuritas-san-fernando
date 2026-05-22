@@ -1,4 +1,5 @@
 export { CameraView } from './CameraView'
+export { CameraAccessGate } from './CameraAccessGate'
 export { CaptureButton } from './CaptureButton'
 export { ValidationRing } from './ValidationRing'
 export { CameraPermissionScreen } from './CameraPermissionScreen'

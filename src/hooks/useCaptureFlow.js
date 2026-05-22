@@ -11,6 +11,7 @@ import {
   processCaptureForUnlock,
 } from '../services/captureService'
 import { getQaState, setQaFlag } from '../utils/diagnostics'
+import { cameraLog } from '../utils/cameraLog'
 import { captureLog, albumLog, rewardLog } from '../utils/devLog'
 
 export const CAPTURE_PHASES = {
@@ -226,6 +227,12 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     async (file) => {
       if (capturingRef.current || !file || !figure || !inCaptureRange) return
       if (!validateDistance()) return
+
+      cameraLog.nativeFileSelected({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })
 
       capturingRef.current = true
       setCaptureError(null)

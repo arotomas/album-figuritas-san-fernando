@@ -13,10 +13,12 @@ export function CameraView({
   isReady,
   isCapturing,
   useNativeFallback = false,
+  showBlackPreviewFallback = false,
   inCaptureRange = false,
   distanceMeters = null,
   onCapture,
   onFileSelected,
+  onUseNativeCamera,
   onClose,
 }) {
   const localInputRef = useRef(null)
@@ -38,7 +40,9 @@ export function CameraView({
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 px-8 text-center">
           <p className="text-lg font-semibold text-white">Cámara del celular</p>
           <p className="mt-2 text-sm text-white/60">
-            Tocá el botón de captura para abrir la cámara nativa.
+            {showBlackPreviewFallback
+              ? 'La vista previa web no funcionó. Usá la cámara nativa para sacar la foto.'
+              : 'Tocá capturar o el botón de abajo para abrir la cámara nativa.'}
           </p>
         </div>
       )}
@@ -102,12 +106,19 @@ export function CameraView({
         )}
       </div>
 
-      <div className="safe-bottom relative z-10 flex flex-col items-center pb-10 pt-4">
+      <div className="safe-bottom relative z-10 flex flex-col items-center gap-3 pb-10 pt-4">
         <CaptureButton
           disabled={!isReady || isCapturing}
           isReady={isReady}
           onCapture={onCapture}
         />
+        <button
+          type="button"
+          onClick={onUseNativeCamera}
+          className="min-h-[44px] rounded-full border border-white/25 bg-black/45 px-5 py-2 text-xs font-semibold text-white/90 backdrop-blur-sm"
+        >
+          Usar cámara del celular
+        </button>
       </div>
 
       <AnimatePresence>
