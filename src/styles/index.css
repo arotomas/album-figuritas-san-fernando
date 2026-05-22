@@ -74,16 +74,39 @@
     margin-inline: auto;
   }
 
-  .map-container .mapboxgl-canvas {
+  .map-container .leaflet-container {
     outline: none;
+    background: #141416;
+    font-family: inherit;
   }
 
   .map-container {
-    filter: saturate(0.75) brightness(0.88) contrast(1.05);
+    filter: saturate(0.55) brightness(0.78) contrast(1.08);
   }
 
-  .map-container .mapboxgl-ctrl-bottom-left {
-    opacity: 0.5;
+  .map-container .leaflet-control-attribution {
+    opacity: 0.45;
+    font-size: 9px;
+    background: rgba(10, 10, 11, 0.65) !important;
+    color: rgba(255, 255, 255, 0.55) !important;
+  }
+
+  .map-container .leaflet-control-attribution a {
+    color: rgba(255, 255, 255, 0.65) !important;
+  }
+
+  .leaflet-figure-marker,
+  .leaflet-user-marker {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .map-vignette {
+    background: radial-gradient(
+      ellipse at 50% 45%,
+      transparent 35%,
+      rgba(10, 10, 11, 0.42) 100%
+    );
   }
 
   .capture-screen {

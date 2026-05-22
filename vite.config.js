@@ -57,11 +57,11 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/api\.mapbox\.com\/.*/i,
+            urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'mapbox-tiles',
-              expiration: { maxEntries: 40, maxAgeSeconds: 86400 },
+              cacheName: 'osm-tiles',
+              expiration: { maxEntries: 80, maxAgeSeconds: 86400 },
               networkTimeoutSeconds: 4,
             },
           },
@@ -73,7 +73,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('mapbox-gl')) return 'mapbox'
+          if (id.includes('leaflet') || id.includes('react-leaflet')) return 'leaflet'
           if (id.includes('framer-motion')) return 'motion'
           if (id.includes('react-icons')) return 'icons'
         },

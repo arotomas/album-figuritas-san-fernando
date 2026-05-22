@@ -1,4 +1,5 @@
-export { MapView } from './MapView'
+export { LeafletMapView } from './LeafletMapView'
+export { LeafletMapView as MapView } from './LeafletMapView'
 export { FigureMarker } from './FigureMarker'
 export { NearFigureOverlay } from './NearFigureOverlay'
 export { UserLocationDot } from './UserLocationDot'
