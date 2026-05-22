@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { syncQaModeFromUrl, isQaModeEnabled } from './utils/qaMode'
+import { syncQaModeFromUrl, isQaMode } from './utils/qaMode'
 import { LazyMotion, domAnimation } from 'framer-motion'
 import { AppRoutes } from './routes'
 import { HydrationScreen } from './components/layout/HydrationScreen'
@@ -18,11 +18,11 @@ function App() {
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
 
   useEffect(() => {
-    syncQaModeFromUrl(`${location.pathname}${location.search}`)
+    syncQaModeFromUrl()
   }, [location.pathname, location.search])
 
   useEffect(() => {
-    if (!isQaModeEnabled(`${location.pathname}${location.search}`) && !isDevMode()) {
+    if (!isQaMode() && !isDevMode()) {
       clearQaTestFigure()
     }
   }, [clearQaTestFigure, location.pathname, location.search])

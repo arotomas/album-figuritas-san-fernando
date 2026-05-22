@@ -2,53 +2,45 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isDevMode } from './devMode'
 
-const QA_SESSION_KEY = 'figuritas-qa-mode'
+const QA_SESSION_KEY = 'album-qa-mode'
+const QA_SESSION_KEY_LEGACY = 'figuritas-qa-mode'
 
-export function hasQaQueryParam(search = '') {
-  if (!search) return false
-  try {
-    return new URLSearchParams(search).get('qa') === '1'
-  } catch {
-    return false
-  }
-}
-
-/**
- * Activa QA temporal si la URL incluye ?qa=1 (persiste solo en esta pestaña).
- */
-export function syncQaModeFromUrl(search) {
+export function isQaMode() {
   if (typeof window === 'undefined') return false
 
   try {
-    const query = search ?? window.location.search
-    if (hasQaQueryParam(query)) {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('qa') === '1') {
       sessionStorage.setItem(QA_SESSION_KEY, '1')
       return true
     }
-  } catch {
-    // sessionStorage no disponible
-  }
 
-  return false
-}
+    if (sessionStorage.getItem(QA_SESSION_KEY) === '1') {
+      return true
+    }
 
-export function isQaModeEnabled(search) {
-  if (typeof window === 'undefined') return false
+    if (sessionStorage.getItem(QA_SESSION_KEY_LEGACY) === '1') {
+      sessionStorage.setItem(QA_SESSION_KEY, '1')
+      return true
+    }
 
-  const query = search ?? window.location.search
-  if (hasQaQueryParam(query)) {
-    syncQaModeFromUrl(query)
-    return true
-  }
-
-  try {
-    return sessionStorage.getItem(QA_SESSION_KEY) === '1'
+    return false
   } catch {
     return false
   }
 }
 
-export function withQaParam(path, active = isQaModeEnabled()) {
+/** @deprecated usar isQaMode */
+export function syncQaModeFromUrl() {
+  return isQaMode()
+}
+
+/** @deprecated usar isQaMode */
+export function isQaModeEnabled() {
+  return isQaMode()
+}
+
+export function withQaParam(path, active = isQaMode()) {
   if (!active || typeof path !== 'string') return path
 
   const [pathname, rawSearch = ''] = path.split('?')
@@ -58,21 +50,19 @@ export function withQaParam(path, active = isQaModeEnabled()) {
   return query ? `${pathname}?${query}` : pathname
 }
 
-/** Dev local o QA temporal en producción (?qa=1 en esta sesión). */
-export function canUseTestFigure(search) {
-  return isDevMode() || isQaModeEnabled(search)
+export function canUseTestFigure() {
+  return isDevMode() || isQaMode()
 }
 
 export function useQaMode() {
   const location = useLocation()
-  const [active, setActive] = useState(() =>
-    isQaModeEnabled(`${location.pathname}${location.search}`),
-  )
+  const [, setTick] = useState(0)
 
   useEffect(() => {
-    const enabled = isQaModeEnabled(`${location.pathname}${location.search}`)
-    setActive(enabled)
-  }, [location.pathname, location.search])
+    setTick((value) => value + 1)
+  }, [location.search, location.pathname])
+
+  const active = isQaMode()
 
   return {
     isQaActive: active,

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { useAuth } from '../hooks/useAuth'
 import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
@@ -7,7 +7,7 @@ import { isWpConfigured } from '../services/api'
 import { getCurrentPosition } from '../services/geoService'
 import { GPS_HIGH_ACCURACY_OPTIONS } from '../config/gps'
 import { isDevMode } from '../utils/devMode'
-import { useQaMode } from '../utils/qaMode'
+import { isQaMode, withQaParam } from '../utils/qaMode'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -17,8 +17,8 @@ const STATUS_LABELS = {
 
 export function OptionsScreen() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
-  const { isQaActive, showQaTools, withQa } = useQaMode()
   const resetProgress = useAppStore((state) => state.resetProgress)
   const setQaTestFigureNear = useAppStore((state) => state.setQaTestFigureNear)
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
@@ -28,6 +28,16 @@ export function OptionsScreen() {
   const progress = useAppStore(selectProgress)
   const [qaMessage, setQaMessage] = useState(null)
   const [qaLoading, setQaLoading] = useState(false)
+
+  const qaEnabled = isQaMode()
+  const devEnabled = isDevMode()
+
+  useEffect(() => {
+    console.log('[QA options]', {
+      search: window.location.search,
+      qa: isQaMode(),
+    })
+  }, [location.search, location.pathname])
 
   const handleCreateQaFigure = async () => {
     setQaMessage(null)
@@ -46,7 +56,7 @@ export function OptionsScreen() {
       }
 
       setQaMessage('Figurita QA creada a ~5–10m. Andá al mapa.')
-      navigate(withQa('/map'))
+      navigate(withQaParam('/map'))
     } catch {
       setQaMessage('No pudimos obtener tu ubicación. Revisá permisos GPS.')
     } finally {
@@ -63,6 +73,12 @@ export function OptionsScreen() {
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6">
       <h1 className="text-xl font-bold text-ink">Opciones</h1>
       <p className="mt-1 text-sm text-muted">Configuración de la app</p>
+
+      {qaEnabled && (
+        <p className="mt-4 rounded-lg border border-cyan-500 bg-cyan-100 px-3 py-2 text-center text-sm font-bold uppercase tracking-wide text-cyan-900">
+          QA ENABLED
+        </p>
+      )}
 
       <div className="mt-8 space-y-4 rounded-2xl border border-border bg-surface p-5">
         <div>
@@ -102,44 +118,48 @@ export function OptionsScreen() {
         </div>
       </div>
 
-      {showQaTools && (
-        <div
-          className={`mt-6 space-y-3 rounded-2xl border p-5 ${
-            isQaActive
-              ? 'border-cyan-400/40 bg-cyan-50'
-              : 'border-amber-400/30 bg-amber-50'
-          }`}
-        >
-          <p
-            className={`text-xs font-bold uppercase tracking-wide ${
-              isQaActive ? 'text-cyan-900' : 'text-amber-800'
-            }`}
-          >
-            {isQaActive ? 'Modo QA temporal' : 'Modo prueba (dev)'}
+      {qaEnabled && (
+        <div className="mt-6 space-y-3 rounded-2xl border border-cyan-400/40 bg-cyan-50 p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-cyan-900">
+            Modo QA temporal
           </p>
-          <p className={`text-sm ${isQaActive ? 'text-cyan-950/80' : 'text-amber-900/80'}`}>
+          <p className="text-sm text-cyan-950/80">
             Crea una figurita temporal a 5–10m de tu ubicación. Flujo real:
             proximidad → cámara → foto → desbloqueo. Solo memoria — no backend.
           </p>
-          {isQaActive && (
-            <p className="text-xs text-cyan-800/90">
-              Activado con{' '}
-              <code className="rounded bg-cyan-100 px-1">?qa=1</code> en esta sesión.
-            </p>
-          )}
-          {!isQaActive && isDevMode() && (
-            <p className="text-xs text-amber-800/90">Disponible en entorno de desarrollo.</p>
-          )}
           {qaTestFigure && (
-            <p className={`text-xs ${isQaActive ? 'text-cyan-900' : 'text-amber-800'}`}>
-              Activa: {qaTestFigure.nombre}
-            </p>
+            <p className="text-xs text-cyan-900">Activa: {qaTestFigure.nombre}</p>
           )}
           {qaMessage && (
-            <p className={`text-xs ${isQaActive ? 'text-cyan-950' : 'text-amber-900'}`}>
-              {qaMessage}
-            </p>
+            <p className="text-xs text-cyan-950">{qaMessage}</p>
           )}
+          <Button
+            variant="outline"
+            disabled={qaLoading}
+            onClick={handleCreateQaFigure}
+          >
+            {qaLoading ? 'Obteniendo ubicación…' : 'Crear figurita de prueba cerca mío'}
+          </Button>
+          {qaTestFigure && (
+            <Button variant="ghost" onClick={handleClearQaFigure}>
+              Eliminar figurita QA
+            </Button>
+          )}
+        </div>
+      )}
+
+      {devEnabled && !qaEnabled && (
+        <div className="mt-6 space-y-3 rounded-2xl border border-amber-400/30 bg-amber-50 p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+            Modo prueba (dev)
+          </p>
+          <p className="text-sm text-amber-900/80">
+            Mismas herramientas QA disponibles en entorno de desarrollo.
+          </p>
+          {qaTestFigure && (
+            <p className="text-xs text-amber-800">Activa: {qaTestFigure.nombre}</p>
+          )}
+          {qaMessage && <p className="text-xs text-amber-900">{qaMessage}</p>}
           <Button
             variant="outline"
             disabled={qaLoading}
