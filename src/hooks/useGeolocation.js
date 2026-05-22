@@ -12,6 +12,13 @@ import {
   GPS_UPDATE_INTERVAL_MS,
   GPS_ACCEPT_MAX_ACCURACY_M,
   GPS_PROXIMITY_MAX_ACCURACY_M,
+  GPS_INITIAL_FIX_RETRY_MS,
+  GPS_INITIAL_FIX_MAX_ATTEMPTS,
+  GPS_NO_FIX_TIMEOUT_MS,
+  GPS_STALL_TIMEOUT_MS,
+  GPS_STALLED_LABEL,
+  GPS_ACQUISITION_LABEL,
+  GPS_NO_FIX_MESSAGE,
   DEBUG_GPS,
   canUseProximity,
   getAccuracyTier,
@@ -59,6 +66,14 @@ export function useGeolocation(options = {}) {
   const timeoutCountRef = useRef(0)
   const updateCountRef = useRef(0)
   const discardCountRef = useRef(0)
+  const hasAnyFixRef = useRef(false)
+  const acquisitionGenerationRef = useRef(0)
+  const initialRetryTimersRef = useRef([])
+  const noFixTimerRef = useRef(null)
+  const stallTimerRef = useRef(null)
+  const lastGpsUpdateAtRef = useRef(null)
+  const lastValidFixAtRef = useRef(null)
+  const stallLoggedRef = useRef(false)
 
   const [position, setPosition] = useState(null)
   const [error, setError] = useState(null)
@@ -79,6 +94,99 @@ export function useGeolocation(options = {}) {
   const [lastFixOutcome, setLastFixOutcome] = useState(null)
   const [isWatching, setIsWatching] = useState(false)
   const [approximateMessage, setApproximateMessage] = useState(null)
+  const [acquisitionStatus, setAcquisitionStatus] = useState('initializing')
+  const [acquisitionMessage, setAcquisitionMessage] = useState(
+    GPS_ACQUISITION_LABEL.initializing,
+  )
+  const [lastValidFixAt, setLastValidFixAt] = useState(null)
+  const [isGpsStalled, setIsGpsStalled] = useState(false)
+
+  const clearStallTimer = useCallback(() => {
+    if (stallTimerRef.current) {
+      clearTimeout(stallTimerRef.current)
+      stallTimerRef.current = null
+    }
+  }, [])
+
+  const scheduleStallCheck = useCallback(() => {
+    clearStallTimer()
+    if (!stopRef.current) return
+
+    stallTimerRef.current = setTimeout(() => {
+      if (!stopRef.current) return
+      if (!lastGpsUpdateAtRef.current) return
+
+      setIsGpsStalled(true)
+      if (!stallLoggedRef.current) {
+        stallLoggedRef.current = true
+        gpsLog.stalledNoUpdates({
+          elapsedMs: Date.now() - lastGpsUpdateAtRef.current,
+          lastUpdateAt: lastGpsUpdateAtRef.current,
+        })
+      }
+      patchGpsDiagnostics({
+        isGpsStalled: true,
+        gpsStalledMessage: GPS_STALLED_LABEL,
+        lastValidFixAt: lastValidFixAtRef.current,
+      })
+    }, GPS_STALL_TIMEOUT_MS)
+  }, [clearStallTimer])
+
+  const recordGpsUpdate = useCallback(
+    (reading, meta = {}) => {
+      const now = Date.now()
+      const fixAt = reading?.timestamp ?? now
+
+      lastGpsUpdateAtRef.current = now
+      lastValidFixAtRef.current = fixAt
+      stallLoggedRef.current = false
+      setIsGpsStalled(false)
+      setLastValidFixAt(fixAt)
+
+      gpsLog.lastValidFix({
+        at: fixAt,
+        lat: reading?.lat,
+        lng: reading?.lng,
+        accuracy: reading?.accuracy,
+        source: meta.apiSource,
+      })
+
+      patchGpsDiagnostics({
+        lastValidFixAt: fixAt,
+        isGpsStalled: false,
+        gpsStalledMessage: null,
+        lastGpsUpdateAt: now,
+      })
+
+      scheduleStallCheck()
+    },
+    [scheduleStallCheck],
+  )
+
+  const clearAcquisitionTimers = useCallback(() => {
+    initialRetryTimersRef.current.forEach(clearTimeout)
+    initialRetryTimersRef.current = []
+    if (noFixTimerRef.current) {
+      clearTimeout(noFixTimerRef.current)
+      noFixTimerRef.current = null
+    }
+  }, [])
+
+  const markAnyFixReceived = useCallback(() => {
+    if (hasAnyFixRef.current) return
+    hasAnyFixRef.current = true
+    clearAcquisitionTimers()
+    setAcquisitionStatus('ready')
+    setAcquisitionMessage(GPS_ACQUISITION_LABEL.ready)
+    setIsLoading(false)
+    patchGpsDiagnostics({
+      acquisitionStatus: 'ready',
+      acquisitionMessage: GPS_ACQUISITION_LABEL.ready,
+    })
+  }, [clearAcquisitionTimers])
+
+  const markAnyFixReceivedRef = useRef(markAnyFixReceived)
+  markAnyFixReceivedRef.current = markAnyFixReceived
 
   const syncDerivedState = useCallback((nextPosition, refining) => {
     const tier = getAccuracyTier(nextPosition?.accuracy)
@@ -245,6 +353,10 @@ export function useGeolocation(options = {}) {
       const next = normalizeGeoPosition(geoPosition, { phase })
       const source = estimateFixSource(geoPosition, { maximumAge })
 
+      recordGpsUpdate(next, { apiSource })
+
+      markAnyFixReceivedRef.current?.()
+
       if (DEBUG_GPS || import.meta.env.DEV) {
         gpsLog.rawReading({ ...next, apiSource, phase })
       }
@@ -307,7 +419,7 @@ export function useGeolocation(options = {}) {
       })
       return true
     },
-    [recordDiscard],
+    [recordDiscard, recordGpsUpdate],
   )
 
   if (!throttledApplyRefinedRef.current) {
@@ -345,10 +457,17 @@ export function useGeolocation(options = {}) {
     stopRef.current?.()
     stopRef.current = null
     setIsWatching(false)
-  }, [])
+    clearAcquisitionTimers()
+    clearStallTimer()
+    setIsGpsStalled(false)
+    stallLoggedRef.current = false
+  }, [clearAcquisitionTimers, clearStallTimer])
 
   const resetGpsSession = useCallback(() => {
     clearLastKnownPosition()
+    clearAcquisitionTimers()
+    hasAnyFixRef.current = false
+    acquisitionGenerationRef.current += 1
     positionRef.current = null
     hasAcceptedFixRef.current = false
     setPosition(null)
@@ -358,7 +477,15 @@ export function useGeolocation(options = {}) {
     setError(null)
     setErrorType(null)
     setShowSoftWarning(false)
-  }, [])
+    setAcquisitionStatus('initializing')
+    setAcquisitionMessage(GPS_ACQUISITION_LABEL.initializing)
+    lastGpsUpdateAtRef.current = null
+    lastValidFixAtRef.current = null
+    stallLoggedRef.current = false
+    setLastValidFixAt(null)
+    setIsGpsStalled(false)
+    clearStallTimer()
+  }, [clearAcquisitionTimers, clearStallTimer])
 
   const handleWatchError = useCallback(
     (geoError) => {
@@ -411,7 +538,7 @@ export function useGeolocation(options = {}) {
         setGpsPhase('searching')
       }
 
-      if (!hasAcceptedFixRef.current && elapsed >= GPS_HARD_ERROR_MS && !previewPosition) {
+      if (!hasAcceptedFixRef.current && elapsed >= GPS_HARD_ERROR_MS && !previewPosition && !hasAnyFixRef.current) {
         setError(
           classified.type === 'timeout'
             ? 'No pudimos obtener tu ubicación. Probá al aire libre.'
@@ -431,8 +558,18 @@ export function useGeolocation(options = {}) {
 
   const ingestPosition = useCallback(
     (geoPosition, apiSource) => {
-      const current = positionRef.current
       const preview = normalizeGeoPosition(geoPosition, { phase: 'refined' })
+
+      if (apiSource === 'watchPosition') {
+        gpsLog.watchUpdate({
+          lat: preview.lat,
+          lng: preview.lng,
+          accuracy: preview.accuracy,
+          timestamp: preview.timestamp,
+        })
+      }
+
+      const current = positionRef.current
       const shouldApplyImmediate =
         !current || preview.accuracy < (current.accuracy ?? Infinity) - 4
 
@@ -449,6 +586,103 @@ export function useGeolocation(options = {}) {
     },
     [tryApplyFix],
   )
+
+  const requestInitialFix = useCallback(
+    (attempt, generation) => {
+      if (generation !== acquisitionGenerationRef.current) return
+      if (hasAnyFixRef.current) return
+
+      gpsLog.requestingInitialFix({
+        attempt,
+        maxAttempts: GPS_INITIAL_FIX_MAX_ATTEMPTS,
+      })
+
+      setAcquisitionStatus(attempt === 1 ? 'initializing' : 'waiting')
+      setAcquisitionMessage(
+        attempt === 1
+          ? GPS_ACQUISITION_LABEL.initializing
+          : GPS_ACQUISITION_LABEL.waiting,
+      )
+      patchGpsDiagnostics({
+        acquisitionStatus: attempt === 1 ? 'initializing' : 'waiting',
+        acquisitionMessage:
+          attempt === 1
+            ? GPS_ACQUISITION_LABEL.initializing
+            : GPS_ACQUISITION_LABEL.waiting,
+        initialFixAttempt: attempt,
+      })
+
+      getCurrentPosition(geoOptionsRef.current)
+        .then((geoPosition) => {
+          if (generation !== acquisitionGenerationRef.current) return
+          gpsLog.initialFixSuccess({
+            attempt,
+            accuracy: geoPosition.coords.accuracy,
+            lat: geoPosition.coords.latitude,
+            lng: geoPosition.coords.longitude,
+          })
+          ingestPosition(geoPosition, 'getCurrentPosition')
+        })
+        .catch((geoError) => {
+          if (generation !== acquisitionGenerationRef.current) return
+          gpsLog.initialFixTimeout({
+            attempt,
+            code: geoError?.code,
+            message: geoError?.message,
+          })
+        })
+    },
+    [ingestPosition],
+  )
+
+  const startInitialAcquisition = useCallback(
+    (generation) => {
+      clearAcquisitionTimers()
+      hasAnyFixRef.current = false
+      setAcquisitionStatus('initializing')
+      setAcquisitionMessage(GPS_ACQUISITION_LABEL.initializing)
+
+      requestInitialFix(1, generation)
+
+      for (let attempt = 2; attempt <= GPS_INITIAL_FIX_MAX_ATTEMPTS; attempt += 1) {
+        const timer = setTimeout(() => {
+          if (generation !== acquisitionGenerationRef.current) return
+          if (hasAnyFixRef.current) return
+          requestInitialFix(attempt, generation)
+        }, GPS_INITIAL_FIX_RETRY_MS * (attempt - 1))
+        initialRetryTimersRef.current.push(timer)
+      }
+
+      noFixTimerRef.current = setTimeout(() => {
+        if (generation !== acquisitionGenerationRef.current) return
+        if (hasAnyFixRef.current) return
+
+        setAcquisitionStatus('no_response')
+        setAcquisitionMessage(GPS_ACQUISITION_LABEL.no_response)
+        setError(GPS_NO_FIX_MESSAGE)
+        setErrorType('no_fix')
+        setIsLoading(false)
+        patchGpsDiagnostics({
+          acquisitionStatus: 'no_response',
+          acquisitionMessage: GPS_ACQUISITION_LABEL.no_response,
+          error: GPS_NO_FIX_MESSAGE,
+          errorType: 'no_fix',
+        })
+      }, GPS_NO_FIX_TIMEOUT_MS)
+    },
+    [clearAcquisitionTimers, requestInitialFix],
+  )
+
+  const startContinuousWatch = useCallback(() => {
+    stopRef.current = watchPosition(
+      (geoPosition) => ingestPosition(geoPosition, 'watchPosition'),
+      handleWatchError,
+      geoOptionsRef.current,
+    )
+    setIsWatching(true)
+    patchGpsDiagnostics({ isWatching: true })
+    scheduleStallCheck()
+  }, [handleWatchError, ingestPosition, scheduleStallCheck])
 
   const startWatching = useCallback(() => {
     if (getQaState().forcePermissionDenied) {
@@ -473,29 +707,21 @@ export function useGeolocation(options = {}) {
     if (applyMockIfNeeded()) return
 
     stopWatching()
-    setIsWatching(true)
+    const generation = acquisitionGenerationRef.current
     startTimeRef.current = Date.now()
     timeoutCountRef.current = 0
     setIsLoading(true)
     setGpsPhase('searching')
     setGpsStatusLabel('Buscando ubicación…')
 
-    getCurrentPosition(geoOptionsRef.current)
-      .then((geoPosition) => {
-        ingestPosition(geoPosition, 'getCurrentPosition')
-      })
-      .catch((geoError) => {
-        handleWatchError(geoError)
-      })
-
-    stopRef.current = watchPosition(
-      (geoPosition) => ingestPosition(geoPosition, 'watchPosition'),
-      handleWatchError,
-      geoOptionsRef.current,
-    )
-
-    patchGpsDiagnostics({ isWatching: true })
-  }, [applyMockIfNeeded, handleWatchError, ingestPosition, stopWatching])
+    startInitialAcquisition(generation)
+    startContinuousWatch()
+  }, [
+    applyMockIfNeeded,
+    startContinuousWatch,
+    startInitialAcquisition,
+    stopWatching,
+  ])
 
   const handlePermissionChangeRef = useRef(null)
   handlePermissionChangeRef.current = (event) => {
@@ -566,8 +792,24 @@ export function useGeolocation(options = {}) {
       isLocationAccepted: lastFixOutcome === 'accepted',
       geolocationAvailable: GEOLOCATION_AVAILABLE,
       approximateMessage,
+      acquisitionStatus,
+      acquisitionMessage,
+      lastValidFixAt,
+      isGpsStalled,
+      gpsStalledMessage: isGpsStalled ? GPS_STALLED_LABEL : null,
     })
-  }, [isLoading, permission, isWatching, position, lastFixOutcome, approximateMessage])
+  }, [
+    isLoading,
+    permission,
+    isWatching,
+    position,
+    lastFixOutcome,
+    approximateMessage,
+    acquisitionStatus,
+    acquisitionMessage,
+    lastValidFixAt,
+    isGpsStalled,
+  ])
 
   useEffect(() => {
     clearLastKnownPosition()
@@ -610,6 +852,8 @@ export function useGeolocation(options = {}) {
     return () => {
       unsubQa()
       cancelScheduled(throttledApplyRefinedRef.current)
+      clearAcquisitionTimers()
+      clearStallTimer()
       permissionStatusRef.current?.removeEventListener?.(
         'change',
         handlePermissionChangeRef.current,
@@ -642,7 +886,12 @@ export function useGeolocation(options = {}) {
     errorType,
     approximateMessage,
     showPreciseLocationHelp,
-    isLoading: isLoading && !hasAcceptedFixRef.current,
+    acquisitionStatus,
+    acquisitionMessage,
+    lastValidFixAt,
+    isGpsStalled,
+    gpsStalledMessage: isGpsStalled ? GPS_STALLED_LABEL : null,
+    isLoading: isLoading && !hasAnyFixRef.current && !hasAcceptedFixRef.current,
     isRefining,
     isWatching,
     gpsPhase,

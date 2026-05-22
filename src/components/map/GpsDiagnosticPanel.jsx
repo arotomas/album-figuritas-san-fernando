@@ -151,7 +151,16 @@ function GpsDiagnosticPanelInner({
                 ? `${formatCoord(trustedPosition.lat)}, ${formatCoord(trustedPosition.lng)}`
                 : '—'}
             </p>
+            <p>
+              Último fix válido:{' '}
+              {formatGpsTimestamp(gps.lastValidFixAt ?? reading?.timestamp)}
+            </p>
             <p>watchPosition: {gps.isWatching ? 'activo' : 'inactivo'}</p>
+            {gps.isGpsStalled && (
+              <p className="text-amber-300">
+                estado: {gps.gpsStalledMessage ?? 'GPS detenido o sin señal'}
+              </p>
+            )}
             {errorLabel && <p className="text-red-300">error: {errorLabel}</p>}
             <p>
               updates: {gps.updates ?? 0} · descartes: {gps.discards ?? 0}

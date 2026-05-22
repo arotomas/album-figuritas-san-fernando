@@ -33,6 +33,26 @@ export const GPS_CAPTURE_MAX_ACCURACY_M = 30
 /** @deprecated alias — usar GPS_ACCEPT_MAX_ACCURACY_M */
 export const GPS_USABLE_ACCURACY_M = GPS_ACCEPT_MAX_ACCURACY_M
 
+/** Reintentos de getCurrentPosition si watchPosition no entrega primer fix (Android) */
+export const GPS_INITIAL_FIX_RETRY_MS = 5_000
+export const GPS_INITIAL_FIX_MAX_ATTEMPTS = 3
+export const GPS_NO_FIX_TIMEOUT_MS = 20_000
+
+/** Sin updates GPS crudos durante este tiempo → GPS detenido o sin señal */
+export const GPS_STALL_TIMEOUT_MS = 15_000
+
+export const GPS_STALLED_LABEL = 'GPS detenido o sin señal'
+
+export const GPS_ACQUISITION_LABEL = {
+  initializing: 'Inicializando GPS…',
+  waiting: 'Esperando señal GPS…',
+  ready: 'GPS listo',
+  no_response: 'GPS sin respuesta',
+}
+
+export const GPS_NO_FIX_MESSAGE =
+  'Tu celular no está entregando ubicación GPS. Probá abrir Google Maps primero o activar Ubicación precisa.'
+
 /** Tiempo antes de mostrar error si no hay ningún fix aceptable */
 export const GPS_HARD_ERROR_MS = 12_000
 

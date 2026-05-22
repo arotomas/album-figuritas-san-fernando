@@ -75,6 +75,8 @@ export function buildGpsDiagnosticReport({
         : '—'
     }`,
     `watch: ${gps.isWatching ? 'activo' : 'inactivo'}`,
+    `último fix válido: ${formatGpsTimestamp(gps.lastValidFixAt ?? reading?.timestamp)}`,
+    `estado GPS: ${gps.isGpsStalled ? gps.gpsStalledMessage ?? 'GPS detenido o sin señal' : 'activo'}`,
     `error: ${getGpsErrorLabel(gps.errorType) ?? '—'}`,
     '',
     '--- Proximidad ---',

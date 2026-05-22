@@ -93,4 +93,22 @@ export const gpsLog = {
   error: (...args) => {
     if (shouldLog()) console.warn('[GPS]', ...args)
   },
+  requestingInitialFix(data) {
+    emit('info', 'requesting initial fix', data)
+  },
+  initialFixSuccess(data) {
+    emit('info', 'initial fix success', data)
+  },
+  initialFixTimeout(data) {
+    emit('warn', 'initial fix timeout', data)
+  },
+  watchUpdate(data) {
+    emit('info', 'watch update', data)
+  },
+  lastValidFix(data) {
+    emit('info', 'last valid fix', data)
+  },
+  stalledNoUpdates(data) {
+    emit('warn', 'stalled/no updates', data)
+  },
 }

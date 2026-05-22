@@ -33,6 +33,8 @@ export function getGpsErrorLabel(errorType) {
       return 'Error watchPosition'
     case 'approximate':
       return 'Ubicación aproximada (>80m)'
+    case 'no_fix':
+      return 'Sin respuesta GPS'
     default:
       return errorType ?? null
   }

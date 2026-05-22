@@ -231,6 +231,8 @@ function LeafletMapViewInner({
     geolocationAvailable,
     approximateMessage,
     showPreciseLocationHelp,
+    acquisitionStatus,
+    acquisitionMessage,
     retryPreciseLocation,
     requestSingleFix,
     startTracking,
@@ -293,25 +295,39 @@ function LeafletMapViewInner({
     }
   }, [nearFigure, onNearFigureChange])
 
+  const showAcquisitionBanner =
+    (acquisitionStatus === 'initializing' ||
+      acquisitionStatus === 'waiting' ||
+      acquisitionStatus === 'no_response') &&
+    errorType !== 'no_fix'
+
   const showGpsBanner =
     !error &&
     !mapPosition &&
+    !showAcquisitionBanner &&
     (gpsPhase === 'searching' || isLoading || showSoftWarning)
 
   const showRefiningBanner =
     !error &&
     mapPosition &&
+    acquisitionStatus === 'ready' &&
     (gpsPhase === 'refining' ||
       qualityState === 'refining' ||
       showSoftWarning)
 
-  const gpsBannerLabel = showSoftWarning
-    ? 'Señal débil — seguimos buscando…'
-    : mapPosition?.accuracy
-      ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
-      : gpsStatusLabel
+  const gpsBannerLabel = showAcquisitionBanner
+    ? acquisitionMessage
+    : showSoftWarning
+      ? 'Señal débil — seguimos buscando…'
+      : acquisitionStatus === 'ready' && mapPosition
+        ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
+        : mapPosition?.accuracy
+          ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
+          : gpsStatusLabel
 
   const showApproximateBanner = Boolean(approximateMessage) && errorType !== 'denied'
+
+  const showNoFixBanner = errorType === 'no_fix'
 
   const showHardError = error && errorType === 'denied'
 
@@ -354,6 +370,19 @@ function LeafletMapViewInner({
         <div className="map-vignette pointer-events-none absolute inset-0 z-[400]" aria-hidden />
       </div>
 
+      {showAcquisitionBanner && (
+        <MapGpsStatus
+          label={gpsBannerLabel}
+          phase={
+            acquisitionStatus === 'no_response'
+              ? 'warn'
+              : acquisitionStatus === 'ready'
+                ? 'ready'
+                : 'searching'
+          }
+        />
+      )}
+
       {showGpsBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
@@ -366,6 +395,20 @@ function LeafletMapViewInner({
           label={gpsBannerLabel}
           phase={showSoftWarning ? 'warn' : 'refining'}
         />
+      )}
+
+      {showNoFixBanner && (
+        <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-red-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
+          <p className="text-sm font-semibold text-red-200">{acquisitionMessage}</p>
+          <p className="mt-2 text-xs leading-relaxed text-red-200/90">{error}</p>
+          <button
+            type="button"
+            onClick={retryPreciseLocation}
+            className="mt-3 min-h-[44px] w-full rounded-lg border border-red-400/40 bg-red-950/50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-100 active:scale-[0.98]"
+          >
+            Reintentar ubicación precisa
+          </button>
+        </div>
       )}
 
       {showApproximateBanner && (
@@ -402,7 +445,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {error && !showHardError && !showApproximateBanner && (
+      {error && !showHardError && !showApproximateBanner && !showNoFixBanner && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500]">
           <MapGpsStatus label={error} phase="warn" />
           <button
