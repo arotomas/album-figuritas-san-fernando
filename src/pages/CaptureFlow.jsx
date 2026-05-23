@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CameraView } from '../components/camera'
+import { NativeCapturePanel } from '../components/camera/NativeCapturePanel'
 import { CameraAccessGate } from '../components/camera/CameraAccessGate'
 import { PermissionFallback } from '../components/qa/PermissionFallback'
 import { useGeolocation } from '../hooks/useGeolocation'
@@ -37,6 +38,7 @@ export function CaptureFlow() {
   const nearFigure = useAppStore((state) => state.nearFigure)
   const figures = useAppStore((state) => state.figures)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
+  const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
 
   const {
@@ -61,9 +63,11 @@ export function CaptureFlow() {
     camera,
     capture,
     captureFromFile,
+    openNativeCapture,
     compressedPhoto,
     captureError,
     rewardFigure,
+    pendingFigure,
     gpsProgress,
     gpsAccuracy,
     isReady,
@@ -72,6 +76,7 @@ export function CaptureFlow() {
     isApproximateGps,
     distanceMeters,
     retryCapture,
+    clearPendingCapture,
     showRewardComplete,
     complete,
   } = useCaptureFlow({
@@ -80,10 +85,21 @@ export function CaptureFlow() {
     onObtainFigure: handleObtain,
   })
 
+  const nativeAutoOpenRef = useRef(false)
+
   const isPostCapturePhase =
     phase === CAPTURE_PHASES.REWARD ||
     phase === CAPTURE_PHASES.UNLOCK ||
     phase === CAPTURE_PHASES.DONE
+
+  const isCaptureSessionActive =
+    isPostCapturePhase ||
+    phase === CAPTURE_PHASES.CAPTURING ||
+    phase === CAPTURE_PHASES.COMPRESSING ||
+    isProcessing ||
+    Boolean(pendingFigure)
+
+  const displayFigure = pendingFigure ?? nearFigure
 
   useEffect(() => {
     camera.initPermission()
@@ -95,7 +111,7 @@ export function CaptureFlow() {
   }, [])
 
   useEffect(() => {
-    if (!nearFigure || isPostCapturePhase) return
+    if (!nearFigure || isCaptureSessionActive) return
 
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
     const stored = figures.find(
@@ -105,7 +121,22 @@ export function CaptureFlow() {
       setNearFigure(null)
       navigate('/map', { replace: true })
     }
-  }, [nearFigure, figures, isPostCapturePhase, navigate, setNearFigure])
+  }, [nearFigure, figures, isCaptureSessionActive, navigate, setNearFigure])
+
+  useEffect(() => {
+    if (!camera.nativeOnly || !nearFigure || isCaptureSessionActive) return
+    if (nativeAutoOpenRef.current) return
+    if (!inCaptureRange) return
+
+    nativeAutoOpenRef.current = true
+    openNativeCapture()
+  }, [
+    camera.nativeOnly,
+    inCaptureRange,
+    isCaptureSessionActive,
+    nearFigure,
+    openNativeCapture,
+  ])
 
   useAppLifecycle({
     onVisible: async () => {
@@ -132,10 +163,10 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
-    if (!nearFigure && !isPostCapturePhase) {
+    if (!nearFigure && !isCaptureSessionActive) {
       navigate('/map', { replace: true })
     }
-  }, [nearFigure, isPostCapturePhase, navigate])
+  }, [nearFigure, isCaptureSessionActive, navigate])
 
   useEffect(() => {
     const lockPortrait = async () => {
@@ -160,15 +191,19 @@ export function CaptureFlow() {
   const handleClose = useCallback(() => {
     stopVibration()
     camera.stop()
+    clearPendingCapture()
+    nativeAutoOpenRef.current = false
     setNearFigure(null)
     navigate('/map')
-  }, [camera, navigate, setNearFigure])
+  }, [camera, clearPendingCapture, navigate, setNearFigure])
 
   const handleComplete = useCallback(() => {
     complete()
+    clearQaTestFigure()
     setNearFigure(null)
+    nativeAutoOpenRef.current = false
     navigate('/map', { replace: true })
-  }, [complete, navigate, setNearFigure])
+  }, [clearQaTestFigure, complete, navigate, setNearFigure])
 
   const handleRetryGeo = useCallback(async () => {
     requestPermission()
@@ -192,6 +227,11 @@ export function CaptureFlow() {
     },
     [captureFromFile],
   )
+
+  const handleRetryNative = useCallback(() => {
+    nativeAutoOpenRef.current = false
+    retryCapture()
+  }, [retryCapture])
 
   const geoPermissionDenied = geoErrorType === 'denied'
   const geoSignalIssue =
@@ -219,7 +259,7 @@ export function CaptureFlow() {
     )
   }
 
-  if (!nearFigure) return null
+  if (!nearFigure && !pendingFigure) return null
 
   if (needsGeoUi) {
     return (
@@ -234,7 +274,7 @@ export function CaptureFlow() {
     )
   }
 
-  if (camera.needsPrompt) {
+  if (!camera.nativeOnly && camera.needsPrompt) {
     return (
       <CameraAccessGate
         variant="prompt"
@@ -245,7 +285,7 @@ export function CaptureFlow() {
     )
   }
 
-  if (camera.isDenied) {
+  if (!camera.nativeOnly && camera.isDenied) {
     return (
       <CameraAccessGate
         variant="denied"
@@ -260,15 +300,33 @@ export function CaptureFlow() {
     phase === CAPTURE_PHASES.COMPRESSING ||
     isProcessing
 
+  const showCaptureError =
+    Boolean(captureError) &&
+    phase === CAPTURE_PHASES.CAMERA &&
+    !isProcessing
+
+  if (camera.nativeOnly) {
+    return (
+      <NativeCapturePanel
+        figure={displayFigure}
+        fileInputRef={camera.fileInputRef}
+        isProcessing={isCapturing}
+        inCaptureRange={inCaptureRange}
+        distanceMeters={distanceMeters}
+        gpsStatusLabel={gpsStatusLabel}
+        captureError={showCaptureError ? captureError : null}
+        onFileSelected={handleFileSelected}
+        onRetry={handleRetryNative}
+        onClose={handleClose}
+      />
+    )
+  }
+
   const showCamera =
-    camera.nativeOnly ||
     camera.isLoading ||
     camera.isReady ||
     camera.useNativeFallback ||
     phase === CAPTURE_PHASES.CAMERA
-
-  const showCaptureError =
-    Boolean(captureError) && phase === CAPTURE_PHASES.CAMERA && !isProcessing
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -285,12 +343,12 @@ export function CaptureFlow() {
         <CameraView
           videoRef={camera.videoRef}
           fileInputRef={camera.fileInputRef}
-          figure={nearFigure}
+          figure={displayFigure}
           gpsProgress={gpsProgress}
           gpsAccuracy={gpsAccuracy}
           isReady={isReady}
           isCapturing={isCapturing}
-          nativeOnly={camera.nativeOnly}
+          nativeOnly={false}
           useNativeFallback={camera.useNativeFallback}
           showBlackPreviewFallback={camera.showBlackPreviewFallback}
           inCaptureRange={inCaptureRange}
@@ -302,7 +360,7 @@ export function CaptureFlow() {
         />
       )}
 
-      {camera.isLoading && !camera.nativeOnly && (
+      {camera.isLoading && (
         <div className="safe-top safe-bottom pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-black/60">
           <p className="map-skeleton-pulse text-sm text-white/90">Abriendo cámara…</p>
         </div>

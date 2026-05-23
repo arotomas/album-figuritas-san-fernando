@@ -158,10 +158,7 @@ export const useAppStore = create(
           if (existing?.obtenida) {
             persistLog.persist('obtain skipped — already obtained', realFigureId)
             saved = true
-            return {
-              ...state,
-              qaTestFigure: null,
-            }
+            return state
           }
 
           const patch = {
@@ -174,10 +171,7 @@ export const useAppStore = create(
 
           persistLog.persist('figure obtained', realFigureId)
           saved = true
-          return {
-            ...applyFigureUpdate(state, realFigureId, patch),
-            qaTestFigure: null,
-          }
+          return applyFigureUpdate(state, realFigureId, patch)
         })
 
         return saved
