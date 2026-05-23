@@ -31,14 +31,17 @@ export function UnlockAnimation({ onComplete }) {
   return (
     <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8 text-center">
       <ParticleLayer rareza="épica" intensity={0.5} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,rgba(140,198,63,0.18),transparent_58%)]" />
 
       <m.div
-        initial={{ scale: 0.4, opacity: 0, rotate: -20 }}
-        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        initial={{ scale: 0.72, opacity: 0, rotate: -8, y: 28 }}
+        animate={{ scale: 1, opacity: 1, rotate: 0, y: 0 }}
         transition={motionTokens.spring.gentle}
-        className="relative z-10 mb-6 text-5xl"
+        className="reward-pack relative z-10 mb-7 flex h-36 w-52 items-center justify-center rounded-[1.75rem] border border-progress/30 bg-gradient-to-br from-progress via-[#b8dc77] to-[#25320f] shadow-[0_22px_70px_rgba(140,198,63,0.22)]"
       >
-        ✨
+        <div className="absolute inset-x-0 top-1/2 h-px bg-white/35" />
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/25" />
+        <span className="text-5xl drop-shadow-md">✨</span>
       </m.div>
 
       <m.h1
@@ -47,8 +50,16 @@ export function UnlockAnimation({ onComplete }) {
         transition={{ delay: 0.15, ease: motionTokens.ease.premium }}
         className={`${typeClasses.display} relative z-10 text-2xl text-warm-white`}
       >
-        ¡Hay una nueva figurita desbloqueada!
+        ¡Nueva figurita!
       </m.h1>
+      <m.p
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, ease: motionTokens.ease.out }}
+        className={`${typeClasses.label} relative z-10 mt-3 rounded-full border border-progress/30 bg-progress/10 px-4 py-2 text-progress`}
+      >
+        Se abrió un nuevo slot del álbum
+      </m.p>
 
       <m.div
         initial={{ opacity: 0, y: 24 }}

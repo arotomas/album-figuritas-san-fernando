@@ -17,6 +17,28 @@ const PHASES = {
   DONE: 'done',
 }
 
+function MiniConfetti({ rareza }) {
+  const rarity = getRarity(rareza)
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden" aria-hidden>
+      {Array.from({ length: 18 }).map((_, index) => (
+        <span
+          key={index}
+          className="reward-confetti absolute rounded-sm"
+          style={{
+            left: `${8 + ((index * 31) % 84)}%`,
+            top: `${12 + ((index * 17) % 22)}%`,
+            width: 5 + (index % 3),
+            height: 8 + (index % 2) * 4,
+            background: index % 4 === 0 ? '#8cc63f' : rarity.colors.particle,
+            animationDelay: `${index * 0.035}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const [phase, setPhase] = useState(PHASES.ENTER)
   const rarity = getRarity(figure?.rareza)
@@ -75,16 +97,36 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
         intensity={phase === PHASES.REVEAL || phase === PHASES.SHINE ? 1.2 : 0.6}
         className="z-0"
       />
+      {(phase === PHASES.REVEAL || phase === PHASES.SHINE || phase === PHASES.INFO) && (
+        <MiniConfetti rareza={figure.rareza} />
+      )}
 
       {/* Label */}
       <m.p
         initial={{ opacity: 0, y: -20, letterSpacing: '0.3em' }}
         animate={{ opacity: 1, y: 0, letterSpacing: '0.2em' }}
         transition={{ duration: 0.6, ease: motionTokens.ease.premium }}
-        className={`${typeClasses.micro} relative z-10 mb-8 text-progress`}
+        className={`${typeClasses.micro} relative z-10 mb-5 rounded-full border border-progress/25 bg-progress/10 px-4 py-2 text-progress shadow-[0_0_24px_rgba(140,198,63,0.16)]`}
       >
-        ✦ Nueva figurita ✦
+        ¡Nueva figurita!
       </m.p>
+
+      <m.div
+        initial={{ opacity: 0, y: 24, scale: 0.85 }}
+        animate={{
+          opacity: phase === PHASES.ENTER ? 1 : 0,
+          y: phase === PHASES.ENTER ? 0 : -18,
+          scale: phase === PHASES.ENTER ? 1 : 1.08,
+        }}
+        transition={{ duration: 0.45, ease: motionTokens.ease.premium }}
+        className="reward-pack relative z-10 mb-5 flex h-28 w-44 items-center justify-center rounded-[1.4rem] border border-progress/30 bg-gradient-to-br from-progress via-[#b8dc77] to-[#314313] shadow-[0_18px_50px_rgba(140,198,63,0.18)]"
+      >
+        <div className="absolute inset-x-0 top-1/2 h-px bg-white/35" />
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/25" />
+        <span className={`${typeClasses.micro} relative z-10 rounded-full bg-ink px-3 py-1 text-progress`}>
+          Pack SF
+        </span>
+      </m.div>
 
       {/* Card flip */}
       <m.div
@@ -144,11 +186,12 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
           {figure.nombre}
         </h2>
         <p
-          className="mt-2 font-body text-sm leading-relaxed"
+          className="mt-2 inline-flex rounded-full border border-white/10 px-4 py-1.5 font-body text-sm font-bold leading-relaxed"
           style={{ color: rarity.colors.primary }}
         >
-          {rarity.label} · Colección San Fernando
+          Rareza {rarity.label}
         </p>
+        <p className="mt-3 font-body text-xs text-white/40">Colección San Fernando</p>
       </m.div>
     </div>
   )

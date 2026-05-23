@@ -13,14 +13,15 @@ function LockedFigureCardInner({
   const rarity = getRarity(figure.rareza)
   const isFeatured = variant === 'featured'
   const reduced = prefersReducedMotion()
+  const isBonus = Boolean(figure.is_bonus)
 
   return (
     <div
-      className={`album-locked relative overflow-hidden ${isFeatured ? 'aspect-[4/5]' : 'aspect-[3/4]'} ${className}`}
+      className={`album-locked relative overflow-hidden ${isBonus ? 'album-locked-bonus' : ''} ${isFeatured ? 'aspect-[4/5]' : 'aspect-[3/4]'} ${className}`}
     >
       {/* Partial rarity frame — teasing what's hidden */}
       <div
-        className={`absolute inset-0 opacity-30 ${rarity.tailwind.frame}`}
+        className={`absolute inset-0 ${isBonus ? 'opacity-45' : 'opacity-30'} ${rarity.tailwind.frame}`}
         aria-hidden
       />
       <div className={`absolute inset-x-0 top-0 h-1 ${rarity.tailwind.accent} opacity-40`} />
@@ -28,10 +29,10 @@ function LockedFigureCardInner({
       {/* Silhouette / emoji ghost */}
       <div className="absolute inset-0 flex items-center justify-center">
         <span
-          className={`select-none opacity-[0.18] grayscale ${isFeatured ? 'text-[7rem]' : 'text-5xl'}`}
+          className={`select-none grayscale ${isBonus ? 'opacity-[0.12]' : 'opacity-[0.18]'} ${isFeatured ? 'text-[7rem]' : 'text-5xl'}`}
           aria-hidden
         >
-          {figure.emoji}
+          {isBonus ? '✦' : figure.emoji}
         </span>
       </div>
 
@@ -60,11 +61,13 @@ function LockedFigureCardInner({
 
         {isFeatured && (
           <>
-            <p className={`${typeClasses.micro} mt-2 text-white/50`}>
-              Por descubrir
+            <p className={`${typeClasses.micro} mt-2 ${isBonus ? 'text-amber-100/70' : 'text-white/50'}`}>
+              {isBonus ? 'Bonus oculto' : 'Por descubrir'}
             </p>
             <p className={`${albumClasses.featuredDescription} max-w-[220px] text-white/45`}>
-              Desbloqueá más figuritas explorando San Fernando
+              {isBonus
+                ? 'Una figurita especial puede aparecer cuando estés cerca.'
+                : 'Desbloqueá más figuritas explorando San Fernando.'}
             </p>
           </>
         )}

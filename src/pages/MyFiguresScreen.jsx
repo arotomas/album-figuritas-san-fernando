@@ -48,11 +48,13 @@ export function MyFiguresScreen() {
   const mainFigures = useMemo(() => getRevealedNormalFigures(sanitizedFigures), [sanitizedFigures])
   const bonusFigures = useMemo(() => getBonusFigures(sanitizedFigures), [sanitizedFigures])
   const [section, setSection] = useState('main')
-  const figures = section === 'bonus' ? bonusFigures : mainFigures
-  const visibleProgress = section === 'bonus'
+  const isBonusSection = section === 'bonus'
+  const figures = isBonusSection ? bonusFigures : mainFigures
+  const hasSectionFigures = figures.length > 0
+  const visibleProgress = isBonusSection
     ? bonusFigures.filter((figure) => figure.obtenida).length
     : mainProgress.obtained
-  const visibleTotal = section === 'bonus' ? bonusFigures.length : mainProgress.visibleTotal
+  const visibleTotal = isBonusSection ? bonusFigures.length : mainProgress.visibleTotal
 
   const preferredId = lastObtenidaFigureId ?? lastViewedFigureId
   const initialActiveId = resolveActiveFigureId(preferredId, figures)
@@ -125,27 +127,27 @@ export function MyFiguresScreen() {
   const arrowButtonClass =
     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-white/95 text-ink shadow-md disabled:pointer-events-none disabled:opacity-30 active:scale-95'
 
-  if (!hasHydrated || sanitizedFigures.length === 0 || figures.length === 0) {
+  if (!hasHydrated || sanitizedFigures.length === 0) {
     return <AlbumScreenSkeleton />
   }
 
-  if (!activeFigure) {
+  if (!activeFigure && hasSectionFigures) {
     return <AlbumScreenSkeleton />
   }
 
   return (
-    <div className="my-figures-screen relative flex h-full min-h-0 flex-col overflow-hidden">
-      <AlbumBackground rareza={activeFigure.rareza} />
+    <div className={`my-figures-screen relative flex h-full min-h-0 flex-col overflow-hidden ${isBonusSection ? 'album-bonus-mode' : ''}`}>
+      <AlbumBackground rareza={activeFigure?.rareza ?? (isBonusSection ? 'legendaria' : 'común')} />
 
       <header className="my-figures-header relative z-10 shrink-0 px-6 pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className={albumClasses.headerEyebrow}>Tu colección</p>
             <h1 className={`${typeClasses.display} mt-1 text-xl text-ink`}>
-              Mis figuritas
+              Álbum de figuritas
             </h1>
             <p className="mt-1 font-body text-sm text-muted">
-              San Fernando · Álbum digital
+              San Fernando · Colección del jugador
             </p>
           </div>
           <span className="shrink-0 rounded-full border border-border/80 bg-white/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-muted backdrop-blur-sm">
@@ -155,32 +157,65 @@ export function MyFiguresScreen() {
 
         <div className="mt-4">
           <AlbumProgress progress={mainProgress.obtained} total={mainProgress.visibleTotal} />
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-[1.25rem] border border-white/70 bg-white/55 p-1 shadow-sm backdrop-blur-sm">
             <button
               type="button"
               onClick={() => setSection('main')}
-              className={`rounded-full px-3 py-2 text-xs font-bold ${
-                section === 'main' ? 'bg-ink text-white' : 'bg-white/70 text-muted'
+              className={`rounded-2xl px-3 py-2 text-xs font-bold transition ${
+                section === 'main' ? 'bg-progress text-ink shadow-md' : 'text-muted'
               }`}
             >
-              Álbum principal · {mainProgress.obtained}/{mainProgress.visibleTotal}
+              <span className="block">Álbum principal</span>
+              <span className="text-[10px] opacity-75">{mainProgress.obtained}/{mainProgress.visibleTotal}</span>
             </button>
             <button
               type="button"
               onClick={() => setSection('bonus')}
-              className={`rounded-full px-3 py-2 text-xs font-bold ${
-                section === 'bonus' ? 'bg-ink text-white' : 'bg-white/70 text-muted'
+              className={`rounded-2xl px-3 py-2 text-xs font-bold transition ${
+                section === 'bonus' ? 'bg-charcoal text-amber-100 shadow-md' : 'text-muted'
               }`}
             >
-              Bonus · {bonusFigures.filter((figure) => figure.obtenida).length}/{bonusFigures.length}
+              <span className="block">Bonus</span>
+              <span className="text-[10px] opacity-75">{bonusFigures.filter((figure) => figure.obtenida).length}/{bonusFigures.length}</span>
             </button>
           </div>
         </div>
       </header>
 
       <div className="my-figures-scroll relative z-10 min-h-0 flex-1 scroll-y-app px-4">
-        <div className="my-figures-featured flex flex-col items-center py-2">
-          {mobileLayout ? (
+        <div className="album-page-shell mx-auto flex min-h-full w-full max-w-[390px] flex-col items-center rounded-t-[2rem] px-3 pb-4 pt-3">
+          <div className="mb-2 flex w-full items-center justify-between px-1">
+            <div>
+              <p className={`${typeClasses.micro} ${isBonusSection ? 'text-amber-200/80' : 'text-muted'}`}>
+                {isBonusSection ? 'Sección secreta' : 'Página principal'}
+              </p>
+              <h2 className={`${typeClasses.headline} text-base ${isBonusSection ? 'text-amber-50' : 'text-ink'}`}>
+                {isBonusSection ? 'Bonus' : 'Álbum principal'}
+              </h2>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${
+              isBonusSection ? 'bg-amber-300/15 text-amber-100' : 'bg-progress/20 text-ink'
+            }`}>
+              {visibleProgress}/{visibleTotal || 0}
+            </span>
+          </div>
+
+          {!hasSectionFigures ? (
+            <div className="flex min-h-[360px] w-full flex-1 items-center justify-center rounded-[1.5rem] border border-dashed border-amber-200/25 bg-charcoal/90 p-6 text-center shadow-inner">
+              <div>
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-amber-200/20 bg-amber-300/10 text-5xl text-amber-100/70 shadow-[0_0_40px_rgba(251,191,36,0.12)]">
+                  ✦
+                </div>
+                <h3 className={`${typeClasses.headline} mt-5 text-lg text-amber-50`}>
+                  Bonus ocultas
+                </h3>
+                <p className="mt-2 font-body text-sm leading-6 text-white/55">
+                  Todavía no hay bonus reveladas. Cuando una épica o legendaria aparezca cerca,
+                  la vas a ver acá.
+                </p>
+              </div>
+            </div>
+          ) : mobileLayout ? (
             <div className="flex w-full max-w-[360px] items-stretch gap-2">
               <button
                 type="button"
@@ -278,7 +313,7 @@ export function MyFiguresScreen() {
             </div>
           )}
 
-          <AnimatePresence mode="wait">
+          {hasSectionFigures && <AnimatePresence mode="wait">
             <m.p
               key={activeFigure.id}
               initial={{ opacity: 0, y: 4 }}
@@ -287,20 +322,22 @@ export function MyFiguresScreen() {
               transition={album.transition.fade}
               className={`${albumClasses.hint} mt-3 shrink-0 px-2 text-center`}
             >
-              {section === 'bonus' ? 'Bonus' : 'Álbum principal'} · {activeIndex + 1} de {figures.length} · {visibleProgress}/{visibleTotal}
+              {section === 'bonus' ? 'Bonus' : 'Álbum principal'} · slot {activeIndex + 1} de {figures.length} · {visibleProgress}/{visibleTotal}
             </m.p>
-          </AnimatePresence>
+          </AnimatePresence>}
         </div>
       </div>
 
-      <div className="my-figures-carousel-wrap relative z-10 shrink-0 border-t border-border/40 bg-warm-white/80 backdrop-blur-sm">
-        <FigureCarousel
-          figures={figures}
-          activeId={activeFigure.id}
-          lastObtenidaId={lastObtenidaFigureId}
-          onSelect={handleSelect}
-          compact={mobileLayout}
-        />
+      <div className="my-figures-carousel-wrap safe-bottom relative z-10 shrink-0 border-t border-border/40 bg-warm-white/85 pb-1 backdrop-blur-sm">
+        {hasSectionFigures && (
+          <FigureCarousel
+            figures={figures}
+            activeId={activeFigure.id}
+            lastObtenidaId={lastObtenidaFigureId}
+            onSelect={handleSelect}
+            compact={mobileLayout}
+          />
+        )}
       </div>
     </div>
   )
