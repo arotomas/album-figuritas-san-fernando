@@ -17,6 +17,10 @@ import {
   logSessionPhase,
 } from '../../utils/sessionDebug'
 import { useAuthDebugStore } from '../../store/useAuthDebugStore'
+import {
+  PROFILE_ADDRESS_COLUMNS,
+  withAddressDefaults,
+} from './profile'
 
 export function isSupabaseConfigured() {
   return Boolean(
@@ -222,7 +226,7 @@ async function signInAnonymouslyVerified() {
   return { session: persistedSession, user: userResponse.data.user }
 }
 
-async function upsertAndVerifyProfile(userId, username) {
+async function upsertAndVerifyProfile(userId, username, address = null) {
   const trimmed = username?.trim()
   if (!userId || !trimmed) {
     throw new Error('USERNAME_REQUIRED')
@@ -231,18 +235,40 @@ async function upsertAndVerifyProfile(userId, username) {
   profileLog.info('upsert start', { userId, username: trimmed })
   profileDebug.info('upsert start', { userId, username: trimmed })
 
-  const upsertResponse = await supabase
+  const payload = {
+    id: userId,
+    username: trimmed,
+    is_admin: false,
+  }
+
+  if (address) {
+    Object.assign(payload, {
+      direccion_texto: address.direccion_texto?.trim() || null,
+      direccion_lat: address.direccion_lat ?? null,
+      direccion_lng: address.direccion_lng ?? null,
+      localidad: address.localidad?.trim() || null,
+      provincia: address.provincia?.trim() || null,
+      pais: address.pais?.trim() || null,
+      codigo_postal: address.codigo_postal?.trim() || null,
+    })
+  }
+
+  let upsertResponse = await supabase
     .from('profiles')
-    .upsert(
-      {
-        id: userId,
-        username: trimmed,
-        is_admin: false,
-      },
-      { onConflict: 'id' },
-    )
-    .select('id, username, avatar_url, is_admin, created_at')
+    .upsert(payload, { onConflict: 'id' })
+    .select(PROFILE_ADDRESS_COLUMNS)
     .single()
+
+  if (upsertResponse.error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(upsertResponse.error.message ?? '')) {
+    upsertResponse = await supabase
+      .from('profiles')
+      .upsert(
+        { id: userId, username: trimmed, is_admin: false },
+        { onConflict: 'id' },
+      )
+      .select('id, username, avatar_url, is_admin, created_at')
+      .single()
+  }
 
   profileDebug.info('upsert response', summarizePostgrestResponse(upsertResponse))
 
@@ -264,9 +290,19 @@ async function upsertAndVerifyProfile(userId, username) {
 
   const readResponse = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, is_admin, created_at')
+    .select(PROFILE_ADDRESS_COLUMNS)
     .eq('id', userId)
     .single()
+
+  if (readResponse.error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(readResponse.error.message ?? '')) {
+    const fallbackRead = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, is_admin, created_at')
+      .eq('id', userId)
+      .single()
+    readResponse.data = withAddressDefaults(fallbackRead.data)
+    readResponse.error = fallbackRead.error
+  }
 
   profileDebug.info('read-back response', summarizePostgrestResponse(readResponse))
 
@@ -297,11 +333,11 @@ async function upsertAndVerifyProfile(userId, username) {
     username: readResponse.data.username,
   })
   profileDebug.info('upsert verified', readResponse.data)
-  return readResponse.data
+  return withAddressDefaults(readResponse.data)
 }
 
-export async function ensureProfile(userId, username) {
-  return upsertAndVerifyProfile(userId, username)
+export async function ensureProfile(userId, username, address = null) {
+  return upsertAndVerifyProfile(userId, username, address)
 }
 
 /** Restaura sesión persistida — NO crea usuarios nuevos. */
@@ -339,11 +375,19 @@ export async function restoreSupabaseSession() {
 }
 
 export async function fetchProfile(userId) {
-  const response = await supabase
+  let response = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, is_admin, created_at')
+    .select(PROFILE_ADDRESS_COLUMNS)
     .eq('id', userId)
     .maybeSingle()
+
+  if (response.error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(response.error.message ?? '')) {
+    response = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, is_admin, created_at')
+      .eq('id', userId)
+      .maybeSingle()
+  }
 
   profileDebug.info('fetchProfile response', summarizePostgrestResponse(response))
   if (response.error) {
@@ -362,10 +406,10 @@ export async function fetchProfile(userId) {
       username: response.data.username,
     })
   }
-  return response.data
+  return withAddressDefaults(response.data)
 }
 
-export async function loginWithUsername(username) {
+export async function loginWithUsername(username, address = null) {
   const trimmed = username?.trim()
   if (!trimmed) {
     throw new Error('USERNAME_REQUIRED')
@@ -419,7 +463,7 @@ export async function loginWithUsername(username) {
     sessionStatus: 'active',
   })
 
-  const profile = await upsertAndVerifyProfile(user.id, trimmed)
+  const profile = await upsertAndVerifyProfile(user.id, trimmed, address)
 
   const finalSession = await verifyPersistedSession(user.id, 'before login complete')
 

@@ -3,10 +3,12 @@ import { motion } from 'framer-motion'
 import { Logo } from '../components/Logo'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
+import { AddressAutocomplete } from '../components/profile/AddressAutocomplete'
 import { useAuth } from '../hooks/useAuth'
 import { authLog } from '../utils/authLog'
 import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
+import { hasValidAddress } from '../utils/parseGooglePlace'
 
 const SERVER_ERROR_MESSAGE =
   'No pudimos conectar con el servidor. Probá de nuevo.'
@@ -14,6 +16,7 @@ const SERVER_ERROR_MESSAGE =
 export function LoginScreen() {
   const { login, isSubmitting } = useAuth()
   const [username, setUsername] = useState('')
+  const [selectedAddress, setSelectedAddress] = useState(null)
   const [error, setError] = useState(null)
 
   const handleSubmit = async (event) => {
@@ -26,9 +29,14 @@ export function LoginScreen() {
       return
     }
 
+    if (!hasValidAddress(selectedAddress)) {
+      setError('Elegí tu dirección de la lista de sugerencias.')
+      return
+    }
+
     authLog.info('login submit', { username: trimmed })
 
-    const result = await login({ username: trimmed })
+    const result = await login({ username: trimmed, address: selectedAddress })
     if (!result.ok) {
       setError(result.message ?? SERVER_ERROR_MESSAGE)
     }
@@ -48,7 +56,7 @@ export function LoginScreen() {
         <motion.div variants={staggerItem} className="text-center">
           <h1 className="font-display text-2xl font-bold text-ink">Entrá al álbum</h1>
           <p className="mt-2 text-sm text-muted">
-            Elegí un nombre o apodo para guardar tu progreso.
+            Elegí un nombre y tu dirección para guardar tu progreso en la zona.
           </p>
         </motion.div>
 
@@ -64,6 +72,14 @@ export function LoginScreen() {
           />
         </motion.div>
 
+        <motion.div variants={staggerItem}>
+          <AddressAutocomplete
+            onAddressSelect={setSelectedAddress}
+            required
+            helperText="Buscá calles y barrios de Zona Norte. Elegí una sugerencia."
+          />
+        </motion.div>
+
         {error && (
           <motion.div variants={staggerItem} className="space-y-2">
             <p className="text-center text-sm font-medium text-red-600">{error}</p>
@@ -71,7 +87,7 @@ export function LoginScreen() {
         )}
 
         <motion.div variants={staggerItem}>
-          <Button type="submit" disabled={isSubmitting || !username.trim()}>
+          <Button type="submit" disabled={isSubmitting || !username.trim() || !hasValidAddress(selectedAddress)}>
             {isSubmitting ? 'Verificando con Supabase…' : 'Entrar'}
           </Button>
         </motion.div>

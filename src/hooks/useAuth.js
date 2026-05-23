@@ -38,7 +38,7 @@ export function useAuth() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleLogin = useCallback(
-    async ({ username }) => {
+    async ({ username, address = null }) => {
       const trimmed = username?.trim()
       if (!trimmed) {
         return { ok: false, message: 'Escribí tu nombre o apodo para entrar.' }
@@ -56,7 +56,10 @@ export function useAuth() {
       setIsSubmitting(true)
 
       try {
-        const { userId, profile, session, user: authUser } = await loginWithUsername(trimmed)
+        const { userId, profile, session, user: authUser } = await loginWithUsername(
+          trimmed,
+          address,
+        )
 
         if (!session?.user?.id || !profile?.id || !authUser?.id) {
           authLog.error('login blocked — verification incomplete after auth')

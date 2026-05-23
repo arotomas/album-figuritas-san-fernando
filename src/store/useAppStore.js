@@ -107,6 +107,8 @@ function resetStoreToDefaults() {
     isSupabaseAdmin: false,
     supabaseUsername: null,
     supabaseProfileId: null,
+    supabaseProfileAddress: null,
+    supabaseProfileLocalidad: null,
     lastSupabaseSyncWarning: null,
   })
 }
@@ -174,6 +176,8 @@ export const useAppStore = create(
       isSupabaseAdmin: false,
       supabaseUsername: null,
       supabaseProfileId: null,
+      supabaseProfileAddress: null,
+      supabaseProfileLocalidad: null,
       lastSupabaseSyncWarning: null,
 
       setHasHydrated: (value) => set({ _hasHydrated: value }),
@@ -183,8 +187,10 @@ export const useAppStore = create(
           supabaseUserId: userId,
           supabaseReady: Boolean(userId),
           isSupabaseAdmin: isAdmin,
-          supabaseUsername: profile?.username ?? null,
-          supabaseProfileId: profile?.id ?? null,
+      supabaseUsername: profile?.username ?? null,
+      supabaseProfileId: profile?.id ?? null,
+      supabaseProfileAddress: profile?.direccion_texto ?? null,
+      supabaseProfileLocalidad: profile?.localidad ?? null,
         }),
 
       setSupabaseSyncWarning: (warning) =>
@@ -754,6 +760,8 @@ export const useAppStore = create(
           isSupabaseAdmin: false,
           supabaseUsername: null,
           supabaseProfileId: null,
+          supabaseProfileAddress: null,
+          supabaseProfileLocalidad: null,
           lastSupabaseSyncWarning: null,
         })
       },

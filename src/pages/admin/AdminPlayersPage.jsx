@@ -14,6 +14,10 @@ import {
   StatCard,
 } from '../../components/admin/adminShared'
 import { getFigureChallenge } from '../../utils/figureChallenges'
+import {
+  AdminPlayerLocationMap,
+  AdminPlayersDistributionMap,
+} from '../../components/admin/AdminPlayerLocationMap'
 
 export function AdminPlayersPage() {
   const [players, setPlayers] = useState([])
@@ -103,6 +107,7 @@ export function AdminPlayersPage() {
   }
 
   return (
+    <div className="space-y-6">
     <>
       <div className="flex items-end justify-between">
         <p className="text-sm text-muted">
@@ -123,6 +128,16 @@ export function AdminPlayersPage() {
       </div>
 
       <AdminErrorBanner message={error} />
+
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+        <h3 className="text-lg font-black">Distribución de domicilios</h3>
+        <p className="mt-1 text-sm text-muted">
+          Vista admin — ubicación aproximada según dirección declarada por cada jugador.
+        </p>
+        <div className="mt-4">
+          <AdminPlayersDistributionMap players={players} className="h-[360px]" />
+        </div>
+      </section>
 
       <div className="grid grid-cols-[minmax(520px,0.8fr)_minmax(0,1.2fr)] gap-6">
         <div className="min-w-0 rounded-2xl border border-border bg-white shadow-sm">
@@ -240,6 +255,36 @@ export function AdminPlayersPage() {
                   <p>Alta: {formatDate(playerDetail.profile.created_at)}</p>
                   <p>Última captura: {formatDate(playerDetail.summary.lastActivity)}</p>
                 </div>
+
+                <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-blue-900">
+                    Domicilio (solo admin)
+                  </p>
+                  {playerDetail.profile.direccion_texto ? (
+                    <>
+                      <p className="mt-2 text-sm font-semibold text-ink">
+                        {playerDetail.profile.direccion_texto}
+                      </p>
+                      <p className="mt-1 text-xs text-muted">
+                        {[playerDetail.profile.localidad, playerDetail.profile.provincia]
+                          .filter(Boolean)
+                          .join(', ')}
+                        {playerDetail.profile.codigo_postal
+                          ? ` · CP ${playerDetail.profile.codigo_postal}`
+                          : ''}
+                      </p>
+                      <div className="mt-3">
+                        <AdminPlayerLocationMap
+                          lat={playerDetail.profile.direccion_lat}
+                          lng={playerDetail.profile.direccion_lng}
+                          label={playerDetail.profile.username ?? 'Jugador'}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">Sin dirección registrada.</p>
+                  )}
+                </div>
               </div>
 
               <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -356,5 +401,6 @@ export function AdminPlayersPage() {
 
       <PhotoPreviewModal preview={photoPreview} onClose={() => setPhotoPreview(null)} />
     </>
+    </div>
   )
 }
