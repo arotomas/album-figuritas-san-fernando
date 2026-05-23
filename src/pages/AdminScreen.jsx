@@ -16,6 +16,7 @@ import {
   MARKER_ICON_MIME_TYPES,
   uploadMarkerIcon,
 } from '../services/supabase/storage'
+import { isBonusFigure, isMainAlbumFigure } from '../utils/figureGameRules'
 
 const RARITY_OPTIONS = ['común', 'rara', 'épica', 'legendaria']
 const DEFAULT_FIGURE_FORM = {
@@ -54,6 +55,52 @@ function StatCard({ label, value }) {
 
 function normalizeText(value) {
   return String(value ?? '').trim().toLowerCase()
+}
+
+function getGamePlacement(figure) {
+  const isBonus = isBonusFigure(figure)
+  const isMain = isMainAlbumFigure(figure)
+  return {
+    isBonus,
+    isMain,
+    label: isBonus ? 'Bonus / Secreta' : 'Álbum principal',
+    help: isBonus
+      ? 'No cuenta para el progreso principal. Puede aparecer como secreta o especial.'
+      : 'Se muestra dentro del progreso principal del jugador.',
+    rarity: normalizeText(figure?.rarity ?? figure?.rareza),
+    isHidden: Boolean(figure?.is_hidden),
+    isForcedBonus: Boolean(figure?.is_bonus),
+  }
+}
+
+function GameTypeBadges({ figure }) {
+  const placement = getGamePlacement(figure)
+  const badges = [
+    placement.isBonus
+      ? { label: 'Bonus', className: 'bg-violet-100 text-violet-800' }
+      : { label: 'Principal', className: 'bg-progress/15 text-ink' },
+  ]
+
+  if (placement.isHidden) badges.push({ label: 'Oculta', className: 'bg-slate-900 text-white' })
+  if (placement.rarity === 'legendaria') {
+    badges.push({ label: 'Legendaria', className: 'bg-amber-100 text-amber-800' })
+  }
+  if (placement.rarity === 'épica' || placement.rarity === 'epica') {
+    badges.push({ label: 'Épica', className: 'bg-purple-100 text-purple-800' })
+  }
+
+  return (
+    <div className="flex min-w-[150px] flex-wrap gap-1.5">
+      {badges.map((badge) => (
+        <span
+          key={badge.label}
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${badge.className}`}
+        >
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function toFigureForm(figure) {
@@ -125,6 +172,10 @@ export function AdminScreen() {
     dateFrom: '',
     dateTo: '',
   })
+  const [figureFilters, setFigureFilters] = useState({
+    type: 'all',
+    status: 'all',
+  })
 
   const userOptions = useMemo(
     () => [...new Set(captures.map((capture) => capture.username).filter(Boolean))].sort(),
@@ -153,6 +204,30 @@ export function AdminScreen() {
   }, [captures, filters])
 
   const recentCaptures = useMemo(() => filteredCaptures.slice(0, 20), [filteredCaptures])
+  const filteredFigures = useMemo(
+    () =>
+      figures.filter((figure) => {
+        const placement = getGamePlacement(figure)
+        const matchesType =
+          figureFilters.type === 'all' ||
+          (figureFilters.type === 'main' && placement.isMain) ||
+          (figureFilters.type === 'bonus' && placement.isBonus) ||
+          (figureFilters.type === 'hidden' && placement.isHidden)
+        const matchesStatus =
+          figureFilters.status === 'all' ||
+          (figureFilters.status === 'active' && figure.active) ||
+          (figureFilters.status === 'inactive' && !figure.active)
+
+        return matchesType && matchesStatus
+      }),
+    [figureFilters, figures],
+  )
+
+  const updateFigureFilter = (key, value) => {
+    setFigureFilters((current) => ({ ...current, [key]: value }))
+  }
+
+  const figureFormPlacement = useMemo(() => getGamePlacement(figureForm), [figureForm])
 
   const loadAdmin = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
@@ -580,6 +655,37 @@ export function AdminScreen() {
                 </button>
               </div>
 
+              <div className="mt-5 flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-slate-50 p-4">
+                <label className="text-xs font-bold uppercase tracking-wide text-muted">
+                  Tipo
+                  <select
+                    value={figureFilters.type}
+                    onChange={(event) => updateFigureFilter('type', event.target.value)}
+                    className="mt-1 block w-44 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                  >
+                    <option value="all">Todas</option>
+                    <option value="main">Principal</option>
+                    <option value="bonus">Bonus</option>
+                    <option value="hidden">Ocultas</option>
+                  </select>
+                </label>
+                <label className="text-xs font-bold uppercase tracking-wide text-muted">
+                  Estado
+                  <select
+                    value={figureFilters.status}
+                    onChange={(event) => updateFigureFilter('status', event.target.value)}
+                    className="mt-1 block w-44 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                  >
+                    <option value="all">Todas</option>
+                    <option value="active">Activas</option>
+                    <option value="inactive">Inactivas</option>
+                  </select>
+                </label>
+                <p className="pb-2 text-sm font-semibold text-muted">
+                  {filteredFigures.length} de {figures.length} figuritas visibles
+                </p>
+              </div>
+
               {figureFormOpen && (
                 <form
                   ref={figureFormRef}
@@ -705,6 +811,46 @@ export function AdminScreen() {
                             <option value="true">Sí</option>
                           </select>
                         </label>
+                      </div>
+
+                      <div
+                        className={`rounded-2xl border p-4 ${
+                          figureFormPlacement.isBonus
+                            ? 'border-violet-200 bg-violet-50'
+                            : 'border-progress/30 bg-progress/10'
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase tracking-wide text-muted">
+                          Ubicación en el juego
+                        </p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <p className="text-xl font-black text-ink">
+                            {figureFormPlacement.label}
+                          </p>
+                          <GameTypeBadges figure={figureForm} />
+                        </div>
+                        <p className="mt-2 text-sm leading-5 text-muted">
+                          {figureFormPlacement.help}
+                        </p>
+
+                        <div className="mt-3 space-y-2 text-xs font-semibold leading-5">
+                          {figureFormPlacement.isBonus &&
+                            !figureFormPlacement.isForcedBonus && (
+                              <p className="rounded-xl bg-white/70 px-3 py-2 text-violet-800">
+                                Las épicas y legendarias se muestran en la sección Bonus.
+                              </p>
+                            )}
+                          {figureFormPlacement.isForcedBonus && (
+                            <p className="rounded-xl bg-white/70 px-3 py-2 text-violet-800">
+                              Esta figurita será tratada como Bonus aunque su rareza sea común o rara.
+                            </p>
+                          )}
+                          {figureFormPlacement.isHidden && (
+                            <p className="rounded-xl bg-white/70 px-3 py-2 text-slate-800">
+                              Esta figurita no aparece en el mapa hasta que el jugador esté cerca o cumpla la regla de revelado.
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-3">
@@ -919,12 +1065,13 @@ export function AdminScreen() {
               )}
 
               <div className="mt-5 overflow-x-auto rounded-2xl border border-border">
-                <table className="min-w-[1540px] text-left text-sm">
+                <table className="min-w-[1680px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <th className="px-4 py-3">Imagen</th>
                       <th className="px-4 py-3">Title</th>
                       <th className="px-4 py-3">Rarity</th>
+                      <th className="px-4 py-3">Tipo en juego</th>
                       <th className="px-4 py-3">Bonus</th>
                       <th className="px-4 py-3">Oculta</th>
                       <th className="px-4 py-3">Active</th>
@@ -940,7 +1087,7 @@ export function AdminScreen() {
                     </tr>
                   </thead>
                   <tbody>
-                    {figures.map((figure) => (
+                    {filteredFigures.map((figure) => (
                       <tr key={figure.id} className="border-t border-border/70">
                         <td className="px-4 py-4">
                           {figure.image_url ? (
@@ -958,6 +1105,9 @@ export function AdminScreen() {
                         </td>
                         <td className="px-4 py-4 font-semibold">{figure.title}</td>
                         <td className="px-4 py-4">{figure.rarity}</td>
+                        <td className="px-4 py-4">
+                          <GameTypeBadges figure={figure} />
+                        </td>
                         <td className="px-4 py-4">{figure.is_bonus ? 'Sí' : 'No'}</td>
                         <td className="px-4 py-4">{figure.is_hidden ? 'Sí' : 'No'}</td>
                         <td className="px-4 py-4">
@@ -1023,6 +1173,13 @@ export function AdminScreen() {
                         </td>
                       </tr>
                     ))}
+                    {!filteredFigures.length && (
+                      <tr>
+                        <td colSpan="14" className="px-4 py-10 text-center text-muted">
+                          No hay figuritas para los filtros seleccionados.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
