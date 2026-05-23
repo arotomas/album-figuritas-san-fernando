@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { storageService } from '../services/storage/storageService'
 import { HYDRATION_TIMEOUT_MS, persistLog } from '../utils/persistLog'
+import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
+import { getSupabaseProjectRef } from '../utils/authDebug'
 
 function isPersistReady() {
   return (
@@ -61,6 +63,9 @@ export function usePersistedAlbum() {
       persistLog.hydrationWarn(
         `timeout ${HYDRATION_TIMEOUT_MS}ms — entering with defaults`,
       )
+      sessionDebug.error('hydration timeout — clearing album storage only (not supabase auth)', {
+        authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+      })
       try {
         storageService.clearAll()
         useAppStore.persist.clearStorage()

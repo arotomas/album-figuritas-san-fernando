@@ -21,6 +21,8 @@ import { syncUnlockToSupabase } from '../services/supabase/sync'
 import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
 import { canUseTestFigure } from '../utils/qaMode'
 import { myFiguresLog } from '../utils/myFiguresLog'
+import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
+import { getSupabaseProjectRef } from '../utils/authDebug'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
@@ -514,6 +516,10 @@ export const useAppStore = create(
         return (_state, error) => {
           if (error) {
             persistLog.hydrationWarn('rehydrate error — clearing corrupt storage', error)
+            sessionDebug.error('hydration rehydrate error — clearing album storage only', {
+              error: error?.message ?? String(error),
+              authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+            })
             try {
               storageService.clearAll()
               useAppStore.persist.clearStorage()
@@ -523,6 +529,9 @@ export const useAppStore = create(
             }
           } else {
             persistLog.hydration('rehydrate complete')
+            sessionDebug.info('hydration rehydrate complete', {
+              authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+            })
             useAppStore.getState().setHasHydrated(true)
           }
         }

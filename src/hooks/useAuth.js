@@ -11,6 +11,8 @@ import { isAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { authLog } from '../utils/authLog'
 import { authDebug } from '../utils/authDebug'
+import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
+import { getSupabaseProjectRef } from '../utils/authDebug'
 
 const SERVER_ERROR_MESSAGE =
   'No pudimos conectar con el servidor. Probá de nuevo.'
@@ -84,7 +86,17 @@ export function useAuth() {
         }
 
         login({ username: trimmed })
+
+        sessionDebug.info('after login store update — before navigation', {
+          authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+        })
+
         navigate(withQaParam('/map', isQaMode(location.search)), { replace: true })
+
+        sessionDebug.info('after navigation scheduled', {
+          authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+        })
+
         return { ok: true }
       } catch (error) {
         authLog.error('login failed', {

@@ -1,16 +1,18 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import {
-  ensureAnonymousSession,
   fetchProfile,
   isSupabaseConfigured,
+  restoreSupabaseSession,
 } from '../services/supabase/auth'
 import { isAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { supabaseLog } from '../utils/supabaseLog'
+import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
+import { getSupabaseProjectRef } from '../utils/authDebug'
 
 /**
- * Restaura sesión remota y sincroniza álbum cuando el usuario ya ingresó.
+ * Restaura sesión remota persistida — nunca crea usuarios anónimos nuevos.
  */
 export function useSupabaseBootstrap(enabled) {
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
@@ -29,11 +31,22 @@ export function useSupabaseBootstrap(enabled) {
         return
       }
 
+      sessionDebug.info('bootstrap after hydration', {
+        authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+      })
+
       try {
         supabaseLog.sync.info('bootstrap start')
 
-        const result = await ensureAnonymousSession()
-        if (cancelled || !result?.session?.user?.id) return
+        const result = await restoreSupabaseSession()
+        if (cancelled) return
+
+        if (!result?.session?.user?.id) {
+          sessionDebug.error('bootstrap aborted — no persisted supabase session', {
+            localUsername: user?.username ?? null,
+          })
+          return
+        }
 
         const userId = result.session.user.id
         const admin = await isAdmin(userId)
@@ -42,7 +55,7 @@ export function useSupabaseBootstrap(enabled) {
 
         setSupabaseAuth({ userId, isAdmin: admin })
 
-        const profile = result.profile ?? (await fetchProfile(userId))
+        const profile = await fetchProfile(userId)
         const profileUsername = profile?.username?.trim()
         const localUsername = user?.username?.trim()
 
@@ -57,13 +70,21 @@ export function useSupabaseBootstrap(enabled) {
           mergeRemoteUserFigures(remoteRows)
         }
 
+        sessionDebug.info('bootstrap complete', {
+          userId,
+          authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+        })
+
         supabaseLog.sync.info('bootstrap complete', {
           userId,
           isAdmin: admin,
           remoteFigures: remoteRows.length,
         })
       } catch (error) {
-        supabaseLog.sync.warn('bootstrap failed — local fallback', {
+        sessionDebug.error('bootstrap failed', {
+          message: error?.message ?? String(error),
+        })
+        supabaseLog.sync.warn('bootstrap failed', {
           message: error?.message ?? String(error),
         })
       }

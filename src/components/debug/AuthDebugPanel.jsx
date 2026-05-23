@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { isSupabaseConfigured } from '../../services/supabase/auth'
 import {
-  authDebug,
   buildAuthDebugSnapshot,
   getSupabaseProjectRef,
   summarizeAuthResponse,
   summarizeSession,
 } from '../../utils/authDebug'
+import {
+  inspectSupabaseAuthStorage,
+  sessionDebug,
+} from '../../utils/sessionDebug'
 import { useAuthDebugStore } from '../../store/useAuthDebugStore'
 
 export function AuthDebugPanel({ className = '' }) {
@@ -20,14 +23,24 @@ export function AuthDebugPanel({ className = '' }) {
 
     async function refreshLiveState() {
       setLoading(true)
+      const projectRef = getSupabaseProjectRef()
+      const authStorage = inspectSupabaseAuthStorage(projectRef)
+
       try {
         const sessionResponse = await supabase.auth.getSession()
-        const userResponse = await supabase.auth.getUser()
+        const hasSession = Boolean(sessionResponse.data.session?.access_token)
 
-        authDebug.info('debug panel live refresh', {
-          session: summarizeAuthResponse(sessionResponse),
-          user: summarizeAuthResponse(userResponse),
+        sessionDebug.info('debug panel live refresh — getSession', {
+          hasSession,
+          session: summarizeSession(sessionResponse.data.session),
+          authStorage,
         })
+
+        let userResponse = { data: { user: null }, error: null }
+        if (hasSession) {
+          userResponse = await supabase.auth.getUser()
+          sessionDebug.info('debug panel live refresh — getUser', summarizeAuthResponse(userResponse))
+        }
 
         if (cancelled) return
 
@@ -40,8 +53,11 @@ export function AuthDebugPanel({ className = '' }) {
                   is_anonymous: userResponse.data.user.is_anonymous,
                 }
               : null,
-            liveUserError: userResponse.error?.message ?? null,
+            liveUserError: hasSession
+              ? userResponse.error?.message ?? null
+              : '(expected before login — no session yet)',
             liveSessionError: sessionResponse.error?.message ?? null,
+            authStorage,
           }),
         )
       } catch (error) {
@@ -49,6 +65,7 @@ export function AuthDebugPanel({ className = '' }) {
           setLive(
             buildAuthDebugSnapshot({
               liveRefreshError: error?.message ?? String(error),
+              authStorage,
             }),
           )
         }
@@ -70,6 +87,8 @@ export function AuthDebugPanel({ className = '' }) {
     ...snapshot,
   }
 
+  const authStorage = merged.authStorage ?? inspectSupabaseAuthStorage(getSupabaseProjectRef())
+
   return (
     <div
       className={`rounded-xl border border-amber-400/50 bg-amber-50 p-3 text-left font-mono text-[10px] leading-relaxed text-amber-950 ${className}`}
@@ -84,8 +103,12 @@ export function AuthDebugPanel({ className = '' }) {
         <Row label="URL configured" value={String(Boolean(merged.supabaseUrlConfigured))} />
         <Row label="Key configured" value={String(Boolean(merged.supabaseKeyConfigured))} />
         <Row label="Connection" value={merged.supabaseConnection ?? (isSupabaseConfigured() ? 'configured' : 'missing env')} />
+        <Row label="Auth storage key" value={authStorage?.key ?? '(unknown)'} />
+        <Row label="Storage present" value={String(Boolean(authStorage?.present))} />
+        <Row label="Storage user id" value={authStorage?.userId ?? '(none)'} />
+        <Row label="Access token" value={authStorage?.hasAccessToken ? authStorage.accessTokenPreview : '(none)'} />
         <Row label="Login status" value={merged.status ?? 'idle'} />
-        <Row label="Auth status" value={merged.authStatus ?? merged.liveUser?.id ? 'authenticated' : 'anonymous/none'} />
+        <Row label="Auth status" value={merged.authStatus ?? (merged.liveUser?.id ? 'authenticated' : 'none')} />
         <Row label="Session status" value={merged.sessionStatus ?? (merged.liveSession?.userId ? 'active' : 'none')} />
         <Row label="User id" value={merged.userId ?? merged.liveUser?.id ?? merged.liveSession?.userId ?? '(none)'} />
         <Row label="Username" value={merged.profileUsername ?? merged.username ?? '(none)'} />

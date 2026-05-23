@@ -12,6 +12,9 @@ import { usePersistedAlbum } from './hooks/usePersistedAlbum'
 import { useSupabaseBootstrap } from './hooks/useSupabaseBootstrap'
 import { useAppStore } from './store/useAppStore'
 import { isDevMode } from './utils/devMode'
+import { sessionDebug } from './utils/sessionDebug'
+import { inspectSupabaseAuthStorage } from './utils/sessionDebug'
+import { getSupabaseProjectRef } from './utils/authDebug'
 
 function App() {
   const { hasHydrated } = usePersistedAlbum()
@@ -20,6 +23,16 @@ function App() {
   useSupabaseBootstrap(hasHydrated && isAuthenticated && Boolean(username?.trim()))
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
+
+  useEffect(() => {
+    if (hasHydrated) {
+      sessionDebug.info('after hydration — app ready', {
+        authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+        isAuthenticated,
+        username: username ?? null,
+      })
+    }
+  }, [hasHydrated, isAuthenticated, username])
 
   useEffect(() => {
     syncQaModeFromUrl(location.search)
