@@ -31,7 +31,7 @@ export function NativeCapturePanel({
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         {isProcessing ? (
           <>
-            <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-lime-400/40 border-t-lime-400" />
+            <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-progress/40 border-t-progress" />
             <p className="mt-4 text-sm font-medium text-ink">
               {processingMessage ?? 'Procesando foto…'}
             </p>
@@ -56,7 +56,7 @@ export function NativeCapturePanel({
           </>
         ) : (
           <>
-            <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-lime-400/40 border-t-lime-400" />
+            <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-progress/40 border-t-progress" />
             <p className="mt-4 text-sm font-medium text-ink">Abriendo cámara…</p>
           </>
         )}

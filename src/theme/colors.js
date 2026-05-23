@@ -10,9 +10,9 @@ export const colors = {
     white: '#ffffff',
   },
   accent: {
-    lime: '#a3e635',
-    limeSoft: '#84cc16',
-    limeGlow: 'rgba(163, 230, 53, 0.35)',
+    lime: '#8cc63f',
+    limeSoft: '#8cc63f',
+    limeGlow: 'rgba(140, 198, 63, 0.35)',
   },
   surface: {
     light: '#f5f5f3',

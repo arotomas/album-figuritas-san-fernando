@@ -54,14 +54,25 @@ export function mergeFiguresWithTemplate(storedFigures) {
       .map((figure) => [String(figure.id), figure]),
   )
 
-  return mockFigures.map((template) => {
+  return mockFigures.map((template, index) => {
     const stored = storedById.get(String(template.id))
-    if (!stored) return { ...template, id: String(template.id), capture_radius: 250 }
+    const defaults = {
+      id: String(template.id),
+      capture_radius: 250,
+      is_bonus: false,
+      is_hidden: false,
+      unlock_order: index + 1,
+      reveal_after_count: Math.max(0, index + 1 - 5),
+      bonus_type: null,
+      reveal_radius: 200,
+      marker_icon_url: null,
+      marker_icon_size: 48,
+    }
+    if (!stored) return { ...template, ...defaults }
 
     return {
       ...template,
-      id: String(template.id),
-      capture_radius: 250,
+      ...defaults,
       obtenida: Boolean(stored.obtenida),
       foto: stored.foto ?? null,
       fotoSizeBytes: stored.fotoSizeBytes ?? null,
@@ -119,7 +130,7 @@ export function migratePersistedState(raw) {
       mergeFiguresWithTemplate(state.figures ?? []),
     )
 
-    const obtenidas = figures.filter((f) => f.obtenida).length
+    const obtenidas = figures.filter((f) => f.obtenida && !f.is_bonus).length
 
     return {
       version: STORAGE_VERSION,
@@ -135,7 +146,7 @@ export function migratePersistedState(raw) {
         user: state.user ?? null,
         hasSeenSplash: state.hasSeenSplash ?? false,
         progressSnapshot: obtenidas,
-        totalFigures: figures.length,
+        totalFigures: figures.filter((f) => !f.is_bonus).length,
       },
     }
   } catch (error) {

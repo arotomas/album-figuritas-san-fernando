@@ -1,14 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { m } from 'framer-motion'
-import { useAppStore, selectProgress } from '../../store/useAppStore'
+import { useAppStore } from '../../store/useAppStore'
+import { getMainProgressState } from '../../utils/figureGameRules'
 import { motion as motionTokens } from '../../theme/motion'
 import { typeClasses } from '../../theme/typography'
 import { ParticleLayer } from '../ui/ParticleLayer'
 import { rewardLog } from '../../utils/devLog'
 
 export function UnlockAnimation({ onComplete }) {
-  const progress = useAppStore(selectProgress)
-  const totalFigures = useAppStore((state) => state.figures.length)
+  const figures = useAppStore((state) => state.figures)
+  const mainProgress = getMainProgressState(figures)
+  const progress = mainProgress.obtained
+  const totalFigures = mainProgress.visibleTotal
   const onCompleteRef = useRef(onComplete)
 
   useEffect(() => {
@@ -65,13 +68,13 @@ export function UnlockAnimation({ onComplete }) {
                 transition={{ delay: 0.5 + index * 0.07, ease: motionTokens.ease.snap }}
                 className={`h-3 flex-1 rounded-sm ${
                   index < progress
-                    ? 'bg-gradient-to-t from-lime-500 to-lime-400'
+                    ? 'bg-progress'
                     : 'bg-white/10'
                 }`}
               />
             ))}
           </div>
-          <span className="font-display min-w-10 text-sm font-bold text-lime-400">
+          <span className="font-display min-w-10 text-sm font-bold text-progress">
             {progress}/{totalFigures}
           </span>
         </div>

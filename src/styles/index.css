@@ -5,7 +5,7 @@
   --color-ink: #111113;
   --color-muted: #8b8b95;
   --color-border: #e8e8ea;
-  --color-progress: #84cc16;
+  --color-progress: #8cc63f;
   --color-warm-white: #faf9f7;
   --color-charcoal: #1a1a1e;
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
@@ -512,16 +512,16 @@
 
   .new-badge-pulse {
     animation: new-badge-breathe 2.4s ease-in-out infinite;
-    box-shadow: 0 0 12px rgba(163, 230, 53, 0.25);
+    box-shadow: 0 0 12px rgba(140, 198, 63, 0.25);
   }
 
   @keyframes new-badge-breathe {
     0%,
     100% {
-      box-shadow: 0 0 8px rgba(163, 230, 53, 0.15);
+      box-shadow: 0 0 8px rgba(140, 198, 63, 0.15);
     }
     50% {
-      box-shadow: 0 0 16px rgba(163, 230, 53, 0.35);
+      box-shadow: 0 0 16px rgba(140, 198, 63, 0.35);
     }
   }
 

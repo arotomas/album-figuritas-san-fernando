@@ -3,7 +3,7 @@ import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 
 const PUBLIC_FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, created_at'
+  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, created_at'
 
 function normalizeRemoteFigure(row) {
   const lat = Number(row.lat)
@@ -20,6 +20,8 @@ function normalizeRemoteFigure(row) {
 
   const rarity = row.rarity || 'común'
   const title = row.title || `Figurita ${row.id}`
+  const isBonus = Boolean(row.is_bonus)
+  const bonusType = row.bonus_type ?? (rarity === 'legendaria' ? 'legendary' : rarity === 'épica' ? 'epic' : null)
 
   return {
     id: String(row.id),
@@ -33,6 +35,14 @@ function normalizeRemoteFigure(row) {
     lng,
     image_url: row.image_url ?? null,
     capture_radius: Number(row.capture_radius) || 250,
+    is_bonus: isBonus,
+    is_hidden: Boolean(row.is_hidden),
+    unlock_order: row.unlock_order != null ? Number(row.unlock_order) : null,
+    reveal_after_count: Number(row.reveal_after_count) || 0,
+    bonus_type: bonusType,
+    reveal_radius: Number(row.reveal_radius) || 200,
+    marker_icon_url: row.marker_icon_url ?? null,
+    marker_icon_size: Number(row.marker_icon_size) || 48,
     active: row.active !== false,
     emoji: '📍',
     obtenida: false,
@@ -49,14 +59,28 @@ export async function fetchPublicFigures() {
     .eq('active', true)
     .order('created_at', { ascending: true })
 
-  if (error && /capture_radius/i.test(error.message ?? '')) {
+  if (
+    error &&
+    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size/i.test(error.message ?? '')
+  ) {
     const fallback = await supabase
       .from('figures')
       .select('id, title, description, rarity, lat, lng, image_url, active, created_at')
       .eq('active', true)
       .order('created_at', { ascending: true })
 
-    data = fallback.data?.map((row) => ({ ...row, capture_radius: 250 }))
+    data = fallback.data?.map((row) => ({
+      ...row,
+      capture_radius: 250,
+      is_bonus: false,
+      is_hidden: false,
+      unlock_order: null,
+      reveal_after_count: 0,
+      bonus_type: null,
+      reveal_radius: 200,
+      marker_icon_url: null,
+      marker_icon_size: 48,
+    }))
     error = fallback.error
   }
 
@@ -70,14 +94,25 @@ export async function fetchPublicFigures() {
   }
 
   const figures = (data ?? []).map(normalizeRemoteFigure).filter(Boolean)
+  let normalOrder = 0
+  const figuresWithRevealDefaults = figures.map((figure) => {
+    if (figure.is_bonus) return figure
+    normalOrder += 1
+    const unlockOrder = figure.unlock_order ?? normalOrder
+    return {
+      ...figure,
+      unlock_order: unlockOrder,
+      reveal_after_count: figure.reveal_after_count || Math.max(0, unlockOrder - 5),
+    }
+  })
 
   console.info('[figures-remote]', 'loaded', JSON.stringify({
-    count: figures.length,
-    ids: figures.map((figure) => figure.id),
+    count: figuresWithRevealDefaults.length,
+    ids: figuresWithRevealDefaults.map((figure) => figure.id),
     fallback: false,
   }))
 
-  return figures
+  return figuresWithRevealDefaults
 }
 
 export function toRemoteFigureId(figureId) {

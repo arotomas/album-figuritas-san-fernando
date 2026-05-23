@@ -1,10 +1,10 @@
 import { ALBUM_STATUS } from '../config/persistence'
-export function computeAlbumStatus(figures, lastViewedFigureId = null) {
-  const list = Array.isArray(figures) ? figures : []
-  const obtenidas = list.filter((figure) => figure.obtenida).length
-  const totalFigures = list.length
+import { getMainProgressState } from '../utils/figureGameRules'
 
-  if (totalFigures > 0 && obtenidas >= totalFigures) {
+export function computeAlbumStatus(figures, lastViewedFigureId = null) {
+  const { obtained, total } = getMainProgressState(figures)
+
+  if (total > 0 && obtained >= total) {
     return lastViewedFigureId
       ? ALBUM_STATUS.EN_REVISION
       : ALBUM_STATUS.COMPLETADO

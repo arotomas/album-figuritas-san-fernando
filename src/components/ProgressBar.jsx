@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAppStore, selectProgress } from '../store/useAppStore'
+import { useAppStore } from '../store/useAppStore'
+import { getMainProgressState, getRevealedNormalFigures } from '../utils/figureGameRules'
 
 function ProgressBarInner({
   className = '',
@@ -8,13 +9,15 @@ function ProgressBarInner({
   showSimulateLink = true,
   variant = 'light',
 }) {
-  const progress = useAppStore(selectProgress)
   const figures = useAppStore((state) => state.figures)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const navigate = useNavigate()
 
   const isDark = variant === 'dark'
-  const totalFigures = figures.length
+  const mainProgress = getMainProgressState(figures)
+  const visibleFigures = getRevealedNormalFigures(figures)
+  const progress = mainProgress.obtained
+  const totalFigures = mainProgress.visibleTotal
 
   return (
     <div className={className}>
@@ -56,7 +59,7 @@ function ProgressBarInner({
         <button
           type="button"
           onClick={() => {
-            const next = figures.find((f) => !f.obtenida)
+            const next = visibleFigures.find((f) => !f.obtenida)
             if (!next) return
             setNearFigure({ ...next, distanceMeters: 12 })
             navigate('/near')

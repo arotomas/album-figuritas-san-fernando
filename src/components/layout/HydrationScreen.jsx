@@ -5,7 +5,7 @@ export function HydrationScreen() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 50%, rgba(163,230,53,0.06) 0%, transparent 60%)',
+            'radial-gradient(ellipse at 50% 50%, rgba(140,198,63,0.06) 0%, transparent 60%)',
         }}
         aria-hidden
       />

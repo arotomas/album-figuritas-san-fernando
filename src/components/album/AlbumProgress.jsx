@@ -28,7 +28,7 @@ function AlbumProgressInner({ progress, total }) {
                     ...motionTokens.spring.gentle,
                     delay: reduced ? 0 : index * 0.06,
                   }}
-                  className="album-progress-fill absolute inset-0 origin-left rounded-sm bg-gradient-to-r from-lime-400 via-progress to-lime-500"
+                  className="album-progress-fill absolute inset-0 origin-left rounded-sm bg-progress"
                 />
               )}
             </div>

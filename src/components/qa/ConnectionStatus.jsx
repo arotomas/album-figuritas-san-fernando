@@ -55,12 +55,12 @@ export function ConnectionStatus({ onUpdateAvailable }) {
 
       {!isOffline && showReconnected && (
         <div
-          className="flex items-center gap-2 rounded-full border border-lime-400/30 bg-zinc-900/95 px-4 py-2.5 shadow-md backdrop-blur-sm"
+          className="flex items-center gap-2 rounded-full border border-progress/30 bg-zinc-900/95 px-4 py-2.5 shadow-md backdrop-blur-sm"
           role="status"
           aria-live="polite"
         >
-          <FaWifi className="text-lime-400" size={14} aria-hidden />
-          <span className="text-xs font-medium text-lime-200">Conexión restablecida</span>
+          <FaWifi className="text-progress" size={14} aria-hidden />
+          <span className="text-xs font-medium text-progress/80">Conexión restablecida</span>
         </div>
       )}
 

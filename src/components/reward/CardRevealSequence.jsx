@@ -81,7 +81,7 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
         initial={{ opacity: 0, y: -20, letterSpacing: '0.3em' }}
         animate={{ opacity: 1, y: 0, letterSpacing: '0.2em' }}
         transition={{ duration: 0.6, ease: motionTokens.ease.premium }}
-        className={`${typeClasses.micro} relative z-10 mb-8 text-lime-400`}
+        className={`${typeClasses.micro} relative z-10 mb-8 text-progress`}
       >
         ✦ Nueva figurita ✦
       </m.p>

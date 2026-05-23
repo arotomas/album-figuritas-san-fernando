@@ -20,6 +20,14 @@ const DEFAULT_FIGURE_FORM = {
   lat: '',
   lng: '',
   capture_radius: 250,
+  is_bonus: false,
+  is_hidden: false,
+  unlock_order: '',
+  reveal_after_count: 0,
+  bonus_type: '',
+  reveal_radius: 200,
+  marker_icon_url: '',
+  marker_icon_size: 48,
   active: true,
 }
 
@@ -52,6 +60,14 @@ function toFigureForm(figure) {
     lat: figure.lat ?? '',
     lng: figure.lng ?? '',
     capture_radius: figure.capture_radius ?? 250,
+    is_bonus: Boolean(figure.is_bonus),
+    is_hidden: Boolean(figure.is_hidden),
+    unlock_order: figure.unlock_order ?? '',
+    reveal_after_count: figure.reveal_after_count ?? 0,
+    bonus_type: figure.bonus_type ?? '',
+    reveal_radius: figure.reveal_radius ?? 200,
+    marker_icon_url: figure.marker_icon_url ?? '',
+    marker_icon_size: figure.marker_icon_size ?? 48,
     active: Boolean(figure.active),
   }
 }
@@ -64,10 +80,17 @@ function validateFigureForm(form) {
   const lat = Number(form.lat)
   const lng = Number(form.lng)
   const radius = Number(form.capture_radius || 250)
+  const revealRadius = Number(form.reveal_radius || 200)
+  const markerIconSize = Number(form.marker_icon_size || 48)
 
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) return 'La latitud no es válida.'
   if (!Number.isFinite(lng) || lng < -180 || lng > 180) return 'La longitud no es válida.'
   if (!Number.isFinite(radius) || radius <= 0) return 'El radio de captura no es válido.'
+  if (!Number.isFinite(revealRadius) || revealRadius <= 0) return 'El radio de revelado no es válido.'
+  if (!Number.isFinite(markerIconSize) || markerIconSize <= 0) return 'El tamaño del ícono no es válido.'
+  if (form.is_bonus && form.bonus_type && !['epic', 'legendary'].includes(form.bonus_type)) {
+    return 'El tipo bonus no es válido.'
+  }
 
   return null
 }
@@ -570,6 +593,73 @@ export function AdminScreen() {
                         </label>
                       </div>
 
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Es bonus
+                          <select
+                            value={figureForm.is_bonus ? 'true' : 'false'}
+                            onChange={(event) =>
+                              updateFigureForm('is_bonus', event.target.value === 'true')
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          >
+                            <option value="false">No</option>
+                            <option value="true">Sí</option>
+                          </select>
+                        </label>
+
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Oculta
+                          <select
+                            value={figureForm.is_hidden ? 'true' : 'false'}
+                            onChange={(event) =>
+                              updateFigureForm('is_hidden', event.target.value === 'true')
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          >
+                            <option value="false">No</option>
+                            <option value="true">Sí</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Orden
+                          <input
+                            type="number"
+                            min="1"
+                            value={figureForm.unlock_order}
+                            onChange={(event) => updateFigureForm('unlock_order', event.target.value)}
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Revelar tras
+                          <input
+                            type="number"
+                            min="0"
+                            value={figureForm.reveal_after_count}
+                            onChange={(event) =>
+                              updateFigureForm('reveal_after_count', event.target.value)
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Tipo bonus
+                          <select
+                            value={figureForm.bonus_type}
+                            onChange={(event) => updateFigureForm('bonus_type', event.target.value)}
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          >
+                            <option value="">Sin tipo</option>
+                            <option value="epic">Épica</option>
+                            <option value="legendary">Legendaria</option>
+                          </select>
+                        </label>
+                      </div>
+
                       <label className="block text-xs font-bold uppercase tracking-wide text-muted">
                         Imagen URL
                         <input
@@ -625,6 +715,48 @@ export function AdminScreen() {
                         </label>
                       </div>
 
+                      <div className="grid grid-cols-3 gap-3">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Radio revelado
+                          <input
+                            type="number"
+                            min="1"
+                            value={figureForm.reveal_radius}
+                            onChange={(event) =>
+                              updateFigureForm('reveal_radius', event.target.value)
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                        <label className="col-span-2 block text-xs font-bold uppercase tracking-wide text-muted">
+                          Ícono marcador
+                          <input
+                            value={figureForm.marker_icon_url}
+                            onChange={(event) =>
+                              updateFigureForm('marker_icon_url', event.target.value)
+                            }
+                            placeholder="PNG transparente 256x256, máx. 200 KB"
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                        Tamaño ícono marcador
+                        <input
+                          type="number"
+                          min="1"
+                          value={figureForm.marker_icon_size}
+                          onChange={(event) =>
+                            updateFigureForm('marker_icon_size', event.target.value)
+                          }
+                          className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                        />
+                        <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-muted">
+                          Recomendado: PNG transparente 256x256 px, máximo 200 KB.
+                        </span>
+                      </label>
+
                       <button
                         type="submit"
                         disabled={figureSaving}
@@ -639,6 +771,7 @@ export function AdminScreen() {
                       lng={figureForm.lng}
                       radius={figureForm.capture_radius}
                       onChange={({ lat, lng }) => {
+                        console.info('[admin-figures]', 'location selected', { lat, lng })
                         updateFigureForm('lat', lat)
                         updateFigureForm('lng', lng)
                       }}
@@ -654,10 +787,15 @@ export function AdminScreen() {
                       <th className="px-4 py-3">Imagen</th>
                       <th className="px-4 py-3">Title</th>
                       <th className="px-4 py-3">Rarity</th>
+                      <th className="px-4 py-3">Bonus</th>
+                      <th className="px-4 py-3">Oculta</th>
                       <th className="px-4 py-3">Active</th>
+                      <th className="px-4 py-3">Orden</th>
+                      <th className="px-4 py-3">Reveal</th>
                       <th className="px-4 py-3">Lat</th>
                       <th className="px-4 py-3">Lng</th>
                       <th className="px-4 py-3">Radio</th>
+                      <th className="px-4 py-3">Ícono</th>
                       <th className="px-4 py-3">Acción</th>
                     </tr>
                   </thead>
@@ -680,21 +818,41 @@ export function AdminScreen() {
                         </td>
                         <td className="px-4 py-4 font-semibold">{figure.title}</td>
                         <td className="px-4 py-4">{figure.rarity}</td>
+                        <td className="px-4 py-4">{figure.is_bonus ? 'Sí' : 'No'}</td>
+                        <td className="px-4 py-4">{figure.is_hidden ? 'Sí' : 'No'}</td>
                         <td className="px-4 py-4">
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-bold ${
                               figure.active
-                                ? 'bg-green-100 text-green-800'
+                                ? 'bg-progress/15 text-progress'
                                 : 'bg-slate-100 text-slate-600'
                             }`}
                           >
                             {figure.active ? 'Activa' : 'Inactiva'}
                           </span>
                         </td>
+                        <td className="px-4 py-4 font-mono text-xs">
+                          {figure.unlock_order ?? '-'}
+                        </td>
+                        <td className="px-4 py-4 font-mono text-xs">
+                          {figure.reveal_after_count ?? 0}
+                        </td>
                         <td className="px-4 py-4 font-mono text-xs">{figure.lat}</td>
                         <td className="px-4 py-4 font-mono text-xs">{figure.lng}</td>
                         <td className="px-4 py-4 font-mono text-xs">
                           {figure.capture_radius ?? 250}m
+                        </td>
+                        <td className="px-4 py-4">
+                          {figure.marker_icon_url ? (
+                            <img
+                              src={figure.marker_icon_url}
+                              alt=""
+                              className="h-8 w-8 rounded object-contain"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="text-xs text-muted">-</span>
+                          )}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-wrap gap-2">

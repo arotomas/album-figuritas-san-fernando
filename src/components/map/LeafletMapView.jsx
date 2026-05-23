@@ -196,7 +196,7 @@ function FigureMarkersLayer({ figures, nearFigureIds }) {
       const root = rootsRef.current[index]
       if (!root) return
 
-      const isNear = nearFigureIds.has(figure.id)
+      const isNear = nearFigureIds.has(String(figure.id))
       const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}`
 
       if (cacheRef.current[figure.id] === cacheKey) return
@@ -213,9 +213,11 @@ function FigureMarkersLayer({ figures, nearFigureIds }) {
 
 function LeafletMapViewInner({
   figures,
+  proximityFigures = figures,
   className = '',
   onNearFigureChange,
   onOpenCamera,
+  onBonusDiscovered,
 }) {
   const mapRef = useRef(null)
   const [recenterTick, setRecenterTick] = useState(0)
@@ -251,7 +253,7 @@ function LeafletMapViewInner({
     nearFigures,
     nearestFigure,
     nearestDistance,
-  } = useFigureProximity(debouncedProximity, figures)
+  } = useFigureProximity(debouncedProximity, proximityFigures)
 
   const rawNearest = useMemo(
     () => findNearestPendingFigure(mapPosition, figures),
@@ -267,10 +269,24 @@ function LeafletMapViewInner({
   }, [nearestFigure, nearestDistance])
 
   const nearFigureIdsRef = useRef(new Set())
-  nearFigureIdsRef.current = new Set(nearFigures.map((f) => f.id))
+  nearFigureIdsRef.current = new Set(nearFigures.map((f) => String(f.id)))
 
   const lastVibratedFigureIdRef = useRef(null)
+  const bonusVibratedIdsRef = useRef(new Set())
   const reducedMotion = prefersReducedMotion()
+  const visibleFigureIds = useMemo(
+    () => new Set(figures.map((figure) => String(figure.id))),
+    [figures],
+  )
+  const markerFigures = useMemo(() => {
+    const byId = new Map(figures.map((figure) => [String(figure.id), figure]))
+    nearFigures.forEach((figure) => {
+      if (figure.is_bonus && !byId.has(String(figure.id))) {
+        byId.set(String(figure.id), figure)
+      }
+    })
+    return [...byId.values()]
+  }, [figures, nearFigures])
 
   const handleOpenCamera = useCallback(() => {
     const capturePosition = proximityPosition ?? mapPosition ?? position
@@ -302,15 +318,24 @@ function LeafletMapViewInner({
     onNearFigureChange?.(nearFigure ?? null)
 
     if (nearFigure) {
+      if (nearFigure.is_bonus && !visibleFigureIds.has(String(nearFigure.id))) {
+        onBonusDiscovered?.(nearFigure)
+      }
+
       if (lastVibratedFigureIdRef.current !== nearFigure.id) {
         if (vibrateNearFigure(VIBRATION_NEAR_COOLDOWN_MS)) {
           lastVibratedFigureIdRef.current = nearFigure.id
         }
       }
+
+      if (nearFigure.is_bonus && !bonusVibratedIdsRef.current.has(String(nearFigure.id))) {
+        navigator.vibrate?.([150, 80, 150])
+        bonusVibratedIdsRef.current.add(String(nearFigure.id))
+      }
     } else {
       lastVibratedFigureIdRef.current = null
     }
-  }, [nearFigure, onNearFigureChange])
+  }, [nearFigure, onBonusDiscovered, onNearFigureChange, visibleFigureIds])
 
   const showAcquisitionBanner =
     (acquisitionStatus === 'initializing' ||
@@ -373,7 +398,7 @@ function LeafletMapViewInner({
             recenterTick={recenterTick}
           />
           <FigureMarkersLayer
-            figures={figures}
+            figures={markerFigures}
             nearFigureIds={nearFigureIdsRef.current}
           />
           {mapPosition && (

@@ -6,6 +6,11 @@ import { typeClasses } from '../../theme/typography'
 
 function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
   if (!nearFigure) return null
+  const isBonus = Boolean(nearFigure.is_bonus)
+  const bonusKind =
+    nearFigure.bonus_type === 'legendary' || nearFigure.rareza === 'legendaria'
+      ? 'legendaria'
+      : 'épica'
 
   return (
     <GlowCard
@@ -15,8 +20,10 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
     >
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-charcoal/95">
         <div className="border-b border-white/8 px-4 py-3.5">
-          <p className={`${typeClasses.label} text-center text-lime-400`}>
-            Estás cerca. Sacá una foto del lugar para desbloquear la figurita.
+          <p className={`${typeClasses.label} text-center text-progress`}>
+            {isBonus
+              ? `Estás a ${formatDistance(nearFigure.distanceMeters)} de una figurita ${bonusKind}. ¿Querés intentar agregarla?`
+              : 'Estás cerca. Sacá una foto del lugar para desbloquear la figurita.'}
           </p>
           <p className="mt-1.5 text-center font-body text-xs text-white/50">
             {nearFigure.nombre} · a {formatDistance(nearFigure.distanceMeters)}
@@ -25,7 +32,7 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
 
         <div className="p-4">
           <PremiumButton variant="lime" size="md" onClick={onOpenCamera}>
-            Abrir cámara
+            {isBonus ? 'Intentar agregarla' : 'Abrir cámara'}
           </PremiumButton>
         </div>
       </div>

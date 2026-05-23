@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase'
 import { adminLog } from '../../utils/adminLog'
 
 const FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, created_at'
+  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, created_at'
 
 function isPermissionError(error) {
   return (
@@ -102,13 +102,27 @@ export async function getFiguresAdmin() {
     .select(FIGURE_COLUMNS)
     .order('created_at', { ascending: true })
 
-  if (error && /capture_radius/i.test(error.message ?? '')) {
+  if (
+    error &&
+    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size/i.test(error.message ?? '')
+  ) {
     const fallback = await supabase
       .from('figures')
       .select('id, title, description, rarity, lat, lng, image_url, active, created_at')
       .order('created_at', { ascending: true })
 
-    data = fallback.data?.map((figure) => ({ ...figure, capture_radius: 250 }))
+    data = fallback.data?.map((figure) => ({
+      ...figure,
+      capture_radius: 250,
+      is_bonus: false,
+      is_hidden: false,
+      unlock_order: null,
+      reveal_after_count: 0,
+      bonus_type: null,
+      reveal_radius: 200,
+      marker_icon_url: null,
+      marker_icon_size: 48,
+    }))
     error = fallback.error
   }
 
@@ -132,6 +146,14 @@ function normalizeFigurePayload(figure) {
     lat: Number(figure.lat),
     lng: Number(figure.lng),
     capture_radius: Number(figure.capture_radius) || 250,
+    is_bonus: Boolean(figure.is_bonus),
+    is_hidden: Boolean(figure.is_hidden),
+    unlock_order: figure.unlock_order === '' || figure.unlock_order == null ? null : Number(figure.unlock_order),
+    reveal_after_count: Number(figure.reveal_after_count) || 0,
+    bonus_type: figure.is_bonus && figure.bonus_type ? figure.bonus_type : null,
+    reveal_radius: Number(figure.reveal_radius) || 200,
+    marker_icon_url: figure.marker_icon_url?.trim() || null,
+    marker_icon_size: Number(figure.marker_icon_size) || 48,
     active: Boolean(figure.active),
   }
 }

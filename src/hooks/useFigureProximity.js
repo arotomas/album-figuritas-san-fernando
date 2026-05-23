@@ -54,7 +54,8 @@ export function useFigureProximity(
         return
       }
 
-      const figureEnterMeters = Number(figure.capture_radius) || enterMeters
+      const figureEnterMeters =
+        Number(figure.is_bonus ? figure.reveal_radius : figure.capture_radius) || enterMeters
       const figureExitMeters = Math.max(figureEnterMeters + 30, exitMeters)
       const wasNear = Boolean(nextState[figure.id])
       const dist = figure.distanceMeters

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6'
-import { useAppStore, selectProgress, ALBUM_STATUS } from '../store/useAppStore'
+import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
 import { AlbumBackground } from '../components/album/AlbumBackground'
 import { AlbumProgress } from '../components/album/AlbumProgress'
 import { FeaturedFigureCard } from '../components/album/FeaturedFigureCard'
@@ -21,6 +21,11 @@ import {
   resolveActiveFigureId,
   sanitizeAlbumFigures,
 } from '../utils/myFiguresLog'
+import {
+  getBonusFigures,
+  getMainProgressState,
+  getRevealedNormalFigures,
+} from '../utils/figureGameRules'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -37,9 +42,17 @@ export function MyFiguresScreen() {
   const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
   const setLastViewedFigure = useAppStore((state) => state.setLastViewedFigure)
   const hasHydrated = useAppStore((state) => state._hasHydrated)
-  const progress = useAppStore(selectProgress)
 
-  const figures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
+  const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
+  const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
+  const mainFigures = useMemo(() => getRevealedNormalFigures(sanitizedFigures), [sanitizedFigures])
+  const bonusFigures = useMemo(() => getBonusFigures(sanitizedFigures), [sanitizedFigures])
+  const [section, setSection] = useState('main')
+  const figures = section === 'bonus' ? bonusFigures : mainFigures
+  const visibleProgress = section === 'bonus'
+    ? bonusFigures.filter((figure) => figure.obtenida).length
+    : mainProgress.obtained
+  const visibleTotal = section === 'bonus' ? bonusFigures.length : mainProgress.visibleTotal
 
   const preferredId = lastObtenidaFigureId ?? lastViewedFigureId
   const initialActiveId = resolveActiveFigureId(preferredId, figures)
@@ -112,7 +125,7 @@ export function MyFiguresScreen() {
   const arrowButtonClass =
     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-white/95 text-ink shadow-md disabled:pointer-events-none disabled:opacity-30 active:scale-95'
 
-  if (!hasHydrated || figures.length === 0) {
+  if (!hasHydrated || sanitizedFigures.length === 0 || figures.length === 0) {
     return <AlbumScreenSkeleton />
   }
 
@@ -141,7 +154,27 @@ export function MyFiguresScreen() {
         </div>
 
         <div className="mt-4">
-          <AlbumProgress progress={progress} total={figures.length} />
+          <AlbumProgress progress={mainProgress.obtained} total={mainProgress.visibleTotal} />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSection('main')}
+              className={`rounded-full px-3 py-2 text-xs font-bold ${
+                section === 'main' ? 'bg-ink text-white' : 'bg-white/70 text-muted'
+              }`}
+            >
+              Álbum principal · {mainProgress.obtained}/{mainProgress.visibleTotal}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection('bonus')}
+              className={`rounded-full px-3 py-2 text-xs font-bold ${
+                section === 'bonus' ? 'bg-ink text-white' : 'bg-white/70 text-muted'
+              }`}
+            >
+              Bonus · {bonusFigures.filter((figure) => figure.obtenida).length}/{bonusFigures.length}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -254,7 +287,7 @@ export function MyFiguresScreen() {
               transition={album.transition.fade}
               className={`${albumClasses.hint} mt-3 shrink-0 px-2 text-center`}
             >
-              Deslizá o usá las flechas · {activeIndex + 1} de {figures.length}
+              {section === 'bonus' ? 'Bonus' : 'Álbum principal'} · {activeIndex + 1} de {figures.length} · {visibleProgress}/{visibleTotal}
             </m.p>
           </AnimatePresence>
         </div>

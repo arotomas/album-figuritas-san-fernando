@@ -22,6 +22,7 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
   const glowColor = isQaTest ? 'rgba(34,211,238,0.55)' : rarity.colors.glow
   const accentClass = isQaTest ? 'bg-cyan-400' : rarity.tailwind.accent
   const pointerColor = isQaTest ? '#22d3ee' : rarity.colors.secondary
+  const iconSize = Number(figure.marker_icon_size) || 48
 
   return (
     <div className={`relative flex flex-col items-center ${floatClass} ${pulseClass}`}>
@@ -45,7 +46,18 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
         <div className={`h-0.5 w-full ${accentClass}`} />
 
         <div className="flex items-center justify-center py-3 text-2xl">
-          {obtained ? '✓' : figure.emoji}
+          {obtained ? (
+            '✓'
+          ) : figure.marker_icon_url ? (
+            <img
+              src={figure.marker_icon_url}
+              alt=""
+              className="object-contain"
+              style={{ width: iconSize, height: iconSize }}
+            />
+          ) : (
+            figure.emoji
+          )}
         </div>
 
         <div className="px-1.5 pb-2">
@@ -59,7 +71,7 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
 
         {obtained && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/35 backdrop-blur-[1px]">
-            <span className="rounded-full bg-lime-400/90 px-1.5 py-0.5 text-[7px] font-bold uppercase text-ink">
+            <span className="rounded-full bg-progress/90 px-1.5 py-0.5 text-[7px] font-bold uppercase text-ink">
               Obtenida
             </span>
           </div>

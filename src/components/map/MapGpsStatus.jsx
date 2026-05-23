@@ -2,8 +2,8 @@ import { memo } from 'react'
 
 const TONE = {
   searching: 'border-white/15 bg-zinc-900/85 text-white/80',
-  refining: 'border-lime-400/25 bg-zinc-900/85 text-lime-100/90',
-  ready: 'border-lime-400/20 bg-zinc-900/75 text-lime-200/80',
+  refining: 'border-progress/25 bg-zinc-900/85 text-progress/90',
+  ready: 'border-progress/20 bg-zinc-900/75 text-progress/80',
   warn: 'border-amber-400/30 bg-zinc-900/90 text-amber-100/90',
 }
 
@@ -23,7 +23,7 @@ function MapGpsStatusInner({ label, phase = 'searching', showDot = true }) {
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
               phase === 'ready'
-                ? 'bg-lime-400'
+                ? 'bg-progress'
                 : phase === 'warn'
                   ? 'bg-amber-400'
                   : 'map-skeleton-pulse bg-white/70'

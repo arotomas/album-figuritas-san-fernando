@@ -5,7 +5,7 @@
 
 export { RARITY_STYLES, getRarity, RARITIES } from '../theme/rarity'
 
-export const TOTAL_FIGURES = 5
+export const TOTAL_FIGURES = 10
 
 export const PROXIMITY_THRESHOLD_METERS = 25
 

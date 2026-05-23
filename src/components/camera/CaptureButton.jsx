@@ -7,7 +7,7 @@ export function CaptureButton({ disabled, isReady, onCapture }) {
         <motion.p
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-sm font-semibold text-lime-300"
+          className="text-sm font-semibold text-progress"
         >
           ¡Listo para capturar!
         </motion.p>
@@ -21,7 +21,7 @@ export function CaptureButton({ disabled, isReady, onCapture }) {
         aria-label="Capturar foto"
         className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 transition-all ${
           isReady
-            ? 'border-lime-400 bg-white/10 shadow-lg shadow-lime-400/30'
+            ? 'border-progress bg-white/10 shadow-lg shadow-progress/30'
             : 'border-white/40 bg-white/5 opacity-60'
         }`}
       >
@@ -29,7 +29,7 @@ export function CaptureButton({ disabled, isReady, onCapture }) {
           <motion.span
             animate={{ scale: [1, 1.15, 1] }}
             transition={{ duration: 1.2, repeat: Infinity }}
-            className="absolute inset-0 rounded-full border-2 border-lime-400/50"
+            className="absolute inset-0 rounded-full border-2 border-progress/50"
           />
         )}
         <span

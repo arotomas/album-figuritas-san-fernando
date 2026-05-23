@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { useAuth } from '../hooks/useAuth'
-import { useAppStore, selectProgress, ALBUM_STATUS } from '../store/useAppStore'
+import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
+import { getMainProgressState } from '../utils/figureGameRules'
 import { getCurrentPosition } from '../services/geoService'
 import { GPS_HIGH_ACCURACY_OPTIONS } from '../config/gps'
 import { isDevMode } from '../utils/devMode'
@@ -28,8 +29,8 @@ export function OptionsScreen() {
   const supabaseReady = useAppStore((state) => state.supabaseReady)
   const supabaseUsername = useAppStore((state) => state.supabaseUsername)
   const lastSupabaseSyncWarning = useAppStore((state) => state.lastSupabaseSyncWarning)
-  const progress = useAppStore(selectProgress)
-  const totalFigures = useAppStore((state) => state.figures.length)
+  const figures = useAppStore((state) => state.figures)
+  const mainProgress = getMainProgressState(figures)
   const [qaMessage, setQaMessage] = useState(null)
   const [qaLoading, setQaLoading] = useState(false)
 
@@ -98,7 +99,7 @@ export function OptionsScreen() {
             {STATUS_LABELS[albumStatus]}
           </p>
           <p className="mt-0.5 text-xs text-muted">
-            Progreso: {progress}/{totalFigures}
+            Progreso: {mainProgress.obtained}/{mainProgress.visibleTotal}
           </p>
           {lastSavedAt && (
             <p className="mt-0.5 text-xs text-muted">

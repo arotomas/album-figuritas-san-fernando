@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAppStore, selectProgress } from '../../store/useAppStore'
+import { useAppStore } from '../../store/useAppStore'
+import { getMainProgressState } from '../../utils/figureGameRules'
 import { storageService } from '../../services/storage/storageService'
 import { STORAGE_KEY } from '../../config/persistence'
 import { PerformanceDebugPanel } from '../performance/PerformanceDebugPanel'
@@ -14,8 +15,8 @@ export function DebugPanel() {
   const unlockAllFigures = useAppStore((state) => state.unlockAllFigures)
   const clearStorage = useAppStore((state) => state.clearStorage)
   const getPersistedSnapshot = useAppStore((state) => state.getPersistedSnapshot)
-  const progress = useAppStore(selectProgress)
-  const totalFigures = useAppStore((state) => state.figures.length)
+  const figures = useAppStore((state) => state.figures)
+  const mainProgress = getMainProgressState(figures)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastSavedAt = useAppStore((state) => state.lastSavedAt)
 
@@ -32,7 +33,7 @@ export function DebugPanel() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-lime-400 shadow-lg"
+        className="fixed bottom-24 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-progress shadow-lg"
         aria-label="Panel debug"
       >
         DEV
@@ -57,7 +58,7 @@ export function DebugPanel() {
             >
               <h2 className="text-lg font-bold">Debug Panel</h2>
               <p className="mt-1 text-xs text-zinc-400">
-                Progreso: {progress}/{totalFigures} · {albumStatus}
+                Progreso: {mainProgress.obtained}/{mainProgress.visibleTotal} · {albumStatus}
               </p>
               {lastSavedAt && (
                 <p className="mt-1 text-xs text-zinc-500">
@@ -91,7 +92,7 @@ export function DebugPanel() {
                 <button
                   type="button"
                   onClick={handleShowState}
-                  className="w-full rounded-xl bg-lime-950 py-3 text-sm font-medium text-lime-300"
+                  className="w-full rounded-xl bg-zinc-900 py-3 text-sm font-medium text-progress"
                 >
                   Ver estado Zustand
                 </button>

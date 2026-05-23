@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAppStore, selectProgress } from '../../store/useAppStore'
+import { useAppStore } from '../../store/useAppStore'
 import { storageService } from '../../services/storage/storageService'
 import { STORAGE_KEY } from '../../config/persistence'
 import { PerformanceDebugPanel } from '../performance/PerformanceDebugPanel'
@@ -15,6 +15,7 @@ import {
   readMemoryDiagnostics,
 } from '../../utils/diagnostics'
 import { mockFigures } from '../../data/mockFigures'
+import { getMainProgressState, getRevealedNormalFigures } from '../../utils/figureGameRules'
 
 export function QAOverlay() {
   if (!import.meta.env.DEV) return null
@@ -38,8 +39,10 @@ function QAOverlayDev() {
   const getPersistedSnapshot = useAppStore((state) => state.getPersistedSnapshot)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
-  const progress = useAppStore(selectProgress)
-  const totalFigures = useAppStore((state) => state.figures.length)
+  const figures = useAppStore((state) => state.figures)
+  const mainProgress = getMainProgressState(figures)
+  const progress = mainProgress.obtained
+  const totalFigures = mainProgress.visibleTotal
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastSavedAt = useAppStore((state) => state.lastSavedAt)
 
@@ -68,7 +71,7 @@ function QAOverlayDev() {
 
   const getNextPendingFigure = () => {
     const storeFigures = useAppStore.getState().figures
-    const pending = storeFigures.find((f) => !f.obtenida)
+    const pending = getRevealedNormalFigures(storeFigures).find((f) => !f.obtenida)
     if (!pending) return null
     return pending
   }
@@ -135,7 +138,7 @@ function QAOverlayDev() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="safe-bottom fixed bottom-24 right-4 z-50 flex h-11 min-w-[44px] items-center justify-center rounded-full bg-zinc-900 px-3 text-[10px] font-bold text-lime-400 shadow-lg"
+        className="safe-bottom fixed bottom-24 right-4 z-50 flex h-11 min-w-[44px] items-center justify-center rounded-full bg-zinc-900 px-3 text-[10px] font-bold text-progress shadow-lg"
         aria-label="Panel QA"
       >
         QA
@@ -207,7 +210,7 @@ function QAOverlayDev() {
 
               {viewport && (
                 <div className="mt-4 rounded-xl bg-black/40 p-3 text-[10px] leading-relaxed text-zinc-300">
-                  <p className="mb-1 font-bold uppercase tracking-wide text-lime-400/90">
+                  <p className="mb-1 font-bold uppercase tracking-wide text-progress/90">
                     Viewport
                   </p>
                   <p>--app-height: {viewport.appHeight || '—'}</p>
@@ -298,7 +301,7 @@ function QaToggle({ label, active, onClick }) {
       type="button"
       onClick={onClick}
       className={`min-h-[44px] rounded-xl px-3 py-2 text-xs font-medium ${
-        active ? 'bg-lime-950 text-lime-300' : 'bg-zinc-800 text-zinc-300'
+        active ? 'bg-zinc-900 text-progress' : 'bg-zinc-800 text-zinc-300'
       }`}
     >
       {label}

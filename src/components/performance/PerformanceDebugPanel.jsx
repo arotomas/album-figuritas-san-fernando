@@ -36,7 +36,7 @@ export function PerformanceDebugPanel({ isOpen, onClose }) {
   return (
     <div className="mt-4 rounded-xl border border-zinc-700 bg-black/40 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-lime-300">Performance</h3>
+        <h3 className="text-sm font-bold text-progress">Performance</h3>
         <button type="button" onClick={onClose} className="text-xs text-zinc-500">
           Cerrar
         </button>

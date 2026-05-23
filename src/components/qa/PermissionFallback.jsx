@@ -26,7 +26,7 @@ export function PermissionFallback({
             <FaCamera size={36} className="text-zinc-400" aria-hidden />
             <FaLocationDot
               size={18}
-              className="absolute -bottom-1 -right-2 text-lime-400"
+              className="absolute -bottom-1 -right-2 text-progress"
               aria-hidden
             />
           </div>

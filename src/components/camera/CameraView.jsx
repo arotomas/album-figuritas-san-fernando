@@ -123,7 +123,7 @@ export function CameraView({
         </AnimatePresence>
 
         {import.meta.env.DEV && gpsAccuracy != null && (
-          <p className="mt-3 text-center text-[11px] text-lime-300/80">
+          <p className="mt-3 text-center text-[11px] text-progress/80">
             Precisión GPS: ~{Math.round(gpsAccuracy)}m
           </p>
         )}

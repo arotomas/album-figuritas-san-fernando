@@ -1,9 +1,14 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LazyMap } from '../components/performance/LazyMap'
 import { ProgressBar } from '../components/ProgressBar'
 import { useQaTestFigure } from '../hooks/useQaTestFigure'
 import { useAppStore } from '../store/useAppStore'
+import {
+  getHiddenBonusDetectionFigures,
+  getMainProgressState,
+  getPlayerMapFigures,
+} from '../utils/figureGameRules'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -11,7 +16,32 @@ export function MapScreen() {
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const startCaptureSession = useAppStore((state) => state.startCaptureSession)
-  const { mapFigures } = useQaTestFigure()
+  const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
+  const mainProgress = useMemo(() => getMainProgressState(figures), [figures])
+  const visiblePlayerFigures = useMemo(
+    () => getPlayerMapFigures(figures, discoveredBonusIds),
+    [discoveredBonusIds, figures],
+  )
+  const hiddenBonusFigures = useMemo(
+    () => getHiddenBonusDetectionFigures(figures),
+    [figures],
+  )
+  const { mapFigures } = useQaTestFigure(visiblePlayerFigures)
+  const proximityFigures = useMemo(
+    () => [...mapFigures, ...hiddenBonusFigures],
+    [hiddenBonusFigures, mapFigures],
+  )
+
+  const handleBonusDiscovered = useCallback((figure) => {
+    if (!figure?.id) return
+    setDiscoveredBonusIds((current) => {
+      const key = String(figure.id)
+      if (current.has(key)) return current
+      const next = new Set(current)
+      next.add(key)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     console.info('[map-figures]', 'render input', JSON.stringify({
@@ -20,8 +50,9 @@ export function MapScreen() {
       storedIds: figures.map((figure) => String(figure.id)),
       renderedIds: mapFigures.map((figure) => String(figure.id)),
       fallback: figures.some((figure) => figure.source === 'local-fallback'),
+      mainProgress,
     }))
-  }, [figures, mapFigures])
+  }, [figures, mainProgress, mapFigures])
 
   const handleNearFigureChange = useCallback((figure) => {
     setNearFigure(figure)
@@ -32,7 +63,7 @@ export function MapScreen() {
       const target = sessionFigure ?? nearFigure
       if (!target) return
       const targetId = target.targetFigureId ?? target.id
-      const stored = figures.find((f) => f.id === targetId)
+      const stored = figures.find((f) => String(f.id) === String(targetId))
       if (stored?.obtenida) return
 
       startCaptureSession({
@@ -49,6 +80,8 @@ export function MapScreen() {
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
       <LazyMap
         figures={mapFigures}
+        proximityFigures={proximityFigures}
+        onBonusDiscovered={handleBonusDiscovered}
         onNearFigureChange={handleNearFigureChange}
         onOpenCamera={handleOpenCamera}
       />

@@ -23,17 +23,28 @@ import { canUseTestFigure } from '../utils/qaMode'
 import { myFiguresLog } from '../utils/myFiguresLog'
 import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
 import { getSupabaseProjectRef } from '../utils/authDebug'
+import {
+  getMainProgressState,
+} from '../utils/figureGameRules'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
 const zustandStorage = createJSONStorage(() => createZustandStorage())
 
 const createInitialFigures = () =>
-  mockFigures.map((figure) => ({
+  mockFigures.map((figure, index) => ({
     ...figure,
     id: String(figure.id),
     source: 'local-fallback',
     capture_radius: 250,
+    is_bonus: false,
+    is_hidden: false,
+    unlock_order: index + 1,
+    reveal_after_count: Math.max(0, index + 1 - 5),
+    bonus_type: null,
+    reveal_radius: 200,
+    marker_icon_url: null,
+    marker_icon_size: 48,
     obtenida: false,
     foto: null,
     fotoSizeBytes: null,
@@ -275,7 +286,6 @@ export const useAppStore = create(
 
           if (!changed) return state
 
-          const obtenidas = figures.filter((f) => f.obtenida).length
           const validFigureIds = new Set(figures.map((figure) => figure.id))
           const lastObtenidaFigureId = validFigureIds.has(state.lastObtenidaFigureId)
             ? state.lastObtenidaFigureId
@@ -604,13 +614,12 @@ export const useAppStore = create(
       setLastViewedFigure: (figureId) =>
         set((state) => {
           const figures = state.figures
-          const obtenidas = figures.filter((f) => f.obtenida).length
-          const isComplete = figures.length > 0 && obtenidas >= figures.length
+          const mainProgress = getMainProgressState(figures)
 
           return {
             lastViewedFigureId: figureId,
             lastSavedAt: Date.now(),
-            albumStatus: isComplete
+            albumStatus: mainProgress.completed
               ? ALBUM_STATUS.EN_REVISION
               : computeAlbumStatus(figures, figureId),
           }
@@ -634,10 +643,11 @@ export const useAppStore = create(
             obtenida: true,
             obtenidaEn: figure.obtenidaEn ?? Date.now(),
           }))
+          const mainProgress = getMainProgressState(figures)
 
           return {
             figures,
-            albumStatus: ALBUM_STATUS.COMPLETADO,
+            albumStatus: mainProgress.completed ? ALBUM_STATUS.COMPLETADO : computeAlbumStatus(figures),
             lastObtenidaFigureId: figures[figures.length - 1]?.id ?? null,
             lastSavedAt: Date.now(),
           }

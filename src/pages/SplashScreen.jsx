@@ -18,7 +18,7 @@ export function SplashScreen() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 0%, rgba(163,230,53,0.08) 0%, transparent 55%)',
+            'radial-gradient(ellipse at 50% 0%, rgba(140,198,63,0.08) 0%, transparent 55%)',
         }}
         aria-hidden
       />
