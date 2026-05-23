@@ -85,6 +85,11 @@ export async function syncUnlockToSupabase({
           path: uploadResult.path,
           publicUrl: remotePhotoUrl,
         })
+        captureSyncLog.info('upload success', {
+          publicUrl: remotePhotoUrl,
+          path: uploadResult.path,
+          photoSource,
+        })
         if (photoSource === 'mobile-native') {
           useMobilePhotoDebugStore.getState().setSnapshot({
             status: 'uploaded',

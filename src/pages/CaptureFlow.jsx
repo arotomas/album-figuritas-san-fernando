@@ -14,6 +14,7 @@ import { PERMISSION_RETRY_DELAY_MS } from '../config/ux'
 import { delay } from '../utils/recovery'
 import { isNativeCameraOnly } from '../utils/device'
 import { useQaMode } from '../utils/qaMode'
+import { captureSyncLog } from '../utils/captureSyncLog'
 
 const RewardAnimation = lazy(() =>
   import('../components/reward/RewardAnimation').then((m) => ({
@@ -46,6 +47,7 @@ export function CaptureFlow() {
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const clearCaptureSession = useAppStore((state) => state.clearCaptureSession)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
+  const obtainFigureWithPhotoSynced = useAppStore((state) => state.obtainFigureWithPhotoSynced)
 
   const {
     mapPosition,
@@ -59,9 +61,12 @@ export function CaptureFlow() {
 
   const handleObtain = useCallback(
     (figureId, photoData) => {
+      if (photoData?.photoSource === 'mobile-native') {
+        return obtainFigureWithPhotoSynced(figureId, photoData)
+      }
       return obtainFigureWithPhoto(figureId, photoData)
     },
-    [obtainFigureWithPhoto],
+    [obtainFigureWithPhoto, obtainFigureWithPhotoSynced],
   )
 
   const {
@@ -228,6 +233,7 @@ export function CaptureFlow() {
     clearQaTestFigure()
     setNearFigure(null)
     nativePickerOpenedRef.current = false
+    captureSyncLog.info('navigating to my-figures')
     navigate(withQa('/my-figures'), { replace: true })
   }, [clearCaptureSession, clearQaTestFigure, complete, navigate, setNearFigure, withQa])
 

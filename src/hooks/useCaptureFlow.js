@@ -370,7 +370,7 @@ export function useCaptureFlow({
   }, [camera.nativeOnly, isReady, figure?.id])
 
   const runObtainAndReward = useCallback(
-    (photoPayload, figureSnapshot) => {
+    async (photoPayload, figureSnapshot) => {
       if (unlockSubmittedRef.current) {
         return true
       }
@@ -381,30 +381,40 @@ export function useCaptureFlow({
         return false
       }
 
-      unlockSubmittedRef.current = true
-      setCaptureError(null)
-      setCapturedFigure(figureSnapshot)
-      setPhase(CAPTURE_PHASES.REWARD)
-      phaseRef.current = CAPTURE_PHASES.REWARD
-      camera.stop()
-
       captureLog.unlockStart({
         figureId: figureSnapshot.id,
         isQaTest: Boolean(figureSnapshot.isQaTest),
       })
       albumLog.info('saving figure', { figureId: figureSnapshot.id })
 
-      const saved = onObtainFigure?.(figureSnapshot.id, photoPayload)
+      const isMobilePhoto = photoPayload.photoSource === 'mobile-native'
+      unlockSubmittedRef.current = true
+      setCaptureError(null)
+
+      if (isMobilePhoto) {
+        setProcessingMessage('Guardando foto…')
+      }
+
+      const saved = await onObtainFigure?.(figureSnapshot.id, photoPayload)
 
       if (saved === false) {
         unlockSubmittedRef.current = false
+        processingRef.current = false
+        setIsProcessing(false)
+        setProcessingMessage(null)
         phaseRef.current = CAPTURE_PHASES.CAMERA
         setPhase(CAPTURE_PHASES.CAMERA)
         captureLog.processingError({ stage: 'obtainFigureWithPhoto', figureId: figureSnapshot.id })
-        handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR))
+        handleRecoverableError(
+          new Error(isMobilePhoto ? MOBILE_PHOTO_RECOVERABLE_ERROR : CAPTURE_RECOVERABLE_ERROR),
+        )
         return false
       }
 
+      setCapturedFigure(figureSnapshot)
+      setPhase(CAPTURE_PHASES.REWARD)
+      phaseRef.current = CAPTURE_PHASES.REWARD
+      camera.stop()
       captureLog.unlockSuccess({ figureId: figureSnapshot.id })
       rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
       return true
@@ -497,7 +507,7 @@ export function useCaptureFlow({
         )
       }
 
-      const unlocked = runObtainAndReward(
+      const unlocked = await runObtainAndReward(
         {
           foto: compressed.dataUrl,
           fotoSizeBytes: compressed.sizeBytes,
@@ -647,6 +657,10 @@ export function useCaptureFlow({
           ...compressed,
           photoSource: 'mobile-native',
         }
+        mobilePhotoLog.info('jpeg ready', {
+          size: compressed.blob?.size ?? compressed.sizeBytes,
+          type: compressed.blob?.type ?? compressed.type ?? null,
+        })
         publishMobilePhotoDebug({
           status: 'compressed',
           uploadStatus: 'pending',

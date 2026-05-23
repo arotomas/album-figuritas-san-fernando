@@ -375,6 +375,89 @@ export const useAppStore = create(
         return saved
       },
 
+      obtainFigureWithPhotoSynced: async (
+        figureId,
+        { foto, fotoSizeBytes, obtenidaEn, captureRecord, photoSource = null },
+      ) => {
+        const figureKey = String(figureId)
+        const isQaFigure =
+          figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')
+        const state = get()
+        const withinLimit = isQaFigure || storageService.isPhotoWithinLimit(fotoSizeBytes)
+
+        if (!foto || !withinLimit) {
+          persistLog.persist('synced obtain blocked — photo required or too large', figureId)
+          return false
+        }
+
+        let realFigureId = figureId
+        if (isQaFigure) {
+          realFigureId =
+            state.qaTestFigure?.targetFigureId ??
+            Number(figureKey.replace(/^(qa-|dev-)/, ''))
+        }
+
+        const qaTargetFigureId = isQaFigure
+          ? state.qaTestFigure?.targetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+          : null
+
+        const result = await syncUnlockToSupabase({
+          figureId,
+          foto,
+          fotoSizeBytes,
+          photoSource,
+          obtenidaEn,
+          captureRecord,
+          source: isQaFigure ? 'qa' : 'capture',
+          qaTargetFigureId,
+        })
+
+        if (!result.ok || !result.remotePhotoUrl) {
+          const warning =
+            result.uploadError?.reason ??
+            result.reason ??
+            'No se pudo subir la foto a Supabase.'
+          get().setSupabaseSyncWarning(warning)
+          return false
+        }
+
+        const patch = {
+          obtenida: true,
+          obtenidaEn,
+          foto: result.remotePhotoUrl,
+          fotoSizeBytes,
+          ...(captureRecord
+            ? { captureMeta: { ...captureRecord, photoUrl: result.remotePhotoUrl } }
+            : {}),
+        }
+
+        set((current) => {
+          const existing = current.figures.find((f) => f.id === realFigureId)
+          const figures = current.figures.map((figure) =>
+            figure.id === realFigureId ? { ...figure, ...patch } : figure,
+          )
+
+          return {
+            ...(existing?.obtenida
+              ? {
+                  figures,
+                  lastViewedFigureId: realFigureId,
+                  lastSavedAt: Date.now(),
+                  albumStatus: computeAlbumStatus(figures, realFigureId),
+                }
+              : applyFigureUpdate(current, realFigureId, patch)),
+            lastSupabaseSyncWarning: null,
+          }
+        })
+
+        console.info('[capture-sync]', 'local store updated with photo_url', {
+          figureId: realFigureId,
+          publicUrl: result.remotePhotoUrl,
+        })
+
+        return true
+      },
+
       setNearFigure: (figure) => set({ nearFigure: figure }),
 
       startCaptureSession: ({ figure, position = null, distanceToFigure = null }) => {

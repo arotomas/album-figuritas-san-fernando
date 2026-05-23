@@ -94,14 +94,12 @@ export function MyFiguresScreen() {
 
   useEffect(() => {
     if (!activeFigure) return
-    myFiguresLog.info('photo source', {
+    myFiguresLog.info('active photo source', {
       figureId: activeFigure.id,
-      source: activeFigure.foto?.startsWith('http')
-        ? 'supabase-photo_url'
-        : activeFigure.foto?.startsWith('data:')
-          ? 'local-data-url'
-          : 'none',
-      hasPhoto: Boolean(activeFigure.foto),
+      hasPhotoUrl: Boolean(activeFigure.foto?.startsWith('http')),
+      photoUrl: activeFigure.foto?.startsWith('http') ? activeFigure.foto : null,
+      hasLocalPhoto: Boolean(activeFigure.foto?.startsWith('data:')),
+      imageUrl: activeFigure.foto ?? null,
     })
   }, [activeFigure])
 
