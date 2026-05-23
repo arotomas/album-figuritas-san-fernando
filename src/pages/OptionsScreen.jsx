@@ -7,7 +7,7 @@ import { isWpConfigured } from '../services/api'
 import { getCurrentPosition } from '../services/geoService'
 import { GPS_HIGH_ACCURACY_OPTIONS } from '../config/gps'
 import { isDevMode } from '../utils/devMode'
-import { isQaMode, withQaParam } from '../utils/qaMode'
+import { useQaMode, withQaParam } from '../utils/qaMode'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -29,15 +29,15 @@ export function OptionsScreen() {
   const [qaMessage, setQaMessage] = useState(null)
   const [qaLoading, setQaLoading] = useState(false)
 
-  const qaEnabled = isQaMode()
+  const { isQaActive: qaEnabled, withQa } = useQaMode()
   const devEnabled = isDevMode()
 
   useEffect(() => {
     console.log('[QA options]', {
       search: window.location.search,
-      qa: isQaMode(),
+      qa: qaEnabled,
     })
-  }, [location.search, location.pathname])
+  }, [location.search, location.pathname, qaEnabled])
 
   const handleCreateQaFigure = async () => {
     setQaMessage(null)
@@ -56,7 +56,7 @@ export function OptionsScreen() {
       }
 
       setQaMessage('Figurita QA creada a ~5–10m. Andá al mapa.')
-      navigate(withQaParam('/map'))
+      navigate(withQa('/map'))
     } catch {
       setQaMessage('No pudimos obtener tu ubicación. Revisá permisos GPS.')
     } finally {

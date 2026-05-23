@@ -16,6 +16,7 @@ export const cameraLog = {
   metadataLoaded: (data) => emit('info', 'video metadata loaded', data),
   dimensions: (data) => emit('info', 'video dimensions', data),
   blackPreviewFallback: (data) => emit('warn', 'black preview fallback', data),
+  mobileNativeInputOpen: () => emit('info', 'mobile native input open'),
   nativeFileSelected: (data) => emit('info', 'native camera file selected', data),
   warn: (label, data) => emit('warn', label, data),
 }

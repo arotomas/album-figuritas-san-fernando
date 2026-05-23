@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   attachStreamToVideo,
   BLACK_PREVIEW_TIMEOUT_MS,
@@ -10,32 +10,32 @@ import {
   queryCameraPermission,
 } from '../utils/camera'
 import { cameraLog } from '../utils/cameraLog'
-import { isMobileDevice } from '../utils/device'
+import { isNativeCameraOnly } from '../utils/device'
 import { getQaState } from '../utils/diagnostics'
 import { useAppLifecycle } from './useAppLifecycle'
 import { cleanupMediaStream } from '../utils/cleanup'
-
-const nativeOnlyDevice = isMobileDevice()
 
 /**
  * Mobile: siempre cámara nativa (input file).
  * Desktop: getUserMedia con fallback nativo.
  */
 export function useCamera() {
+  const nativeOnly = useMemo(() => isNativeCameraOnly(), [])
+
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const startingRef = useRef(false)
   const blackPreviewTimerRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  const [permission, setPermission] = useState(nativeOnlyDevice ? 'native' : 'unknown')
-  const [status, setStatus] = useState(nativeOnlyDevice ? 'native' : 'idle')
+  const [permission, setPermission] = useState(nativeOnly ? 'native' : 'unknown')
+  const [status, setStatus] = useState(nativeOnly ? 'native' : 'idle')
   const [error, setError] = useState(null)
-  const [useNativeFallback, setUseNativeFallback] = useState(nativeOnlyDevice)
+  const [useNativeFallback, setUseNativeFallback] = useState(nativeOnly)
   const [showBlackPreviewFallback, setShowBlackPreviewFallback] = useState(false)
-  const statusRef = useRef(nativeOnlyDevice ? 'native' : 'idle')
-  const permissionRef = useRef(nativeOnlyDevice ? 'native' : 'unknown')
-  const useNativeFallbackRef = useRef(nativeOnlyDevice)
+  const statusRef = useRef(nativeOnly ? 'native' : 'idle')
+  const permissionRef = useRef(nativeOnly ? 'native' : 'unknown')
+  const useNativeFallbackRef = useRef(nativeOnly)
 
   useEffect(() => {
     statusRef.current = status
@@ -60,7 +60,7 @@ export function useCamera() {
     clearBlackPreviewTimer()
     cleanupMediaStream(streamRef, videoRef)
     setShowBlackPreviewFallback(false)
-    if (nativeOnlyDevice) {
+    if (nativeOnly) {
       setUseNativeFallback(true)
       setStatus('native')
       startingRef.current = false
@@ -72,7 +72,7 @@ export function useCamera() {
       return 'idle'
     })
     startingRef.current = false
-  }, [clearBlackPreviewTimer])
+  }, [clearBlackPreviewTimer, nativeOnly])
 
   const enableNativeFallback = useCallback(({ keepBlackFlag = false } = {}) => {
     clearBlackPreviewTimer()
@@ -87,7 +87,7 @@ export function useCamera() {
   }, [clearBlackPreviewTimer])
 
   const scheduleBlackPreviewCheck = useCallback(() => {
-    if (nativeOnlyDevice) return
+    if (nativeOnly) return
 
     clearBlackPreviewTimer()
 
@@ -105,12 +105,12 @@ export function useCamera() {
         enableNativeFallback({ keepBlackFlag: true })
       }
     }, BLACK_PREVIEW_TIMEOUT_MS)
-  }, [clearBlackPreviewTimer, enableNativeFallback])
+  }, [clearBlackPreviewTimer, enableNativeFallback, nativeOnly])
 
   const videoCallbackRef = useCallback(
     (node) => {
       videoRef.current = node
-      if (nativeOnlyDevice || !node || !streamRef.current) return
+      if (nativeOnly || !node || !streamRef.current) return
 
       attachStreamToVideo(node, streamRef.current)
         .then(() => {
@@ -120,11 +120,11 @@ export function useCamera() {
         })
         .catch(() => {})
     },
-    [scheduleBlackPreviewCheck],
+    [nativeOnly, scheduleBlackPreviewCheck],
   )
 
   const startStream = useCallback(async () => {
-    if (nativeOnlyDevice || startingRef.current) return
+    if (nativeOnly || startingRef.current) return
     startingRef.current = true
 
     if (getQaState().forcePermissionDenied) {
@@ -172,10 +172,10 @@ export function useCamera() {
     } finally {
       startingRef.current = false
     }
-  }, [enableNativeFallback, scheduleBlackPreviewCheck])
+  }, [enableNativeFallback, nativeOnly, scheduleBlackPreviewCheck])
 
   const initPermission = useCallback(async () => {
-    if (nativeOnlyDevice) {
+    if (nativeOnly) {
       enableNativeFallback()
       return
     }
@@ -206,22 +206,25 @@ export function useCamera() {
     }
 
     setStatus('awaiting-permission')
-  }, [enableNativeFallback, startStream])
+  }, [enableNativeFallback, nativeOnly, startStream])
 
   const requestCamera = useCallback(async () => {
-    if (nativeOnlyDevice) {
+    if (nativeOnly) {
+      cameraLog.mobileNativeInputOpen()
       fileInputRef.current?.click()
       return
     }
     await startStream()
-  }, [startStream])
+  }, [nativeOnly, startStream])
 
   const useNativeCamera = useCallback(() => {
     enableNativeFallback()
+    cameraLog.mobileNativeInputOpen()
     fileInputRef.current?.click()
   }, [enableNativeFallback])
 
   const openNativePicker = useCallback(() => {
+    cameraLog.mobileNativeInputOpen()
     fileInputRef.current?.click()
   }, [])
 
@@ -231,13 +234,13 @@ export function useCamera() {
     onHidden: () => {
       wasActiveRef.current =
         statusRef.current === 'active' || statusRef.current === 'loading'
-      if (!nativeOnlyDevice) {
+      if (!nativeOnly) {
         stop()
       }
     },
     onVisible: () => {
       if (
-        !nativeOnlyDevice &&
+        !nativeOnly &&
         wasActiveRef.current &&
         !useNativeFallbackRef.current &&
         permissionRef.current === 'granted'
@@ -250,22 +253,22 @@ export function useCamera() {
   useEffect(() => {
     return () => {
       clearBlackPreviewTimer()
-      if (!nativeOnlyDevice) {
+      if (!nativeOnly) {
         cleanupMediaStream(streamRef, videoRef)
       }
       startingRef.current = false
     }
-  }, [clearBlackPreviewTimer])
+  }, [clearBlackPreviewTimer, nativeOnly])
 
   const needsPrompt =
-    !nativeOnlyDevice && status === 'awaiting-permission' && !useNativeFallback
-  const isDenied = !nativeOnlyDevice && status === 'denied' && !useNativeFallback
+    !nativeOnly && status === 'awaiting-permission' && !useNativeFallback
+  const isDenied = !nativeOnly && status === 'denied' && !useNativeFallback
 
   return {
     videoRef: videoCallbackRef,
     fileInputRef,
     getVideoElement: () => videoRef.current,
-    nativeOnly: nativeOnlyDevice,
+    nativeOnly,
     permission,
     status,
     error,

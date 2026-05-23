@@ -28,7 +28,11 @@ export function CameraView({
   const showSecondaryNativeButton = !nativeOnly && !useNativeFallback
 
   return (
-    <div className="capture-screen relative flex h-full flex-col overflow-hidden bg-black">
+    <div
+      className={`capture-screen relative flex h-full flex-col overflow-hidden ${
+        showNativeUi ? 'bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950' : 'bg-black'
+      }`}
+    >
       {!showNativeUi && (
         <video
           ref={videoRef}
@@ -39,17 +43,22 @@ export function CameraView({
         />
       )}
 
-      {showNativeUi && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 px-8 text-center">
-          <p className="text-lg font-semibold text-white">
-            {nativeOnly ? 'Sacá la foto' : 'Cámara del celular'}
+      {showNativeUi && nativeOnly && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
+          <p className="text-lg font-semibold text-white">Sacá la foto</p>
+          <p className="mt-2 max-w-xs text-sm text-white/70">
+            Tocá capturar para abrir la cámara del celular y desbloquear la figurita.
           </p>
+        </div>
+      )}
+
+      {showNativeUi && !nativeOnly && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
+          <p className="text-lg font-semibold text-white">Cámara del celular</p>
           <p className="mt-2 text-sm text-white/60">
-            {nativeOnly
-              ? 'Tocá capturar para abrir la cámara y desbloquear la figurita.'
-              : showBlackPreviewFallback
-                ? 'La vista previa web no funcionó. Usá la cámara nativa para sacar la foto.'
-                : 'Tocá capturar para abrir la cámara nativa.'}
+            {showBlackPreviewFallback
+              ? 'La vista previa web no funcionó. Usá la cámara nativa para sacar la foto.'
+              : 'Tocá capturar para abrir la cámara nativa.'}
           </p>
         </div>
       )}
@@ -72,7 +81,9 @@ export function CameraView({
         }}
       />
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
+      {!showNativeUi && (
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
+      )}
 
       <div className="safe-top relative z-10 flex items-center justify-between px-5 py-4">
         <button

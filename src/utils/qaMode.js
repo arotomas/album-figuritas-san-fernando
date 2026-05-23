@@ -5,34 +5,50 @@ import { isDevMode } from './devMode'
 const QA_SESSION_KEY = 'album-qa-mode'
 const QA_SESSION_KEY_LEGACY = 'figuritas-qa-mode'
 
+function readSessionQaFlag() {
+  try {
+    if (sessionStorage.getItem(QA_SESSION_KEY) === '1') return true
+    if (sessionStorage.getItem(QA_SESSION_KEY_LEGACY) === '1') {
+      sessionStorage.setItem(QA_SESSION_KEY, '1')
+      return true
+    }
+  } catch {
+    // ignore
+  }
+  return false
+}
+
+export function activateQaMode({ log = true } = {}) {
+  try {
+    sessionStorage.setItem(QA_SESSION_KEY, '1')
+    if (log) {
+      console.info('[QA] enabled', true)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function isQaMode() {
   if (typeof window === 'undefined') return false
 
   try {
     const params = new URLSearchParams(window.location.search)
     if (params.get('qa') === '1') {
-      sessionStorage.setItem(QA_SESSION_KEY, '1')
-      return true
+      return activateQaMode()
     }
 
-    if (sessionStorage.getItem(QA_SESSION_KEY) === '1') {
-      return true
-    }
-
-    if (sessionStorage.getItem(QA_SESSION_KEY_LEGACY) === '1') {
-      sessionStorage.setItem(QA_SESSION_KEY, '1')
-      return true
-    }
-
-    return false
+    return readSessionQaFlag()
   } catch {
     return false
   }
 }
 
-/** @deprecated usar isQaMode */
+/** Sincroniza ?qa=1 → sessionStorage en cada navegación. */
 export function syncQaModeFromUrl() {
-  return isQaMode()
+  const active = isQaMode()
+  return active
 }
 
 /** @deprecated usar isQaMode */
@@ -56,13 +72,11 @@ export function canUseTestFigure() {
 
 export function useQaMode() {
   const location = useLocation()
-  const [, setTick] = useState(0)
+  const [active, setActive] = useState(() => isQaMode())
 
   useEffect(() => {
-    setTick((value) => value + 1)
+    setActive(syncQaModeFromUrl())
   }, [location.search, location.pathname])
-
-  const active = isQaMode()
 
   return {
     isQaActive: active,

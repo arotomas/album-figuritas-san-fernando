@@ -2,12 +2,15 @@ import { Component } from 'react'
 import { logDiagnostic } from '../../utils/diagnostics'
 import { PremiumButton } from '../ui/PremiumButton'
 
-function resetBrokenCaptureState() {
+function mapPathWithQa() {
   try {
-    sessionStorage.removeItem('album-qa-mode')
+    if (sessionStorage.getItem('album-qa-mode') === '1') {
+      return '/map?qa=1'
+    }
   } catch {
     // ignore
   }
+  return '/map'
 }
 
 export class AppErrorBoundary extends Component {
@@ -26,15 +29,13 @@ export class AppErrorBoundary extends Component {
   }
 
   handleRetry = () => {
-    resetBrokenCaptureState()
     this.setState({ hasError: false, error: null })
-    window.location.assign('/map')
+    window.location.assign(mapPathWithQa())
   }
 
   handleGoToMap = () => {
-    resetBrokenCaptureState()
     this.setState({ hasError: false, error: null })
-    window.location.assign('/map')
+    window.location.assign(mapPathWithQa())
   }
 
   handleReload = () => {
