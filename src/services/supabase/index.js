@@ -4,8 +4,10 @@ export {
   fetchProfile,
   getCurrentSession,
   getCurrentUserId,
+  getVerifiedUser,
   isSupabaseConfigured,
   loginWithUsername,
+  signOutSupabase,
 } from './auth'
 
 export { isAdmin } from './admin'

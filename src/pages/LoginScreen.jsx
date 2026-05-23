@@ -5,7 +5,11 @@ import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
 import { authLog } from '../utils/authLog'
+import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
+
+const SERVER_ERROR_MESSAGE =
+  'No pudimos conectar con el servidor. Probá de nuevo.'
 
 export function LoginScreen() {
   const { login, isSubmitting } = useAuth()
@@ -26,7 +30,7 @@ export function LoginScreen() {
 
     const result = await login({ username: trimmed })
     if (!result.ok) {
-      setError(result.message ?? 'No pudimos iniciar sesión. Probá de nuevo.')
+      setError(result.message ?? SERVER_ERROR_MESSAGE)
     }
   }
 
@@ -61,15 +65,19 @@ export function LoginScreen() {
         </motion.div>
 
         {error && (
-          <motion.p variants={staggerItem} className="text-center text-sm text-red-600">
-            {error}
-          </motion.p>
+          <motion.div variants={staggerItem} className="space-y-2">
+            <p className="text-center text-sm font-medium text-red-600">{error}</p>
+          </motion.div>
         )}
 
         <motion.div variants={staggerItem}>
           <Button type="submit" disabled={isSubmitting || !username.trim()}>
-            {isSubmitting ? 'Conectando…' : 'Entrar'}
+            {isSubmitting ? 'Verificando con Supabase…' : 'Entrar'}
           </Button>
+        </motion.div>
+
+        <motion.div variants={staggerItem}>
+          <AuthDebugPanel />
         </motion.div>
       </motion.form>
 

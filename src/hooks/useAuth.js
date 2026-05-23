@@ -2,13 +2,27 @@ import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import { isQaMode, withQaParam } from '../utils/qaMode'
-import { isSupabaseConfigured, loginWithUsername } from '../services/supabase/auth'
+import {
+  isSupabaseConfigured,
+  loginWithUsername,
+  signOutSupabase,
+} from '../services/supabase/auth'
 import { isAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { authLog } from '../utils/authLog'
+import { authDebug } from '../utils/authDebug'
 
 const SERVER_ERROR_MESSAGE =
   'No pudimos conectar con el servidor. Probá de nuevo.'
+
+function formatAuthError(error) {
+  const parts = [
+    error?.message,
+    error?.code,
+    error?.status ? `status ${error.status}` : null,
+  ].filter(Boolean)
+  return parts.join(' · ') || SERVER_ERROR_MESSAGE
+}
 
 export function useAuth() {
   const navigate = useNavigate()
@@ -30,17 +44,29 @@ export function useAuth() {
 
       if (!isSupabaseConfigured()) {
         authLog.error('login blocked — supabase env vars missing')
-        return { ok: false, message: SERVER_ERROR_MESSAGE }
+        authDebug.error('login blocked — supabase env vars missing')
+        return {
+          ok: false,
+          message: `${SERVER_ERROR_MESSAGE} (Supabase no configurado en build)`,
+        }
       }
 
       setIsSubmitting(true)
 
       try {
-        const { userId, profile, session } = await loginWithUsername(trimmed)
+        const { userId, profile, session, user: authUser } = await loginWithUsername(trimmed)
 
-        if (!session?.user?.id || !profile?.id) {
-          authLog.error('login blocked — missing session or profile after auth')
-          return { ok: false, message: SERVER_ERROR_MESSAGE }
+        if (!session?.user?.id || !profile?.id || !authUser?.id) {
+          authLog.error('login blocked — verification incomplete after auth')
+          authDebug.error('login blocked — verification incomplete', {
+            sessionUserId: session?.user?.id ?? null,
+            profileId: profile?.id ?? null,
+            authUserId: authUser?.id ?? null,
+          })
+          return {
+            ok: false,
+            message: `${SERVER_ERROR_MESSAGE} (verificación incompleta)`,
+          }
         }
 
         const admin = await isAdmin(userId)
@@ -52,7 +78,7 @@ export function useAuth() {
             mergeRemoteUserFigures(remoteRows)
           }
         } catch (syncError) {
-          authLog.error('album pull after login failed', {
+          authDebug.error('album pull after login failed', {
             error: syncError?.message ?? String(syncError),
           })
         }
@@ -65,7 +91,15 @@ export function useAuth() {
           error: error?.message ?? String(error),
           code: error?.code,
         })
-        return { ok: false, message: SERVER_ERROR_MESSAGE }
+        authDebug.error('login failed', {
+          error: error?.message ?? String(error),
+          code: error?.code,
+          status: error?.status,
+        })
+        return {
+          ok: false,
+          message: `${SERVER_ERROR_MESSAGE} (${formatAuthError(error)})`,
+        }
       } finally {
         setIsSubmitting(false)
       }
@@ -79,7 +113,15 @@ export function useAuth() {
     ],
   )
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    try {
+      await signOutSupabase()
+    } catch (error) {
+      authDebug.error('logout supabase signOut failed', {
+        error: error?.message ?? String(error),
+      })
+    }
+
     logout()
     navigate(withQaParam('/login', isQaMode(location.search)), { replace: true })
   }, [location.search, logout, navigate])

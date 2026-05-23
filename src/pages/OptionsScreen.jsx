@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
+import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { useAuth } from '../hooks/useAuth'
 import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
 import { isWpConfigured } from '../services/api'
@@ -117,6 +118,8 @@ export function OptionsScreen() {
           </p>
         </div>
       </div>
+
+      <AuthDebugPanel className="mt-6" />
 
       {qaEnabled && (
         <div className="mt-6 space-y-3 rounded-2xl border border-cyan-400/40 bg-cyan-50 p-5">
