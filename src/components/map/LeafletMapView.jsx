@@ -268,8 +268,20 @@ function LeafletMapViewInner({
   const reducedMotion = prefersReducedMotion()
 
   const handleOpenCamera = useCallback(() => {
-    onOpenCamera?.()
-  }, [onOpenCamera])
+    const capturePosition = proximityPosition ?? mapPosition ?? position
+    onOpenCamera?.({
+      figure: nearFigure,
+      position: capturePosition,
+      distanceToFigure: nearestDistance,
+    })
+  }, [
+    mapPosition,
+    nearFigure,
+    nearestDistance,
+    onOpenCamera,
+    position,
+    proximityPosition,
+  ])
 
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return

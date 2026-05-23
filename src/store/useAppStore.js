@@ -16,6 +16,7 @@ import {
 import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
 import { offsetCoordinates } from '../utils/geoOffset'
+import { getDistanceMeters } from '../utils/geo'
 import { canUseTestFigure } from '../utils/qaMode'
 
 export const QA_TEST_FIGURE_ID_PREFIX = 'qa-'
@@ -181,16 +182,39 @@ export const useAppStore = create(
 
       setNearFigure: (figure) => set({ nearFigure: figure }),
 
-      startCaptureSession: ({ figure, position = null }) => {
+      startCaptureSession: ({ figure, position = null, distanceToFigure = null }) => {
         if (!figure) return
+
+        let locationSnapshot = null
+
+        if (figure.isQaTest && !position) {
+          locationSnapshot = {
+            lat: figure.lat,
+            lng: figure.lng,
+            accuracy: null,
+            distanceToFigure: distanceToFigure ?? 0,
+          }
+        } else if (position) {
+          const dist =
+            distanceToFigure ??
+            getDistanceMeters(position.lat, position.lng, figure.lat, figure.lng)
+          locationSnapshot = {
+            lat: position.lat,
+            lng: position.lng,
+            accuracy: position.accuracy ?? null,
+            distanceToFigure: dist,
+          }
+        }
+
         set({
           captureSession: {
             figure: { ...figure },
-            position: position
+            locationSnapshot,
+            position: locationSnapshot
               ? {
-                  lat: position.lat,
-                  lng: position.lng,
-                  accuracy: position.accuracy ?? null,
+                  lat: locationSnapshot.lat,
+                  lng: locationSnapshot.lng,
+                  accuracy: locationSnapshot.accuracy,
                 }
               : null,
             lockedAt: Date.now(),

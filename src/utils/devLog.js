@@ -24,6 +24,11 @@ export const captureLog = {
   info: (...args) => log('CAPTURE', 'info', ...args),
   warn: (...args) => log('CAPTURE', 'warn', ...args),
   pendingFigureSet: (detail) => logCapture('info', 'pending figure set', detail),
+  pendingFigureExistsAfterNativePhoto: (detail) =>
+    logCapture('info', 'pending figure exists after native photo', detail),
+  usingLocationSnapshot: (detail) => logCapture('info', 'using location snapshot', detail),
+  skippingGpsConfirmationAfterPhoto: (detail) =>
+    logCapture('info', 'skipping GPS confirmation after photo', detail),
   nativeInputOpened: (detail) => logCapture('info', 'native input opened', detail),
   photoReceived: (detail) => logCapture('info', 'photo received', detail),
   skipDistanceRecheck: (detail) =>

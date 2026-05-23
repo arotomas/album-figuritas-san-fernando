@@ -3,19 +3,35 @@ import { motion } from 'framer-motion'
 import { FaLocationDot } from 'react-icons/fa6'
 import { PremiumButton } from '../components/ui/PremiumButton'
 import { ProgressBar } from '../components/ProgressBar'
+import { useGeolocation } from '../hooks/useGeolocation'
 import { useAppStore } from '../store/useAppStore'
+import { getDistanceMeters } from '../utils/geo'
+import { loadLastKnownPosition } from '../utils/lastKnownPosition'
 
 export function NearFigureScreen() {
   const navigate = useNavigate()
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const startCaptureSession = useAppStore((state) => state.startCaptureSession)
+  const { proximityPosition, mapPosition } = useGeolocation()
 
   const handleOpenCamera = () => {
-    if (nearFigure) {
-      startCaptureSession({ figure: nearFigure })
-      navigate('/capture')
-    }
+    if (!nearFigure) return
+
+    const position =
+      proximityPosition ?? mapPosition ?? loadLastKnownPosition() ?? null
+    const distanceToFigure = position
+      ? getDistanceMeters(position.lat, position.lng, nearFigure.lat, nearFigure.lng)
+      : nearFigure.isQaTest
+        ? 0
+        : null
+
+    startCaptureSession({
+      figure: nearFigure,
+      position,
+      distanceToFigure,
+    })
+    navigate('/capture')
   }
 
   if (!nearFigure) {

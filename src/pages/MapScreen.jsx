@@ -17,15 +17,23 @@ export function MapScreen() {
     setNearFigure(figure)
   }, [setNearFigure])
 
-  const handleOpenCamera = useCallback(() => {
-    if (!nearFigure) return
-    const targetId = nearFigure.targetFigureId ?? nearFigure.id
-    const stored = figures.find((f) => f.id === targetId)
-    if (stored?.obtenida) return
+  const handleOpenCamera = useCallback(
+    ({ figure: sessionFigure, position, distanceToFigure } = {}) => {
+      const target = sessionFigure ?? nearFigure
+      if (!target) return
+      const targetId = target.targetFigureId ?? target.id
+      const stored = figures.find((f) => f.id === targetId)
+      if (stored?.obtenida) return
 
-    startCaptureSession({ figure: nearFigure })
-    navigate('/capture')
-  }, [figures, nearFigure, navigate, startCaptureSession])
+      startCaptureSession({
+        figure: target,
+        position,
+        distanceToFigure,
+      })
+      navigate('/capture')
+    },
+    [figures, nearFigure, navigate, startCaptureSession],
+  )
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
