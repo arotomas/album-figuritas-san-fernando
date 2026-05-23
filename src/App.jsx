@@ -23,6 +23,7 @@ function App() {
   useSupabaseBootstrap(hasHydrated && isAuthenticated && Boolean(username?.trim()))
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
+  const isAdminRoute = location.pathname.startsWith('/admin')
 
   useEffect(() => {
     if (hasHydrated) {
@@ -57,7 +58,11 @@ function App() {
   return (
     <ViewportProvider>
       <LazyMotion features={domAnimation} strict>
-        <div className="app-shell h-app overflow-hidden text-ink">
+        <div
+          className={`app-shell h-app overflow-hidden text-ink ${
+            isAdminRoute ? 'app-shell-admin' : ''
+          }`}
+        >
           <ConnectionStatus />
           <Suspense fallback={<AppSkeleton />}>
             <AppRoutes />

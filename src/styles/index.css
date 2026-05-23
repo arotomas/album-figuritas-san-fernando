@@ -168,6 +168,16 @@
     background-color: var(--color-warm-white);
   }
 
+  .app-shell-admin {
+    width: 100vw;
+    max-width: none;
+    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin-inline: 0;
+    background-color: #f1f5f9;
+  }
+
   html.standalone .app-shell {
     max-width: 100%;
   }
