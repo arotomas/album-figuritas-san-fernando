@@ -35,3 +35,10 @@ export {
 } from './figures'
 
 export { syncUnlockToSupabase, pullRemoteAlbum } from './sync'
+
+export {
+  getAdminPlayers,
+  getAdminPlayerDetail,
+  updatePlayerAlbumStatus,
+  updateCaptureValidation,
+} from './adminPlayers'
