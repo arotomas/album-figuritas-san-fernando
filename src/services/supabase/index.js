@@ -6,7 +6,6 @@ export {
   getCurrentUserId,
   isSupabaseConfigured,
   loginWithUsername,
-  updateProfileUsername,
 } from './auth'
 
 export { isAdmin } from './admin'

@@ -4,6 +4,7 @@ import { Logo } from '../components/Logo'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
+import { authLog } from '../utils/authLog'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
 
 export function LoginScreen() {
@@ -21,9 +22,11 @@ export function LoginScreen() {
       return
     }
 
-    const ok = await login({ username: trimmed })
-    if (!ok) {
-      setError('No pudimos iniciar sesión. Probá de nuevo.')
+    authLog.info('login submit', { username: trimmed })
+
+    const result = await login({ username: trimmed })
+    if (!result.ok) {
+      setError(result.message ?? 'No pudimos iniciar sesión. Probá de nuevo.')
     }
   }
 
@@ -65,7 +68,7 @@ export function LoginScreen() {
 
         <motion.div variants={staggerItem}>
           <Button type="submit" disabled={isSubmitting || !username.trim()}>
-            {isSubmitting ? 'Entrando…' : 'Entrar'}
+            {isSubmitting ? 'Conectando…' : 'Entrar'}
           </Button>
         </motion.div>
       </motion.form>

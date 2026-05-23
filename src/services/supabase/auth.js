@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { supabaseLog } from '../../utils/supabaseLog'
+import { authLog, profileLog } from '../../utils/authLog'
 
 export function isSupabaseConfigured() {
   return Boolean(
@@ -18,6 +19,44 @@ export async function getCurrentUserId() {
   return session?.user?.id ?? null
 }
 
+/**
+ * Crea o actualiza profile con username. Falla con error real de RLS/red.
+ */
+export async function ensureProfile(userId, username) {
+  const trimmed = username?.trim()
+  if (!userId || !trimmed) {
+    throw new Error('USERNAME_REQUIRED')
+  }
+
+  profileLog.info('upsert start', { userId, username: trimmed })
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(
+      {
+        id: userId,
+        username: trimmed,
+        is_admin: false,
+      },
+      { onConflict: 'id' },
+    )
+    .select('id, username, avatar_url, is_admin, created_at')
+    .single()
+
+  if (error) {
+    profileLog.error('upsert error', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw error
+  }
+
+  profileLog.info('upsert success', { userId, username: data.username })
+  return data
+}
+
 export async function ensureAnonymousSession() {
   if (!isSupabaseConfigured()) {
     supabaseLog.auth.warn('skipped — missing env vars')
@@ -27,62 +66,24 @@ export async function ensureAnonymousSession() {
   const existing = await getCurrentSession()
   if (existing?.user) {
     supabaseLog.auth.info('session restored', { userId: existing.user.id })
-    const profile = await ensureProfile(existing.user.id)
-    return { session: existing, profile }
+    return { session: existing, profile: null }
   }
 
-  supabaseLog.auth.info('signing in anonymously')
+  authLog.info('signInAnonymously start')
   const { data, error } = await supabase.auth.signInAnonymously()
   if (error) {
-    supabaseLog.auth.warn('anonymous sign-in failed', { message: error.message })
+    authLog.error('signInAnonymously error', { error: error.message })
     throw error
   }
 
   const userId = data.user?.id ?? data.session?.user?.id
   if (!userId) {
+    authLog.error('signInAnonymously error', { error: 'AUTH_NO_USER' })
     throw new Error('AUTH_NO_USER')
   }
 
-  supabaseLog.auth.info('anonymous session created', { userId })
-  const profile = await ensureProfile(userId)
-  return { session: data.session, profile }
-}
-
-export async function ensureProfile(userId) {
-  const { data: existing, error: readError } = await supabase
-    .from('profiles')
-    .select('id, username, avatar_url, is_admin, created_at')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (readError) {
-    supabaseLog.auth.warn('profile read failed', { message: readError.message })
-    throw readError
-  }
-
-  if (existing) {
-    supabaseLog.auth.info('profile loaded', { userId, isAdmin: existing.is_admin })
-    return existing
-  }
-
-  const username = `explorador-${userId.slice(0, 8)}`
-  const { data: created, error: insertError } = await supabase
-    .from('profiles')
-    .insert({
-      id: userId,
-      username,
-      is_admin: false,
-    })
-    .select('id, username, avatar_url, is_admin, created_at')
-    .single()
-
-  if (insertError) {
-    supabaseLog.auth.warn('profile create failed', { message: insertError.message })
-    throw insertError
-  }
-
-  supabaseLog.auth.info('profile created', { userId, username })
-  return created
+  authLog.info('signInAnonymously success', { userId })
+  return { session: data.session, profile: null }
 }
 
 export async function fetchProfile(userId) {
@@ -96,35 +97,9 @@ export async function fetchProfile(userId) {
   return data
 }
 
-export async function updateProfileUsername(userId, username) {
-  const trimmed = username?.trim()
-  if (!userId || !trimmed) {
-    throw new Error('USERNAME_REQUIRED')
-  }
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert(
-      {
-        id: userId,
-        username: trimmed,
-      },
-      { onConflict: 'id' },
-    )
-    .select('id, username, avatar_url, is_admin, created_at')
-    .single()
-
-  if (error) {
-    supabaseLog.auth.warn('profile username update failed', { message: error.message })
-    throw error
-  }
-
-  supabaseLog.auth.info('profile username updated', { userId, username: trimmed })
-  return data
-}
-
 /**
- * Login v1: sesión anónima + username en profile.
+ * Login obligatorio: signInAnonymously + profile upsert.
+ * No resuelve si falta session.user.id o profile.
  */
 export async function loginWithUsername(username) {
   const trimmed = username?.trim()
@@ -132,18 +107,52 @@ export async function loginWithUsername(username) {
     throw new Error('USERNAME_REQUIRED')
   }
 
-  const sessionResult = await ensureAnonymousSession()
-  if (!sessionResult?.session?.user?.id) {
-    throw new Error('AUTH_FAILED')
+  if (!isSupabaseConfigured()) {
+    authLog.error('login blocked — missing env vars')
+    throw new Error('SUPABASE_NOT_CONFIGURED')
   }
 
-  const userId = sessionResult.session.user.id
-  const profile = await updateProfileUsername(userId, trimmed)
+  authLog.info('login submit', { username: trimmed })
+
+  let session = await getCurrentSession()
+  let userId = session?.user?.id ?? null
+
+  if (!userId) {
+    authLog.info('signInAnonymously start')
+    const { data, error } = await supabase.auth.signInAnonymously()
+
+    if (error) {
+      authLog.error('signInAnonymously error', { error: error.message })
+      throw error
+    }
+
+    session = data.session
+    userId = data.user?.id ?? data.session?.user?.id
+
+    if (!userId) {
+      authLog.error('signInAnonymously error', { error: 'AUTH_NO_USER' })
+      throw new Error('AUTH_NO_USER')
+    }
+
+    authLog.info('signInAnonymously success', { userId })
+  } else {
+    authLog.info('signInAnonymously skipped — existing session', { userId })
+  }
+
+  const profile = await ensureProfile(userId, trimmed)
+
+  if (!session?.user?.id || !profile?.id) {
+    authLog.error('login incomplete', {
+      hasSession: Boolean(session?.user?.id),
+      hasProfile: Boolean(profile?.id),
+    })
+    throw new Error('AUTH_INCOMPLETE')
+  }
 
   supabaseLog.auth.info('login complete', { userId, username: trimmed })
   return {
     userId,
     profile,
-    session: sessionResult.session,
+    session,
   }
 }

@@ -5,7 +5,10 @@ import { isQaMode, withQaParam } from '../utils/qaMode'
 import { isSupabaseConfigured, loginWithUsername } from '../services/supabase/auth'
 import { isAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
-import { supabaseLog } from '../utils/supabaseLog'
+import { authLog } from '../utils/authLog'
+
+const SERVER_ERROR_MESSAGE =
+  'No pudimos conectar con el servidor. Probá de nuevo.'
 
 export function useAuth() {
   const navigate = useNavigate()
@@ -21,31 +24,48 @@ export function useAuth() {
   const handleLogin = useCallback(
     async ({ username }) => {
       const trimmed = username?.trim()
-      if (!trimmed) return false
+      if (!trimmed) {
+        return { ok: false, message: 'Escribí tu nombre o apodo para entrar.' }
+      }
+
+      if (!isSupabaseConfigured()) {
+        authLog.error('login blocked — supabase env vars missing')
+        return { ok: false, message: SERVER_ERROR_MESSAGE }
+      }
 
       setIsSubmitting(true)
 
       try {
-        if (isSupabaseConfigured()) {
-          try {
-            const { userId } = await loginWithUsername(trimmed)
-            const admin = await isAdmin(userId)
-            setSupabaseAuth({ userId, isAdmin: admin })
+        const { userId, profile, session } = await loginWithUsername(trimmed)
 
-            const remoteRows = await pullRemoteAlbum()
-            if (remoteRows.length > 0) {
-              mergeRemoteUserFigures(remoteRows)
-            }
-          } catch (error) {
-            supabaseLog.auth.warn('login remote sync failed — continuing locally', {
-              message: error?.message ?? String(error),
-            })
+        if (!session?.user?.id || !profile?.id) {
+          authLog.error('login blocked — missing session or profile after auth')
+          return { ok: false, message: SERVER_ERROR_MESSAGE }
+        }
+
+        const admin = await isAdmin(userId)
+        setSupabaseAuth({ userId, isAdmin: admin })
+
+        try {
+          const remoteRows = await pullRemoteAlbum()
+          if (remoteRows.length > 0) {
+            mergeRemoteUserFigures(remoteRows)
           }
+        } catch (syncError) {
+          authLog.error('album pull after login failed', {
+            error: syncError?.message ?? String(syncError),
+          })
         }
 
         login({ username: trimmed })
         navigate(withQaParam('/map', isQaMode(location.search)), { replace: true })
-        return true
+        return { ok: true }
+      } catch (error) {
+        authLog.error('login failed', {
+          error: error?.message ?? String(error),
+          code: error?.code,
+        })
+        return { ok: false, message: SERVER_ERROR_MESSAGE }
       } finally {
         setIsSubmitting(false)
       }

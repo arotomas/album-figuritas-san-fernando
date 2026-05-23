@@ -11,8 +11,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
-console.log('supabase connected')
-console.info('[supabase] URL', supabaseUrl ?? '(missing)')
+console.info('[supabase] VITE_SUPABASE_URL configured', Boolean(supabaseUrl))
+console.info('[supabase] VITE_SUPABASE_ANON_KEY configured', Boolean(supabaseAnonKey))
+console.info('[supabase] URL in use', supabaseUrl || '(missing)')
 
 async function logSupabaseConnectionStatus() {
   if (!supabaseUrl || !supabaseAnonKey) {
