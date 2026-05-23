@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getRecentCaptures } from '../../services/supabase/adminDashboard'
-import { updateCaptureValidation } from '../../services/supabase/adminPlayers'
 import {
   AdminErrorBanner,
   formatDate,
@@ -13,8 +12,6 @@ export function AdminCapturesPage() {
   const [captures, setCaptures] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [reviewNotes, setReviewNotes] = useState({})
-  const [reviewingId, setReviewingId] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [filters, setFilters] = useState({
     user: '',
@@ -77,26 +74,11 @@ export function AdminCapturesPage() {
     setFilters({ user: '', figure: '', status: 'all', dateFrom: '', dateTo: '' })
   }
 
-  const handleCaptureReview = async (captureId, status) => {
-    setReviewingId(captureId)
-    setError(null)
-    try {
-      const updated = await updateCaptureValidation(captureId, status, reviewNotes[captureId] ?? '')
-      setCaptures((current) =>
-        current.map((capture) => (capture.id === captureId ? { ...capture, ...updated } : capture)),
-      )
-    } catch (reviewError) {
-      setError(reviewError?.message ?? 'No pudimos actualizar la captura.')
-    } finally {
-      setReviewingId(null)
-    }
-  }
-
   return (
     <>
       <div className="flex items-end justify-between">
         <p className="text-sm text-muted">
-          {filteredCaptures.length} de {captures.length} capturas visibles
+          Vista de consulta. La moderación se hace por álbum completo en Jugadores.
         </p>
         <div className="flex items-center gap-3">
           {loading && <p className="text-sm font-medium text-muted">Cargando datos…</p>}
@@ -190,7 +172,7 @@ export function AdminCapturesPage() {
         </div>
 
         <div className="mt-6 overflow-x-auto rounded-2xl border border-border">
-          <table className="min-w-[1280px] text-left text-sm">
+          <table className="min-w-[1080px] text-left text-sm">
             <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Foto</th>
@@ -200,10 +182,6 @@ export function AdminCapturesPage() {
                 <th className="px-4 py-3">Lat/Lng</th>
                 <th className="px-4 py-3">Device</th>
                 <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Nota</th>
-                <th className="sticky right-0 z-10 bg-slate-50 px-4 py-3 shadow-[-8px_0_12px_rgba(15,23,42,0.06)]">
-                  Acciones
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -247,52 +225,11 @@ export function AdminCapturesPage() {
                   <td className="px-4 py-3">
                     <ReviewBadge status={capture.validation_status ?? 'pending'} />
                   </td>
-                  <td className="px-4 py-3">
-                    <input
-                      value={reviewNotes[capture.id] ?? capture.review_note ?? ''}
-                      onChange={(event) =>
-                        setReviewNotes((current) => ({
-                          ...current,
-                          [capture.id]: event.target.value,
-                        }))
-                      }
-                      placeholder="Nota de revisión"
-                      className="w-44 rounded-lg border border-border px-2 py-1 text-xs"
-                    />
-                  </td>
-                  <td className="sticky right-0 bg-white px-4 py-3 shadow-[-8px_0_12px_rgba(15,23,42,0.06)]">
-                    <div className="flex min-w-[220px] flex-col gap-2">
-                      <button
-                        type="button"
-                        disabled={reviewingId === capture.id}
-                        onClick={() => handleCaptureReview(capture.id, 'approved')}
-                        className="rounded-xl bg-progress px-3 py-2 text-xs font-bold text-ink disabled:opacity-50"
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={reviewingId === capture.id}
-                        onClick={() => handleCaptureReview(capture.id, 'rejected')}
-                        className="rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                      >
-                        Rechazar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={reviewingId === capture.id}
-                        onClick={() => handleCaptureReview(capture.id, 'pending')}
-                        className="rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold disabled:opacity-50"
-                      >
-                        Pendiente
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
               {!filteredCaptures.length && !loading && (
                 <tr>
-                  <td colSpan="9" className="px-4 py-10 text-center text-muted">
+                  <td colSpan="7" className="px-4 py-10 text-center text-muted">
                     No hay capturas para los filtros seleccionados.
                   </td>
                 </tr>

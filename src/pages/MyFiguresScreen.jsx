@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
 import { AlbumBackground } from '../components/album/AlbumBackground'
@@ -6,7 +7,9 @@ import { AlbumProgress } from '../components/album/AlbumProgress'
 import { AlbumScreenSkeleton } from '../components/album/AlbumFigureSkeleton'
 import { LockedFigureCard } from '../components/album/LockedFigureCard'
 import { NewBadge } from '../components/album/NewBadge'
+import { FigureDetailSheet } from '../components/album/FigureDetailSheet'
 import { RarityBadge } from '../components/ui/RarityBadge'
+import { useQaMode } from '../utils/qaMode'
 import { albumClasses } from '../theme/album'
 import { getRarity } from '../theme/rarity'
 import { typeClasses } from '../theme/typography'
@@ -137,12 +140,16 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
 }
 
 export function MyFiguresScreen() {
+  const navigate = useNavigate()
+  const { withQa } = useQaMode()
   const rawFigures = useAppStore((state) => state.figures)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
   const setLastViewedFigure = useAppStore((state) => state.setLastViewedFigure)
+  const startRetakeSession = useAppStore((state) => state.startRetakeSession)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const hasHydrated = useAppStore((state) => state._hasHydrated)
+  const [selectedFigureId, setSelectedFigureId] = useState(null)
 
   const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
   const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
@@ -164,6 +171,13 @@ export function MyFiguresScreen() {
     (figure) => figure.id === lastObtenidaFigureId,
   )
   const featuredRarity = nearFigure?.rareza ?? lastObtainedFigure?.rareza ?? nextMissionFigure?.rareza
+  const selectedFigure = useMemo(
+    () =>
+      selectedFigureId
+        ? sanitizedFigures.find((figure) => String(figure.id) === String(selectedFigureId))
+        : null,
+    [sanitizedFigures, selectedFigureId],
+  )
 
   const handleSelect = useCallback(
     (figureId) => {
@@ -175,8 +189,21 @@ export function MyFiguresScreen() {
 
       vibrateAlbumSwipe()
       setLastViewedFigure(figureId)
+      if (selected.obtenida) {
+        setSelectedFigureId(figureId)
+      }
     },
     [sanitizedFigures, setLastViewedFigure],
+  )
+
+  const handleRetakePhoto = useCallback(
+    (figure) => {
+      if (!figure?.obtenida) return
+      setSelectedFigureId(null)
+      startRetakeSession(figure)
+      navigate(withQa('/capture'))
+    },
+    [navigate, startRetakeSession, withQa],
   )
 
   useEffect(() => {
@@ -307,6 +334,13 @@ export function MyFiguresScreen() {
           )}
         </section>
       </div>
+
+      <FigureDetailSheet
+        figure={selectedFigure}
+        open={Boolean(selectedFigure?.obtenida)}
+        onClose={() => setSelectedFigureId(null)}
+        onRetakePhoto={handleRetakePhoto}
+      />
     </div>
   )
 }

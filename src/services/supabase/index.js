@@ -30,11 +30,12 @@ export { insertCapture } from './captures'
 
 export {
   fetchUserFigures,
+  replaceUserFigurePhoto,
   upsertUserFigure,
   toRemoteFigureId,
 } from './figures'
 
-export { syncUnlockToSupabase, pullRemoteAlbum } from './sync'
+export { syncUnlockToSupabase, syncReplaceFigurePhoto, pullRemoteAlbum } from './sync'
 
 export {
   getAdminPlayers,

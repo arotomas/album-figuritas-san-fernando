@@ -17,7 +17,7 @@ import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
 import { offsetCoordinates } from '../utils/geoOffset'
 import { getDistanceMeters } from '../utils/geo'
-import { syncUnlockToSupabase } from '../services/supabase/sync'
+import { syncUnlockToSupabase, syncReplaceFigurePhoto } from '../services/supabase/sync'
 import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
 import { canUseTestFigure } from '../utils/qaMode'
 import { myFiguresLog } from '../utils/myFiguresLog'
@@ -530,6 +530,68 @@ export const useAppStore = create(
         return true
       },
 
+      replaceFigurePhotoSynced: async (
+        figureId,
+        { foto, fotoSizeBytes, captureRecord, photoSource = null },
+      ) => {
+        const figureKey = String(figureId)
+        const state = get()
+        const withinLimit = storageService.isPhotoWithinLimit(fotoSizeBytes)
+
+        if (!foto || !withinLimit) {
+          persistLog.persist('photo replace blocked — photo required or too large', figureId)
+          return false
+        }
+
+        const existing = state.figures.find((f) => sameFigureId(f.id, figureId))
+        if (!existing?.obtenida) {
+          persistLog.persist('photo replace blocked — figure not obtained', figureId)
+          return false
+        }
+
+        const result = await syncReplaceFigurePhoto({
+          figureId,
+          foto,
+          fotoSizeBytes,
+          photoSource,
+          captureRecord,
+          source: 'retake',
+        })
+
+        if (!result.ok || !result.remotePhotoUrl) {
+          get().setSupabaseSyncWarning(
+            result.uploadError?.reason ??
+              result.reason ??
+              'No se pudo actualizar la foto en Supabase.',
+          )
+          return false
+        }
+
+        set((current) => ({
+          figures: current.figures.map((figure) =>
+            sameFigureId(figure.id, figureId)
+              ? {
+                  ...figure,
+                  foto: result.remotePhotoUrl,
+                  fotoSizeBytes,
+                  fotoUpdatedAt: Date.now(),
+                  ...(captureRecord
+                    ? { captureMeta: { ...captureRecord, photoUrl: result.remotePhotoUrl } }
+                    : {}),
+                }
+              : figure,
+          ),
+          lastSupabaseSyncWarning: null,
+        }))
+
+        console.info('[photo-replace]', 'local store updated with photo_url', {
+          figureId,
+          publicUrl: result.remotePhotoUrl,
+        })
+
+        return true
+      },
+
       setNearFigure: (figure) => set({ nearFigure: figure }),
 
       startCaptureSession: ({ figure, position = null, distanceToFigure = null }) => {
@@ -558,6 +620,7 @@ export const useAppStore = create(
 
         set({
           captureSession: {
+            mode: 'unlock',
             figure: { ...figure },
             locationSnapshot,
             position: locationSnapshot
@@ -567,6 +630,21 @@ export const useAppStore = create(
                   accuracy: locationSnapshot.accuracy,
                 }
               : null,
+            lockedAt: Date.now(),
+          },
+        })
+      },
+
+      startRetakeSession: (figure) => {
+        if (!figure?.obtenida) return
+
+        set({
+          nearFigure: { ...figure },
+          captureSession: {
+            mode: 'retake',
+            figure: { ...figure },
+            locationSnapshot: null,
+            position: null,
             lockedAt: Date.now(),
           },
         })

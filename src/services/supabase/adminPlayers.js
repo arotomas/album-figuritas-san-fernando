@@ -62,11 +62,22 @@ async function fetchFigures() {
 async function fetchUserFigures(userId = null) {
   let query = supabase
     .from('user_figures')
-    .select('id, user_id, figure_id, captured_at, photo_url, source')
+    .select('id, user_id, figure_id, captured_at, photo_url, source, updated_at, last_photo_updated_at')
 
   if (userId) query = query.eq('user_id', userId)
 
-  const { data, error } = await query
+  let { data, error } = await query
+
+  if (error && /updated_at|last_photo_updated_at/i.test(error.message ?? '')) {
+    let fallbackQuery = supabase
+      .from('user_figures')
+      .select('id, user_id, figure_id, captured_at, photo_url, source')
+    if (userId) fallbackQuery = fallbackQuery.eq('user_id', userId)
+    const fallback = await fallbackQuery
+    data = fallback.data
+    error = fallback.error
+  }
+
   if (error) throw error
   return data ?? []
 }
@@ -168,6 +179,7 @@ export async function getAdminPlayerDetail(userId) {
       obtenida: Boolean(unlock),
       captured_at: unlock?.captured_at ?? capture?.created_at ?? null,
       photo_url: unlock?.photo_url ?? capture?.photo_url ?? null,
+      last_photo_updated_at: unlock?.last_photo_updated_at ?? unlock?.updated_at ?? null,
       capture,
     }
   })

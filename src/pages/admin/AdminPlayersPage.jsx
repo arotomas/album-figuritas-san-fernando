@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   getAdminPlayerDetail,
   getAdminPlayers,
-  updateCaptureValidation,
   updatePlayerAlbumStatus,
 } from '../../services/supabase/adminPlayers'
 import {
@@ -23,7 +22,6 @@ export function AdminPlayersPage() {
   const [playerLoading, setPlayerLoading] = useState(false)
   const [error, setError] = useState(null)
   const [albumReviewNote, setAlbumReviewNote] = useState('')
-  const [captureReviewNotes, setCaptureReviewNotes] = useState({})
   const [photoPreview, setPhotoPreview] = useState(null)
   const [playerFilters, setPlayerFilters] = useState({
     username: '',
@@ -100,20 +98,6 @@ export function AdminPlayersPage() {
       ])
     } catch (reviewError) {
       setError(reviewError?.message ?? 'No pudimos actualizar el estado del álbum.')
-    }
-  }
-
-  const handleCaptureReview = async (captureId, status) => {
-    if (!captureId || !selectedPlayerId) return
-    setError(null)
-    try {
-      await updateCaptureValidation(captureId, status, captureReviewNotes[captureId] ?? '')
-      await Promise.all([
-        loadPlayers({ silent: true }),
-        loadPlayerDetail(selectedPlayerId),
-      ])
-    } catch (reviewError) {
-      setError(reviewError?.message ?? 'No pudimos actualizar la captura.')
     }
   }
 
@@ -333,49 +317,15 @@ export function AdminPlayersPage() {
                               ? `Capturada: ${formatDate(figure.captured_at)}`
                               : 'Pendiente'}
                           </p>
+                          {figure.last_photo_updated_at && (
+                            <p className="text-xs text-muted">
+                              Foto actualizada: {formatDate(figure.last_photo_updated_at)}
+                            </p>
+                          )}
                           {capture?.lat != null && capture?.lng != null && (
                             <p className="font-mono text-[11px] text-muted">
                               {Number(capture.lat).toFixed(5)}, {Number(capture.lng).toFixed(5)}
                             </p>
-                          )}
-                          <ReviewBadge status={capture?.validation_status ?? 'pending'} />
-                          {capture && (
-                            <>
-                              <input
-                                value={captureReviewNotes[capture.id] ?? capture.review_note ?? ''}
-                                onChange={(event) =>
-                                  setCaptureReviewNotes((current) => ({
-                                    ...current,
-                                    [capture.id]: event.target.value,
-                                  }))
-                                }
-                                placeholder="Nota de captura"
-                                className="w-full rounded-lg border border-border px-2 py-1 text-xs"
-                              />
-                              <div className="grid grid-cols-3 gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleCaptureReview(capture.id, 'approved')}
-                                  className="rounded-lg bg-progress px-2 py-1 text-[11px] font-bold text-ink"
-                                >
-                                  OK
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCaptureReview(capture.id, 'rejected')}
-                                  className="rounded-lg bg-red-600 px-2 py-1 text-[11px] font-bold text-white"
-                                >
-                                  Rechazar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCaptureReview(capture.id, 'pending')}
-                                  className="rounded-lg border border-border px-2 py-1 text-[11px] font-bold"
-                                >
-                                  Pend.
-                                </button>
-                              </div>
-                            </>
                           )}
                         </div>
                       </div>

@@ -3,7 +3,7 @@ import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
 import { getSessionUserId, isSupabaseConfigured } from './auth'
-import { fetchUserFigures, upsertUserFigure } from './figures'
+import { fetchUserFigures, replaceUserFigurePhoto, upsertUserFigure } from './figures'
 import { insertCapture } from './captures'
 import { uploadCapturePhoto } from './storage'
 
@@ -200,6 +200,114 @@ export async function syncUnlockToSupabase({
       figureId,
     })
     return { ok: false, reason: error?.message ?? 'sync_failed' }
+  }
+}
+
+/**
+ * Reemplaza la foto de una figurita ya obtenida sin alterar progreso ni captured_at.
+ */
+export async function syncReplaceFigurePhoto({
+  figureId,
+  foto,
+  fotoSizeBytes,
+  photoSource = null,
+  captureRecord,
+  source = 'retake',
+  qaTargetFigureId = null,
+}) {
+  if (!isSupabaseConfigured()) {
+    supabaseLog.sync.warn('photo replace skipped — supabase not configured')
+    return { ok: false, reason: 'not_configured' }
+  }
+
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) {
+      supabaseLog.sync.warn('photo replace skipped — no auth session')
+      return { ok: false, reason: 'no_session' }
+    }
+
+    const realFigureId = resolveRealFigureId(figureId, qaTargetFigureId)
+    supabaseLog.sync.info('photo replace start', {
+      userId,
+      figureId: realFigureId,
+      source,
+      fotoSizeBytes,
+    })
+    captureSyncLog.info('photo replace start', {
+      userId,
+      figureId: realFigureId,
+      hasPhoto: Boolean(foto),
+      photoSource,
+    })
+
+    let remotePhotoUrl = null
+
+    if (foto?.startsWith('data:')) {
+      const uploadResult = await uploadCapturePhoto({ userId, dataUrl: foto })
+      if (!uploadResult.ok || !uploadResult.publicUrl) {
+        captureSyncLog.error('photo replace upload error', {
+          reason: uploadResult.reason,
+          error: uploadResult.error,
+        })
+        if (photoSource === 'mobile-native') {
+          return {
+            ok: false,
+            remotePhotoUrl: null,
+            uploadError: uploadResult,
+            reason: uploadResult.reason ?? 'mobile_upload_failed',
+          }
+        }
+      } else {
+        remotePhotoUrl = uploadResult.publicUrl
+        captureSyncLog.info('photo replace upload success', { publicUrl: remotePhotoUrl })
+      }
+    } else if (foto?.startsWith('http')) {
+      remotePhotoUrl = foto
+    }
+
+    if (!remotePhotoUrl) {
+      return { ok: false, reason: 'photo_upload_failed' }
+    }
+
+    await replaceUserFigurePhoto({
+      userId,
+      figureId: realFigureId,
+      photoUrl: remotePhotoUrl,
+      source,
+    })
+
+    if (captureRecord) {
+      await insertCapture({
+        userId,
+        figureId: realFigureId,
+        lat: captureRecord.lat,
+        lng: captureRecord.lng,
+        photoUrl: remotePhotoUrl,
+        createdAt: captureRecord.createdAt ?? Date.now(),
+      })
+      captureSyncLog.info('photo replace capture history inserted', {
+        figureId: realFigureId,
+        photoUrl: remotePhotoUrl,
+      })
+    }
+
+    supabaseLog.sync.info('photo replace success', {
+      figureId: realFigureId,
+      publicUrl: remotePhotoUrl,
+    })
+
+    return { ok: true, remotePhotoUrl }
+  } catch (error) {
+    supabaseLog.sync.warn('photo replace failed', {
+      message: error?.message ?? String(error),
+      figureId,
+    })
+    captureSyncLog.error('photo replace error', {
+      message: error?.message ?? String(error),
+      figureId,
+    })
+    return { ok: false, reason: error?.message ?? 'replace_failed' }
   }
 }
 

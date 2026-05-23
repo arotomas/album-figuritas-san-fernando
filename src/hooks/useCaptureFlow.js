@@ -28,6 +28,7 @@ export const CAPTURE_PHASES = {
   COMPRESSING: 'compressing',
   REWARD: 'reward',
   UNLOCK: 'unlock',
+  PHOTO_UPDATED: 'photo_updated',
   DONE: 'done',
 }
 
@@ -142,8 +143,11 @@ export function useCaptureFlow({
   position,
   captureSession,
   onObtainFigure,
+  onReplacePhoto,
+  captureMode = 'unlock',
 }) {
   const camera = useCamera()
+  const isRetake = captureMode === 'retake'
 
   const [phase, setPhase] = useState(CAPTURE_PHASES.CAMERA)
   const [compressedPhoto, setCompressedPhoto] = useState(null)
@@ -175,7 +179,8 @@ export function useCaptureFlow({
   )
 
   const inCaptureRange =
-    distanceMeters != null && distanceMeters <= CAPTURE_MAX_DISTANCE_METERS
+    isRetake ||
+    (distanceMeters != null && distanceMeters <= CAPTURE_MAX_DISTANCE_METERS)
 
   const isApproximateGps =
     position?.accuracy != null &&
@@ -308,7 +313,7 @@ export function useCaptureFlow({
 
   const validateDistanceForOpen = useCallback(
     (targetFigure = figure, targetPosition = position) => {
-      if (targetFigure?.isQaTest) {
+      if (isRetake || targetFigure?.isQaTest) {
         return true
       }
 
@@ -329,7 +334,7 @@ export function useCaptureFlow({
 
       return true
     },
-    [figure, position],
+    [figure, isRetake, position],
   )
 
   const lockPendingWithValidation = useCallback(
@@ -381,19 +386,43 @@ export function useCaptureFlow({
         return false
       }
 
-      captureLog.unlockStart({
-        figureId: figureSnapshot.id,
-        isQaTest: Boolean(figureSnapshot.isQaTest),
-      })
-      albumLog.info('saving figure', { figureId: figureSnapshot.id })
-
       const isMobilePhoto = photoPayload.photoSource === 'mobile-native'
       unlockSubmittedRef.current = true
       setCaptureError(null)
 
       if (isMobilePhoto) {
-        setProcessingMessage('Guardando foto…')
+        setProcessingMessage(isRetake ? 'Actualizando foto…' : 'Guardando foto…')
       }
+
+      if (isRetake) {
+        captureLog.info('photo replace start', { figureId: figureSnapshot.id })
+        const saved = await onReplacePhoto?.(figureSnapshot.id, photoPayload)
+
+        if (saved === false) {
+          unlockSubmittedRef.current = false
+          processingRef.current = false
+          setIsProcessing(false)
+          setProcessingMessage(null)
+          phaseRef.current = CAPTURE_PHASES.CAMERA
+          setPhase(CAPTURE_PHASES.CAMERA)
+          handleRecoverableError(
+            new Error(isMobilePhoto ? MOBILE_PHOTO_RECOVERABLE_ERROR : CAPTURE_RECOVERABLE_ERROR),
+          )
+          return false
+        }
+
+        setCapturedFigure(figureSnapshot)
+        setPhase(CAPTURE_PHASES.PHOTO_UPDATED)
+        phaseRef.current = CAPTURE_PHASES.PHOTO_UPDATED
+        camera.stop()
+        return true
+      }
+
+      captureLog.unlockStart({
+        figureId: figureSnapshot.id,
+        isQaTest: Boolean(figureSnapshot.isQaTest),
+      })
+      albumLog.info('saving figure', { figureId: figureSnapshot.id })
 
       const saved = await onObtainFigure?.(figureSnapshot.id, photoPayload)
 
@@ -419,7 +448,7 @@ export function useCaptureFlow({
       rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
       return true
     },
-    [camera, handleRecoverableError, onObtainFigure],
+    [camera, handleRecoverableError, isRetake, onObtainFigure, onReplacePhoto],
   )
 
   const resolveCaptureLocation = useCallback((figureSnapshot, { afterNativePhoto = false } = {}) => {
@@ -449,6 +478,18 @@ export function useCaptureFlow({
       return qaSnapshot
     }
 
+    if (isRetake && position) {
+      return buildLocationSnapshot(figureSnapshot, position)
+    }
+
+    if (isRetake && figureSnapshot?.lat != null && figureSnapshot?.lng != null) {
+      return buildLocationSnapshot(figureSnapshot, {
+        lat: figureSnapshot.lat,
+        lng: figureSnapshot.lng,
+        accuracy: null,
+      })
+    }
+
     if (afterNativePhoto && figureSnapshot) {
       captureLog.skippingGpsConfirmationAfterPhoto({
         figureId: figureSnapshot.id,
@@ -462,7 +503,7 @@ export function useCaptureFlow({
     }
 
     return buildLocationSnapshot(figureSnapshot, position)
-  }, [captureSession?.locationSnapshot, position])
+  }, [captureSession?.locationSnapshot, isRetake, position])
 
   const finalizeUnlock = useCallback(
     async (compressed, figureSnapshot, locationSnapshot, capturePosition) => {

@@ -28,6 +28,12 @@ const UnlockAnimation = lazy(() =>
   })),
 )
 
+const PhotoUpdatedAnimation = lazy(() =>
+  import('../components/reward/PhotoUpdatedAnimation').then((m) => ({
+    default: m.PhotoUpdatedAnimation,
+  })),
+)
+
 function RewardSkeleton() {
   return (
     <div className="safe-top safe-bottom flex h-full items-center justify-center bg-zinc-950">
@@ -48,6 +54,10 @@ export function CaptureFlow() {
   const clearCaptureSession = useAppStore((state) => state.clearCaptureSession)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
   const obtainFigureWithPhotoSynced = useAppStore((state) => state.obtainFigureWithPhotoSynced)
+  const replaceFigurePhotoSynced = useAppStore((state) => state.replaceFigurePhotoSynced)
+
+  const captureMode = captureSession?.mode ?? 'unlock'
+  const isRetake = captureMode === 'retake'
 
   const {
     mapPosition,
@@ -67,6 +77,11 @@ export function CaptureFlow() {
       return obtainFigureWithPhoto(figureId, photoData)
     },
     [obtainFigureWithPhoto, obtainFigureWithPhotoSynced],
+  )
+
+  const handleReplacePhoto = useCallback(
+    (figureId, photoData) => replaceFigurePhotoSynced(figureId, photoData),
+    [replaceFigurePhotoSynced],
   )
 
   const {
@@ -95,7 +110,9 @@ export function CaptureFlow() {
     figure: nearFigure,
     position: proximityPosition ?? mapPosition,
     captureSession,
+    captureMode,
     onObtainFigure: handleObtain,
+    onReplacePhoto: handleReplacePhoto,
   })
 
   const nativePickerOpenedRef = useRef(false)
@@ -103,6 +120,7 @@ export function CaptureFlow() {
   const isPostCapturePhase =
     phase === CAPTURE_PHASES.REWARD ||
     phase === CAPTURE_PHASES.UNLOCK ||
+    phase === CAPTURE_PHASES.PHOTO_UPDATED ||
     phase === CAPTURE_PHASES.DONE
 
   const isCaptureSessionActive =
@@ -147,7 +165,7 @@ export function CaptureFlow() {
   ])
 
   useEffect(() => {
-    if (!nearFigure || isCaptureSessionActive) return
+    if (isRetake || !nearFigure || isCaptureSessionActive) return
 
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
     const stored = figures.find(
@@ -159,6 +177,7 @@ export function CaptureFlow() {
       navigate('/map', { replace: true })
     }
   }, [
+    isRetake,
     nearFigure,
     figures,
     isCaptureSessionActive,
@@ -192,10 +211,11 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
+    if (isRetake) return
     if (!nearFigure && !isCaptureSessionActive) {
       navigate('/map', { replace: true })
     }
-  }, [nearFigure, isCaptureSessionActive, navigate])
+  }, [isRetake, nearFigure, isCaptureSessionActive, navigate])
 
   useEffect(() => {
     const lockPortrait = async () => {
@@ -224,8 +244,8 @@ export function CaptureFlow() {
     clearCaptureSession()
     nativePickerOpenedRef.current = false
     setNearFigure(null)
-    navigate('/map')
-  }, [camera, clearCaptureSession, clearPendingCapture, navigate, setNearFigure])
+    navigate(isRetake ? withQa('/my-figures') : '/map')
+  }, [camera, clearCaptureSession, clearPendingCapture, isRetake, navigate, setNearFigure, withQa])
 
   const handleComplete = useCallback(() => {
     complete()
@@ -236,6 +256,14 @@ export function CaptureFlow() {
     captureSyncLog.info('navigating to my-figures')
     navigate(withQa('/my-figures'), { replace: true })
   }, [clearCaptureSession, clearQaTestFigure, complete, navigate, setNearFigure, withQa])
+
+  const handlePhotoUpdatedComplete = useCallback(() => {
+    complete()
+    clearCaptureSession()
+    setNearFigure(null)
+    nativePickerOpenedRef.current = false
+    navigate(withQa('/my-figures'), { replace: true })
+  }, [clearCaptureSession, complete, navigate, setNearFigure, withQa])
 
   const handleRetryGeo = useCallback(async () => {
     requestPermission()
@@ -278,6 +306,18 @@ export function CaptureFlow() {
           figure={rewardFigure}
           photoUrl={compressedPhoto}
           onComplete={showRewardComplete}
+        />
+      </Suspense>
+    )
+  }
+
+  if (phase === CAPTURE_PHASES.PHOTO_UPDATED && rewardFigure) {
+    return (
+      <Suspense fallback={<RewardSkeleton />}>
+        <PhotoUpdatedAnimation
+          figure={rewardFigure}
+          photoUrl={compressedPhoto}
+          onComplete={handlePhotoUpdatedComplete}
         />
       </Suspense>
     )
