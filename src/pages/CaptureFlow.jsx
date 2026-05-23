@@ -126,6 +126,7 @@ export function CaptureFlow() {
     if (nativePickerOpenedRef.current) return
     if (!displayFigure) return
     if (isPostCapturePhase || isProcessing) return
+    if (phase === CAPTURE_PHASES.CAPTURING || phase === CAPTURE_PHASES.COMPRESSING) return
 
     nativePickerOpenedRef.current = true
     openNativeCapture()
@@ -135,6 +136,7 @@ export function CaptureFlow() {
     isPostCapturePhase,
     isProcessing,
     openNativeCapture,
+    phase,
   ])
 
   useEffect(() => {
@@ -296,10 +298,7 @@ export function CaptureFlow() {
     )
   }
 
-  const isCapturing =
-    phase === CAPTURE_PHASES.CAPTURING ||
-    phase === CAPTURE_PHASES.COMPRESSING ||
-    isProcessing
+  const isCapturing = isProcessing
 
   const showCaptureError =
     Boolean(captureError) &&

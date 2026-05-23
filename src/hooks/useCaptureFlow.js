@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCamera } from './useCamera'
-import { captureFrameFromVideo, isImageFile, loadImageFromFile } from '../utils/camera'
+import { captureFrameFromVideo, isImageFile } from '../utils/camera'
 import {
-  compressImageWithFallback,
-  readFileAsDataUrl,
-} from '../utils/imageCompression'
+  prepareNativeCapturePhoto,
+  QA_PLACEHOLDER_JPEG,
+} from '../utils/nativePhotoPrepare'
+import { compressImageWithFallback } from '../utils/imageCompression'
 import { withTimeout } from '../utils/withTimeout'
 import { vibrateCapture, vibrateReady, vibrateUnlock } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
@@ -245,6 +246,10 @@ export function useCaptureFlow({
     processingRef.current = false
     setIsProcessing(false)
     setProcessingMessage(null)
+    if (!unlockSubmittedRef.current && phaseRef.current !== CAPTURE_PHASES.CAMERA) {
+      phaseRef.current = CAPTURE_PHASES.CAMERA
+      setPhase(CAPTURE_PHASES.CAMERA)
+    }
   }, [])
 
   const startProcessingGuard = useCallback(
@@ -278,6 +283,7 @@ export function useCaptureFlow({
 
       resetProcessingState()
       setCaptureError(toProcessingError(error))
+      phaseRef.current = CAPTURE_PHASES.CAMERA
       setPhase(CAPTURE_PHASES.CAMERA)
     },
     [resetProcessingState],
@@ -358,20 +364,30 @@ export function useCaptureFlow({
         return false
       }
 
+      unlockSubmittedRef.current = true
+      setCaptureError(null)
+      setCapturedFigure(figureSnapshot)
+      setPhase(CAPTURE_PHASES.REWARD)
+      phaseRef.current = CAPTURE_PHASES.REWARD
+      camera.stop()
+
+      captureLog.unlockStart({
+        figureId: figureSnapshot.id,
+        isQaTest: Boolean(figureSnapshot.isQaTest),
+      })
       albumLog.info('saving figure', { figureId: figureSnapshot.id })
+
       const saved = onObtainFigure?.(figureSnapshot.id, photoPayload)
 
       if (saved === false) {
+        unlockSubmittedRef.current = false
+        phaseRef.current = CAPTURE_PHASES.CAMERA
+        setPhase(CAPTURE_PHASES.CAMERA)
         captureLog.processingError({ stage: 'obtainFigureWithPhoto', figureId: figureSnapshot.id })
         handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR))
         return false
       }
 
-      unlockSubmittedRef.current = true
-      setCaptureError(null)
-      setCapturedFigure(figureSnapshot)
-      camera.stop()
-      setPhase(CAPTURE_PHASES.REWARD)
       captureLog.unlockSuccess({ figureId: figureSnapshot.id })
       rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
       return true
@@ -450,8 +466,6 @@ export function useCaptureFlow({
         createdAt: Date.now(),
       })
 
-      captureLog.unlockStart({ figureId: figureSnapshot.id, isQaTest: Boolean(figureSnapshot.isQaTest) })
-
       let validatedCapture
       if (figureSnapshot.isQaTest) {
         validatedCapture = {
@@ -521,18 +535,15 @@ export function useCaptureFlow({
           quality: 0.68,
         })
       } catch (compressError) {
-        if (figureSnapshot.isQaTest && sourceFile) {
-          captureLog.warn('QA compress fallback — raw file', { figureId: figureSnapshot.id })
-          const dataUrl = await withTimeout(
-            readFileAsDataUrl(sourceFile),
-            LOAD_IMAGE_TIMEOUT_MS,
-            'readFileAsDataUrl',
-          )
+        if (figureSnapshot.isQaTest) {
+          captureLog.warn('QA compress fallback — placeholder jpeg', {
+            figureId: figureSnapshot.id,
+          })
           compressed = {
-            dataUrl,
-            sizeBytes: Math.max(1, Math.round(dataUrl.length * 0.75)),
-            width: canvas?.width ?? 0,
-            height: canvas?.height ?? 0,
+            dataUrl: QA_PLACEHOLDER_JPEG,
+            sizeBytes: Math.max(1, Math.round(QA_PLACEHOLDER_JPEG.length * 0.75)),
+            width: 1,
+            height: 1,
           }
         } else {
           throw compressError
@@ -553,54 +564,50 @@ export function useCaptureFlow({
         figureId: figureSnapshot.id,
       })
 
+      const locationSnapshot = resolveCaptureLocation(figureSnapshot, { afterNativePhoto: true })
+      const capturePosition = snapshotToPosition(locationSnapshot)
+      if (!capturePosition) {
+        throw new Error(CAPTURE_RECOVERABLE_ERROR)
+      }
+
+      setPhase(CAPTURE_PHASES.COMPRESSING)
+      phaseRef.current = CAPTURE_PHASES.COMPRESSING
+
       captureLog.loadImageStart({ figureId: figureSnapshot.id })
-      let canvas
+      captureLog.compressStart({ figureId: figureSnapshot.id, mode: 'native-resize' })
+
+      let compressed
       try {
-        canvas = await withTimeout(
-          loadImageFromFile(file),
+        compressed = await withTimeout(
+          prepareNativeCapturePhoto(file, { isQaTest: Boolean(figureSnapshot.isQaTest) }),
           LOAD_IMAGE_TIMEOUT_MS,
-          'loadImageFromFile',
+          'prepareNativeCapturePhoto',
         )
         captureLog.loadImageSuccess({
           figureId: figureSnapshot.id,
-          width: canvas.width,
-          height: canvas.height,
+          width: compressed.width,
+          height: compressed.height,
         })
-      } catch (loadError) {
+      } catch (prepareError) {
         if (figureSnapshot.isQaTest) {
-          captureLog.warn('QA load fallback — skip canvas', { figureId: figureSnapshot.id })
-          const locationSnapshot = resolveCaptureLocation(figureSnapshot, { afterNativePhoto: true })
-          const capturePosition = snapshotToPosition(locationSnapshot)
-          if (!capturePosition) {
-            throw new Error(CAPTURE_RECOVERABLE_ERROR)
+          captureLog.warn('QA prepare fallback — placeholder jpeg', {
+            figureId: figureSnapshot.id,
+            message: prepareError?.message,
+          })
+          compressed = {
+            dataUrl: QA_PLACEHOLDER_JPEG,
+            sizeBytes: Math.max(1, Math.round(QA_PLACEHOLDER_JPEG.length * 0.75)),
+            width: 1,
+            height: 1,
           }
-          const dataUrl = await withTimeout(
-            readFileAsDataUrl(file),
-            LOAD_IMAGE_TIMEOUT_MS,
-            'readFileAsDataUrl',
-          )
-          captureLog.compressStart({ figureId: figureSnapshot.id, mode: 'qa-raw' })
-          return finalizeUnlock(
-            {
-              dataUrl,
-              sizeBytes: Math.max(1, Math.round(dataUrl.length * 0.75)),
-              width: 0,
-              height: 0,
-            },
-            figureSnapshot,
-            locationSnapshot,
-            capturePosition,
-          )
+        } else {
+          throw prepareError
         }
-        throw loadError
       }
 
-      return processCanvas(canvas, figureSnapshot, {
-        afterNativePhoto: true,
-        sourceFile: file,
-      })
+      return finalizeUnlock(compressed, figureSnapshot, locationSnapshot, capturePosition)
     },
-    [finalizeUnlock, processCanvas, resolveCaptureLocation],
+    [finalizeUnlock, resolveCaptureLocation],
   )
 
   const openNativeCapture = useCallback(() => {
@@ -692,7 +699,13 @@ export function useCaptureFlow({
   const captureFromFile = useCallback(
     async (file) => {
       if (!file) return
-      if (phaseRef.current !== CAPTURE_PHASES.CAMERA) return
+      if (
+        phaseRef.current !== CAPTURE_PHASES.CAMERA &&
+        phaseRef.current !== CAPTURE_PHASES.CAPTURING &&
+        phaseRef.current !== CAPTURE_PHASES.COMPRESSING
+      ) {
+        return
+      }
       if (processingRef.current || unlockSubmittedRef.current) return
 
       const fileKey = getFileKey(file)
