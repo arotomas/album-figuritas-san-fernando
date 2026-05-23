@@ -15,7 +15,7 @@ function toLatLng(row) {
   return [Number(row.lat), Number(row.lng)]
 }
 
-export function AdminMap({ figures, captures }) {
+export function AdminMap({ figures, captures, className = 'h-[620px]' }) {
   const figureMarkers = useMemo(
     () => (figures ?? []).map((figure) => ({ ...figure, latlng: toLatLng(figure) })).filter((m) => m.latlng),
     [figures],
@@ -26,7 +26,7 @@ export function AdminMap({ figures, captures }) {
   )
 
   return (
-    <div className="h-[420px] overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+    <div className={`${className} overflow-hidden rounded-2xl border border-border bg-white shadow-sm`}>
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={DEFAULT_ZOOM}
