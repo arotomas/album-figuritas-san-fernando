@@ -84,7 +84,7 @@ export function OptionsScreen() {
         <div>
           <p className="text-xs uppercase tracking-wide text-muted">Usuario</p>
           <p className="mt-1 font-medium text-ink">
-            {user?.displayName || 'Explorador'}
+            {user?.username || user?.displayName || 'Explorador'}
           </p>
         </div>
 

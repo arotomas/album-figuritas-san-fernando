@@ -1,22 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { ensureAnonymousSession, isSupabaseConfigured } from '../services/supabase/auth'
+import {
+  ensureAnonymousSession,
+  fetchProfile,
+  isSupabaseConfigured,
+} from '../services/supabase/auth'
 import { isAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { supabaseLog } from '../utils/supabaseLog'
 
 /**
- * Auth anónimo + pull del álbum remoto tras hidratar localStorage.
- * Falla en silencio — la app sigue con datos locales.
+ * Restaura sesión remota y sincroniza álbum cuando el usuario ya ingresó.
  */
 export function useSupabaseBootstrap(enabled) {
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
   const mergeRemoteUserFigures = useAppStore((state) => state.mergeRemoteUserFigures)
-  const startedRef = useRef(false)
+  const login = useAppStore((state) => state.login)
+  const user = useAppStore((state) => state.user)
 
   useEffect(() => {
-    if (!enabled || startedRef.current) return
-    startedRef.current = true
+    if (!enabled) return
 
     let cancelled = false
 
@@ -38,6 +41,14 @@ export function useSupabaseBootstrap(enabled) {
         if (cancelled) return
 
         setSupabaseAuth({ userId, isAdmin: admin })
+
+        const profile = result.profile ?? (await fetchProfile(userId))
+        const profileUsername = profile?.username?.trim()
+        const localUsername = user?.username?.trim()
+
+        if (profileUsername && !localUsername) {
+          login({ username: profileUsername })
+        }
 
         const remoteRows = await pullRemoteAlbum()
         if (cancelled) return
@@ -63,5 +74,5 @@ export function useSupabaseBootstrap(enabled) {
     return () => {
       cancelled = true
     }
-  }, [enabled, mergeRemoteUserFigures, setSupabaseAuth])
+  }, [enabled, login, mergeRemoteUserFigures, setSupabaseAuth, user?.username])
 }

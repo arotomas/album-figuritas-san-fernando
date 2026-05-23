@@ -15,7 +15,9 @@ import { isDevMode } from './utils/devMode'
 
 function App() {
   const { hasHydrated } = usePersistedAlbum()
-  useSupabaseBootstrap(hasHydrated)
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated)
+  const username = useAppStore((state) => state.user?.username)
+  useSupabaseBootstrap(hasHydrated && isAuthenticated && Boolean(username?.trim()))
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
 

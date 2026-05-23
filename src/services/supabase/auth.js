@@ -95,3 +95,55 @@ export async function fetchProfile(userId) {
   if (error) throw error
   return data
 }
+
+export async function updateProfileUsername(userId, username) {
+  const trimmed = username?.trim()
+  if (!userId || !trimmed) {
+    throw new Error('USERNAME_REQUIRED')
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(
+      {
+        id: userId,
+        username: trimmed,
+      },
+      { onConflict: 'id' },
+    )
+    .select('id, username, avatar_url, is_admin, created_at')
+    .single()
+
+  if (error) {
+    supabaseLog.auth.warn('profile username update failed', { message: error.message })
+    throw error
+  }
+
+  supabaseLog.auth.info('profile username updated', { userId, username: trimmed })
+  return data
+}
+
+/**
+ * Login v1: sesión anónima + username en profile.
+ */
+export async function loginWithUsername(username) {
+  const trimmed = username?.trim()
+  if (!trimmed) {
+    throw new Error('USERNAME_REQUIRED')
+  }
+
+  const sessionResult = await ensureAnonymousSession()
+  if (!sessionResult?.session?.user?.id) {
+    throw new Error('AUTH_FAILED')
+  }
+
+  const userId = sessionResult.session.user.id
+  const profile = await updateProfileUsername(userId, trimmed)
+
+  supabaseLog.auth.info('login complete', { userId, username: trimmed })
+  return {
+    userId,
+    profile,
+    session: sessionResult.session,
+  }
+}

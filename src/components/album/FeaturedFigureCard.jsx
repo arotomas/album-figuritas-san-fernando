@@ -9,8 +9,25 @@ import { RarityBadge } from '../ui/RarityBadge'
 import { LockedFigureCard } from './LockedFigureCard'
 import { NewBadge } from './NewBadge'
 import { prefersReducedMotion } from '../../utils/performance'
+import { isValidAlbumFigure } from '../../utils/myFiguresLog'
+import { AlbumFigureSkeleton } from './AlbumFigureSkeleton'
 
 function FeaturedFigureCardInner({ figure, isNew = false, dragX = 0, compact = false }) {
+  if (!isValidAlbumFigure(figure)) {
+    return <AlbumFigureSkeleton compact={compact} />
+  }
+
+  return (
+    <FeaturedFigureCardContent
+      figure={figure}
+      isNew={isNew}
+      dragX={dragX}
+      compact={compact}
+    />
+  )
+}
+
+function FeaturedFigureCardContent({ figure, isNew = false, dragX = 0, compact = false }) {
   const rarity = getRarity(figure.rareza)
   const reduced = prefersReducedMotion()
   const { cardRef, cardMotionStyle, glareStyle, onPointerMove, onPointerLeave } =

@@ -5,6 +5,7 @@ import { motion as motionTokens } from '../../theme/motion'
 import { RarityBadge } from '../ui/RarityBadge'
 import { LockedFigureCard } from './LockedFigureCard'
 import { NewBadge } from './NewBadge'
+import { isValidAlbumFigure } from '../../utils/myFiguresLog'
 
 export const FigureCarousel = memo(function FigureCarousel({
   figures,
@@ -39,7 +40,7 @@ export const FigureCarousel = memo(function FigureCarousel({
       }`}
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
-      {figures.map((figure) => {
+      {figures.filter(isValidAlbumFigure).map((figure) => {
         const isActive = figure.id === activeId
         const isNew = figure.obtenida && figure.id === lastObtenidaId
         const rarity = getRarity(figure.rareza)

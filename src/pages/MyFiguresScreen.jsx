@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6'
 import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
@@ -6,11 +6,21 @@ import { AlbumBackground } from '../components/album/AlbumBackground'
 import { AlbumProgress } from '../components/album/AlbumProgress'
 import { FeaturedFigureCard } from '../components/album/FeaturedFigureCard'
 import { FigureCarousel } from '../components/album/FigureCarousel'
+import {
+  AlbumFigureSkeleton,
+  AlbumScreenSkeleton,
+} from '../components/album/AlbumFigureSkeleton'
 import { useCarouselPhysics } from '../hooks/useCarouselPhysics'
 import { album, albumClasses } from '../theme/album'
 import { typeClasses } from '../theme/typography'
 import { vibrateAlbumSwipe } from '../utils/vibration'
 import { isMobileDevice } from '../utils/device'
+import {
+  myFiguresLog,
+  resolveActiveFigure,
+  resolveActiveFigureId,
+  sanitizeAlbumFigures,
+} from '../utils/myFiguresLog'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -21,40 +31,66 @@ const STATUS_LABELS = {
 const mobileLayout = isMobileDevice()
 
 export function MyFiguresScreen() {
-  const figures = useAppStore((state) => state.figures)
+  const rawFigures = useAppStore((state) => state.figures)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastViewedFigureId = useAppStore((state) => state.lastViewedFigureId)
   const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
   const setLastViewedFigure = useAppStore((state) => state.setLastViewedFigure)
+  const hasHydrated = useAppStore((state) => state._hasHydrated)
   const progress = useAppStore(selectProgress)
 
-  const [activeId, setActiveId] = useState(
-    () => lastObtenidaFigureId ?? lastViewedFigureId ?? figures[0]?.id,
-  )
+  const figures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
 
-  const activeFigure = figures.find((f) => f.id === activeId) ?? figures[0]
+  const preferredId = lastObtenidaFigureId ?? lastViewedFigureId
+  const initialActiveId = resolveActiveFigureId(preferredId, figures)
+
+  const [activeId, setActiveId] = useState(initialActiveId)
+
+  const activeFigure = useMemo(
+    () => resolveActiveFigure(activeId, figures),
+    [activeId, figures],
+  )
 
   const handleSelect = useCallback(
     (figureId) => {
+      if (!resolveActiveFigure(figureId, figures)) {
+        myFiguresLog.warn('render guard — select ignored for missing figure', { figureId })
+        return
+      }
+
       if (figureId !== activeId) vibrateAlbumSwipe()
       setActiveId(figureId)
       setLastViewedFigure(figureId)
     },
-    [activeId, setLastViewedFigure],
+    [activeId, figures, setLastViewedFigure],
   )
 
   const { activeIndex, dragX, dragProps, getStackStyle, goNext, goPrev } = useCarouselPhysics({
     items: figures,
-    activeId,
+    activeId: activeFigure?.id ?? activeId,
     onChange: handleSelect,
   })
 
   useEffect(() => {
-    const preferredId = lastObtenidaFigureId ?? lastViewedFigureId
-    if (preferredId && figures.some((f) => f.id === preferredId)) {
-      setActiveId(preferredId)
+    const nextId = resolveActiveFigureId(preferredId, figures)
+    if (nextId != null && nextId !== activeId) {
+      myFiguresLog.info('render guard — syncing active figure', {
+        preferredId,
+        nextId,
+      })
+      setActiveId(nextId)
     }
-  }, [figures, lastObtenidaFigureId, lastViewedFigureId])
+  }, [activeId, figures, preferredId])
+
+  useEffect(() => {
+    if (!activeFigure && figures.length > 0) {
+      myFiguresLog.warn('render guard — active figure missing, resetting', {
+        activeId,
+        fallbackId: figures[0]?.id ?? null,
+      })
+      setActiveId(figures[0].id)
+    }
+  }, [activeFigure, activeId, figures])
 
   const visibleIndices = [
     activeIndex - 1,
@@ -65,9 +101,17 @@ export function MyFiguresScreen() {
   const arrowButtonClass =
     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-white/95 text-ink shadow-md disabled:pointer-events-none disabled:opacity-30 active:scale-95'
 
+  if (!hasHydrated || figures.length === 0) {
+    return <AlbumScreenSkeleton />
+  }
+
+  if (!activeFigure) {
+    return <AlbumScreenSkeleton />
+  }
+
   return (
     <div className="my-figures-screen relative flex h-full min-h-0 flex-col overflow-hidden">
-      <AlbumBackground rareza={activeFigure?.rareza} />
+      <AlbumBackground rareza={activeFigure.rareza} />
 
       <header className="my-figures-header relative z-10 shrink-0 px-6 pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
@@ -110,7 +154,7 @@ export function MyFiguresScreen() {
               >
                 <FeaturedFigureCard
                   figure={activeFigure}
-                  isNew={activeFigure?.obtenida && activeFigure.id === lastObtenidaFigureId}
+                  isNew={activeFigure.obtenida && activeFigure.id === lastObtenidaFigureId}
                   dragX={dragX}
                   compact
                 />
@@ -154,6 +198,11 @@ export function MyFiguresScreen() {
               >
                 {visibleIndices.map((index) => {
                   const figure = figures[index]
+                  if (!figure) {
+                    myFiguresLog.warn('render guard — skip null stack figure', { index })
+                    return null
+                  }
+
                   const style = getStackStyle(index)
                   const isActive = index === activeIndex
 
@@ -187,7 +236,7 @@ export function MyFiguresScreen() {
 
           <AnimatePresence mode="wait">
             <m.p
-              key={activeFigure?.id}
+              key={activeFigure.id}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
@@ -203,7 +252,7 @@ export function MyFiguresScreen() {
       <div className="my-figures-carousel-wrap relative z-10 shrink-0 border-t border-border/40 bg-warm-white/80 backdrop-blur-sm">
         <FigureCarousel
           figures={figures}
-          activeId={activeId}
+          activeId={activeFigure.id}
           lastObtenidaId={lastObtenidaFigureId}
           onSelect={handleSelect}
           compact={mobileLayout}

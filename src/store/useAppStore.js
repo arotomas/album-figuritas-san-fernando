@@ -20,6 +20,7 @@ import { getDistanceMeters } from '../utils/geo'
 import { syncUnlockToSupabase } from '../services/supabase/sync'
 import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
 import { canUseTestFigure } from '../utils/qaMode'
+import { myFiguresLog } from '../utils/myFiguresLog'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
@@ -132,13 +133,35 @@ export const useAppStore = create(
         set((state) => {
           if (!Array.isArray(remoteRows) || remoteRows.length === 0) return state
 
-          const remoteById = new Map(
-            remoteRows.map((row) => [Number(row.figure_id) || row.figure_id, row]),
+          const catalogIds = new Set(
+            state.figures.map((figure) => String(figure.id)),
           )
+
+          const remoteById = new Map()
+          for (const row of remoteRows) {
+            if (!row?.figure_id) {
+              myFiguresLog.warn('remote row missing figure_id — ignored', row)
+              continue
+            }
+
+            const remoteKey = String(Number(row.figure_id) || row.figure_id)
+            if (!catalogIds.has(remoteKey)) {
+              myFiguresLog.warn('remote figure not in catalog — ignored', {
+                figureId: row.figure_id,
+                hasPhotoUrl: Boolean(row.photo_url),
+              })
+              continue
+            }
+
+            remoteById.set(Number(row.figure_id) || row.figure_id, row)
+          }
+
+          if (remoteById.size === 0) return state
 
           let changed = false
           const figures = state.figures.map((figure) => {
-            const remote = remoteById.get(figure.id) ?? remoteById.get(String(figure.id))
+            const remote =
+              remoteById.get(figure.id) ?? remoteById.get(String(figure.id))
             if (!remote) return figure
 
             const remoteTime = remote.captured_at
@@ -162,25 +185,46 @@ export const useAppStore = create(
           if (!changed) return state
 
           const obtenidas = figures.filter((f) => f.obtenida).length
+          const validFigureIds = new Set(figures.map((figure) => figure.id))
+          const lastObtenidaFigureId = validFigureIds.has(state.lastObtenidaFigureId)
+            ? state.lastObtenidaFigureId
+            : null
+          const lastViewedFigureId = validFigureIds.has(state.lastViewedFigureId)
+            ? state.lastViewedFigureId
+            : lastObtenidaFigureId
+
+          if (
+            state.lastObtenidaFigureId != null &&
+            lastObtenidaFigureId !== state.lastObtenidaFigureId
+          ) {
+            myFiguresLog.warn('render guard — cleared invalid lastObtenidaFigureId', {
+              previous: state.lastObtenidaFigureId,
+            })
+          }
+
           return {
             figures,
+            lastObtenidaFigureId,
+            lastViewedFigureId,
             albumStatus:
               obtenidas >= TOTAL_FIGURES
                 ? ALBUM_STATUS.COMPLETADO
-                : computeAlbumStatus(figures, state.lastViewedFigureId),
+                : computeAlbumStatus(figures, lastViewedFigureId),
             lastSavedAt: Date.now(),
           }
         }),
 
-      login: ({ username }) =>
-        set({
+      login: ({ username }) => {
+        const trimmed = username?.trim() || 'explorador'
+        return set({
           isAuthenticated: true,
           user: {
-            username: username || 'explorador',
-            displayName: username || 'Explorador',
+            username: trimmed,
+            displayName: trimmed,
           },
           lastSavedAt: Date.now(),
-        }),
+        })
+      },
 
       logout: () =>
         set({
