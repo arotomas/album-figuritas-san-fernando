@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '../layouts/AppLayout'
 import { AuthLayout } from '../layouts/AuthLayout'
+import { AdminLayout } from '../layouts/AdminLayout'
 import { ProtectedRoute, GuestRoute } from './ProtectedRoute'
 import { AdminRoute } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
@@ -27,8 +28,20 @@ const MyFiguresScreen = lazy(() =>
 const OptionsScreen = lazy(() =>
   import('../pages/OptionsScreen').then((m) => ({ default: m.OptionsScreen })),
 )
-const AdminScreen = lazy(() =>
-  import('../pages/AdminScreen').then((m) => ({ default: m.AdminScreen })),
+const AdminDashboardPage = lazy(() =>
+  import('../pages/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
+)
+const AdminPlayersPage = lazy(() =>
+  import('../pages/admin/AdminPlayersPage').then((m) => ({ default: m.AdminPlayersPage })),
+)
+const AdminFiguresPage = lazy(() =>
+  import('../pages/admin/AdminFiguresPage').then((m) => ({ default: m.AdminFiguresPage })),
+)
+const AdminCapturesPage = lazy(() =>
+  import('../pages/admin/AdminCapturesPage').then((m) => ({ default: m.AdminCapturesPage })),
+)
+const AdminMapPage = lazy(() =>
+  import('../pages/admin/AdminMapPage').then((m) => ({ default: m.AdminMapPage })),
 )
 
 function LazyPage({ children }) {
@@ -118,13 +131,52 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <AdminRoute>
-              <LazyPage>
-                <AdminScreen />
-              </LazyPage>
+              <AdminLayout />
             </AdminRoute>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route
+          index
+          element={
+            <LazyPage>
+              <AdminDashboardPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="players"
+          element={
+            <LazyPage>
+              <AdminPlayersPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="figures"
+          element={
+            <LazyPage>
+              <AdminFiguresPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="captures"
+          element={
+            <LazyPage>
+              <AdminCapturesPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="map"
+          element={
+            <LazyPage>
+              <AdminMapPage />
+            </LazyPage>
+          }
+        />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
