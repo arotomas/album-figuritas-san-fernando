@@ -1,6 +1,7 @@
 import { QA_TEST_FIGURE_ID_PREFIX } from '../../config/qaConstants'
 import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
+import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
 import { getSessionUserId, isSupabaseConfigured } from './auth'
 import { fetchUserFigures, upsertUserFigure } from './figures'
 import { insertCapture } from './captures'
@@ -21,6 +22,7 @@ export async function syncUnlockToSupabase({
   figureId,
   foto,
   fotoSizeBytes,
+  photoSource = null,
   obtenidaEn,
   captureRecord,
   source = 'capture',
@@ -59,12 +61,22 @@ export async function syncUnlockToSupabase({
       figureId: realFigureId,
       source: syncSource,
       hasPhoto: Boolean(foto),
+      photoSource,
     })
 
     let remotePhotoUrl = null
     let uploadError = null
 
     if (foto?.startsWith('data:')) {
+      if (photoSource === 'mobile-native') {
+        useMobilePhotoDebugStore.getState().setSnapshot({
+          status: 'uploading',
+          uploadStatus: 'uploading',
+          figureId: realFigureId,
+          compressedBlobSize: fotoSizeBytes,
+        })
+      }
+
       const uploadResult = await uploadCapturePhoto({ userId, dataUrl: foto })
 
       if (uploadResult.ok && uploadResult.publicUrl) {
@@ -73,6 +85,16 @@ export async function syncUnlockToSupabase({
           path: uploadResult.path,
           publicUrl: remotePhotoUrl,
         })
+        if (photoSource === 'mobile-native') {
+          useMobilePhotoDebugStore.getState().setSnapshot({
+            status: 'uploaded',
+            uploadStatus: 'success',
+            uploadPublicUrl: remotePhotoUrl,
+            uploadPath: uploadResult.path,
+            figureId: realFigureId,
+            compressedBlobSize: fotoSizeBytes,
+          })
+        }
       } else {
         uploadError = uploadResult
         supabaseLog.sync.warn('unlock sync — photo upload failed', {
@@ -85,6 +107,21 @@ export async function syncUnlockToSupabase({
           error: uploadResult.error,
           path: uploadResult.path,
         })
+        if (photoSource === 'mobile-native') {
+          useMobilePhotoDebugStore.getState().setSnapshot({
+            status: 'upload-error',
+            uploadStatus: 'error',
+            uploadError: uploadResult.reason ?? 'UPLOAD_FAILED',
+            figureId: realFigureId,
+            compressedBlobSize: fotoSizeBytes,
+          })
+          return {
+            ok: false,
+            remotePhotoUrl: null,
+            uploadError,
+            reason: uploadResult.reason ?? 'mobile_upload_failed',
+          }
+        }
       }
     } else if (foto?.startsWith('http')) {
       remotePhotoUrl = foto
@@ -93,6 +130,9 @@ export async function syncUnlockToSupabase({
       supabaseLog.sync.warn('unlock sync — unsupported foto format for upload', {
         fotoPrefix: String(foto).slice(0, 32),
       })
+      if (photoSource === 'mobile-native') {
+        return { ok: false, reason: 'mobile_photo_not_uploadable' }
+      }
     }
 
     await upsertUserFigure({

@@ -13,9 +13,11 @@ import {
   sessionDebug,
 } from '../../utils/sessionDebug'
 import { useAuthDebugStore } from '../../store/useAuthDebugStore'
+import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
 
 export function AuthDebugPanel({ className = '' }) {
   const snapshot = useAuthDebugStore((state) => state.snapshot)
+  const mobilePhoto = useMobilePhotoDebugStore((state) => state.snapshot)
   const [live, setLive] = useState(null)
   const [loading, setLoading] = useState(true)
   const [storageTest, setStorageTest] = useState(null)
@@ -146,6 +148,12 @@ export function AuthDebugPanel({ className = '' }) {
         <Row label="Live user error" value={merged.liveUserError ?? '(none)'} />
         <Row label="Live session error" value={merged.liveSessionError ?? '(none)'} />
         <Row label="Updated" value={merged.updatedAt ?? '(never)'} />
+        <Row label="Mobile file size" value={mobilePhoto?.fileSize ?? '(none)'} />
+        <Row label="Mobile file type" value={mobilePhoto?.fileType ?? '(none)'} />
+        <Row label="Compressed size" value={mobilePhoto?.compressedBlobSize ?? '(none)'} />
+        <Row label="Compressed type" value={mobilePhoto?.compressedBlobType ?? '(none)'} />
+        <Row label="Upload status" value={mobilePhoto?.uploadStatus ?? '(none)'} />
+        <Row label="Upload error" value={mobilePhoto?.uploadError ?? '(none)'} />
       </dl>
 
       {loading && <p className="mt-2 text-amber-800">Refreshing live auth state…</p>}

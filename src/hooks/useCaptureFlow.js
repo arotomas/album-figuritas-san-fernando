@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCamera } from './useCamera'
-import { captureFrameFromVideo, isImageFile } from '../utils/camera'
+import { captureFrameFromVideo } from '../utils/camera'
 import {
   prepareNativeCapturePhoto,
   QA_PLACEHOLDER_JPEG,
@@ -16,9 +16,11 @@ import {
   processCaptureForUnlock,
   CAPTURE_VALIDATION_STATUS,
 } from '../services/captureService'
+import { useMobilePhotoDebugStore } from '../store/useMobilePhotoDebugStore'
 import { getQaState, setQaFlag } from '../utils/diagnostics'
 import { cameraLog } from '../utils/cameraLog'
 import { captureLog, albumLog, rewardLog } from '../utils/devLog'
+import { mobilePhotoLog } from '../utils/mobilePhotoLog'
 
 export const CAPTURE_PHASES = {
   CAMERA: 'camera',
@@ -31,6 +33,9 @@ export const CAPTURE_PHASES = {
 
 export const CAPTURE_RECOVERABLE_ERROR =
   'No pudimos procesar la foto. Probá otra vez.'
+
+export const MOBILE_PHOTO_RECOVERABLE_ERROR =
+  'No pudimos procesar la foto del celular. Probá otra vez.'
 
 export const CAPTURE_TIMEOUT_ERROR =
   'La foto tardó demasiado en procesarse. Probá otra vez.'
@@ -46,6 +51,17 @@ function getDistanceToFigure(position, figure) {
 
 function getFileKey(file) {
   return `${file.name}-${file.size}-${file.lastModified}`
+}
+
+function isAcceptableMobilePhotoFile(file) {
+  if (!file || file.size <= 0) return false
+  if (!file.type) return true
+  if (file.type.startsWith('image/')) return true
+  return /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name ?? '')
+}
+
+function publishMobilePhotoDebug(snapshot) {
+  useMobilePhotoDebugStore.getState().setSnapshot(snapshot)
 }
 
 function cloneFigure(figure) {
@@ -99,6 +115,7 @@ function toProcessingError(error) {
   if (!error?.message) return CAPTURE_RECOVERABLE_ERROR
   if (
     error.message === CAPTURE_RECOVERABLE_ERROR ||
+    error.message === MOBILE_PHOTO_RECOVERABLE_ERROR ||
     error.message === CAPTURE_TIMEOUT_ERROR
   ) {
     return error.message
@@ -484,6 +501,9 @@ export function useCaptureFlow({
         {
           foto: compressed.dataUrl,
           fotoSizeBytes: compressed.sizeBytes,
+          photoSource: compressed.photoSource ?? null,
+          compressedBlobSize: compressed.blob?.size ?? compressed.sizeBytes,
+          compressedBlobType: compressed.blob?.type ?? compressed.type ?? null,
           obtenidaEn: Date.now(),
           captureRecord: validatedCapture,
         },
@@ -557,6 +577,39 @@ export function useCaptureFlow({
 
   const processNativePhoto = useCallback(
     async (file, figureSnapshot) => {
+      mobilePhotoLog.info('file received', {
+        name: file?.name ?? null,
+        type: file?.type ?? '',
+        size: file?.size ?? 0,
+        lastModified: file?.lastModified ?? null,
+      })
+      publishMobilePhotoDebug({
+        status: 'file-received',
+        fileName: file?.name ?? null,
+        fileType: file?.type ?? '',
+        fileSize: file?.size ?? 0,
+        lastModified: file?.lastModified ?? null,
+        figureId: figureSnapshot.id,
+      })
+
+      if (!isAcceptableMobilePhotoFile(file)) {
+        mobilePhotoLog.error('invalid mobile file', {
+          name: file?.name ?? null,
+          type: file?.type ?? '',
+          size: file?.size ?? 0,
+        })
+        publishMobilePhotoDebug({
+          status: 'error',
+          uploadStatus: 'not-started',
+          uploadError: 'MOBILE_INVALID_FILE',
+          fileName: file?.name ?? null,
+          fileType: file?.type ?? '',
+          fileSize: file?.size ?? 0,
+          figureId: figureSnapshot.id,
+        })
+        throw new Error(MOBILE_PHOTO_RECOVERABLE_ERROR)
+      }
+
       captureLog.fileReceived({
         name: file.name,
         type: file.type,
@@ -583,26 +636,47 @@ export function useCaptureFlow({
           LOAD_IMAGE_TIMEOUT_MS,
           'prepareNativeCapturePhoto',
         )
+        if (
+          !compressed?.dataUrl?.startsWith('data:image/jpeg') ||
+          (compressed.blob && compressed.blob.type !== 'image/jpeg') ||
+          compressed.sizeBytes <= 0
+        ) {
+          throw new Error('MOBILE_INVALID_COMPRESSED_JPEG')
+        }
+        compressed = {
+          ...compressed,
+          photoSource: 'mobile-native',
+        }
+        publishMobilePhotoDebug({
+          status: 'compressed',
+          uploadStatus: 'pending',
+          fileName: file.name ?? null,
+          fileType: file.type ?? '',
+          fileSize: file.size,
+          compressedBlobSize: compressed.blob?.size ?? compressed.sizeBytes,
+          compressedBlobType: compressed.blob?.type ?? compressed.type ?? null,
+          figureId: figureSnapshot.id,
+        })
         captureLog.loadImageSuccess({
           figureId: figureSnapshot.id,
           width: compressed.width,
           height: compressed.height,
         })
       } catch (prepareError) {
-        if (figureSnapshot.isQaTest) {
-          captureLog.warn('QA prepare fallback — placeholder jpeg', {
-            figureId: figureSnapshot.id,
-            message: prepareError?.message,
-          })
-          compressed = {
-            dataUrl: QA_PLACEHOLDER_JPEG,
-            sizeBytes: Math.max(1, Math.round(QA_PLACEHOLDER_JPEG.length * 0.75)),
-            width: 1,
-            height: 1,
-          }
-        } else {
-          throw prepareError
-        }
+        mobilePhotoLog.error('prepare failed', {
+          figureId: figureSnapshot.id,
+          message: prepareError?.message ?? String(prepareError),
+        })
+        publishMobilePhotoDebug({
+          status: 'error',
+          uploadStatus: 'not-started',
+          uploadError: prepareError?.message ?? 'MOBILE_PREPARE_FAILED',
+          fileName: file.name ?? null,
+          fileType: file.type ?? '',
+          fileSize: file.size,
+          figureId: figureSnapshot.id,
+        })
+        throw new Error(MOBILE_PHOTO_RECOVERABLE_ERROR)
       }
 
       return finalizeUnlock(compressed, figureSnapshot, locationSnapshot, capturePosition)
@@ -742,8 +816,15 @@ export function useCaptureFlow({
         size: file.size,
       })
 
-      if (!isImageFile(file)) {
-        handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR), {
+      mobilePhotoLog.info('file received', {
+        name: file.name ?? null,
+        type: file.type ?? '',
+        size: file.size,
+        lastModified: file.lastModified ?? null,
+      })
+
+      if (!isAcceptableMobilePhotoFile(file)) {
+        handleRecoverableError(new Error(MOBILE_PHOTO_RECOVERABLE_ERROR), {
           figureId: figureSnapshot.id,
           source: 'native',
         })

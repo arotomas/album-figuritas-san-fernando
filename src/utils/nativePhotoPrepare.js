@@ -1,8 +1,10 @@
 import { MAX_PHOTO_BYTES } from '../config/persistence'
 import { withTimeout } from './withTimeout'
+import { mobilePhotoLog } from './mobilePhotoLog'
 
 const LOAD_MS = 8_000
 const ENCODE_MS = 8_000
+const JPEG_MIME = 'image/jpeg'
 
 /** JPEG mínimo válido (~600 bytes) — último recurso QA. */
 export const QA_PLACEHOLDER_JPEG =
@@ -19,7 +21,7 @@ function calculateDimensions(width, height, maxWidth, maxHeight) {
   }
 }
 
-function canvasToBlobAsync(canvas, quality, mimeType = 'image/jpeg') {
+function canvasToBlobAsync(canvas, quality, mimeType = JPEG_MIME) {
   return new Promise((resolve, reject) => {
     if (!canvas.toBlob) {
       try {
@@ -81,26 +83,40 @@ function blobToDataUrl(blob) {
 
 async function encodeSmallCanvas(canvas, quality) {
   const encoded = await withTimeout(
-    canvasToBlobAsync(canvas, quality),
+    canvasToBlobAsync(canvas, quality, JPEG_MIME),
     ENCODE_MS,
     'encodeCanvas',
   )
 
   if (typeof encoded === 'string') {
+    if (!encoded.startsWith('data:image/jpeg')) {
+      throw new Error('MOBILE_JPEG_ENCODE_FAILED')
+    }
     return {
       dataUrl: encoded,
       sizeBytes: Math.max(1, Math.round(encoded.length * 0.75)),
       width: canvas.width,
       height: canvas.height,
+      type: JPEG_MIME,
     }
   }
 
+  if (encoded.type !== JPEG_MIME || encoded.size <= 0) {
+    throw new Error('MOBILE_INVALID_JPEG_BLOB')
+  }
+
   const dataUrl = await blobToDataUrl(encoded)
+  if (!dataUrl.startsWith('data:image/jpeg')) {
+    throw new Error('MOBILE_JPEG_DATA_URL_FAILED')
+  }
+
   return {
     dataUrl,
+    blob: encoded,
     sizeBytes: encoded.size,
     width: canvas.width,
     height: canvas.height,
+    type: encoded.type,
   }
 }
 
@@ -174,10 +190,15 @@ function loadImageElementFromFile(file) {
  * Evita decodificar 12MP completos en el hilo principal.
  */
 export async function prepareNativeCapturePhoto(file, { isQaTest = false } = {}) {
+  if (!file || file.size <= 0) {
+    throw new Error('MOBILE_FILE_EMPTY')
+  }
+
   const attempts = [
-    { maxDim: 720, quality: 0.62 },
-    { maxDim: 560, quality: 0.5 },
-    { maxDim: 420, quality: 0.4 },
+    { maxDim: 720, quality: 0.75 },
+    { maxDim: 640, quality: 0.68 },
+    { maxDim: 560, quality: 0.58 },
+    { maxDim: 420, quality: 0.48 },
   ]
 
   let lastError = null
@@ -192,6 +213,15 @@ export async function prepareNativeCapturePhoto(file, { isQaTest = false } = {})
         attempt.maxDim,
         attempt.quality,
       )
+      mobilePhotoLog.info('compressed jpeg', {
+        mode: 'bitmap',
+        maxDim: attempt.maxDim,
+        quality: attempt.quality,
+        size: result.sizeBytes,
+        type: result.type,
+        width: result.width,
+        height: result.height,
+      })
       if (result.sizeBytes <= MAX_PHOTO_BYTES || isQaTest) {
         return result
       }
@@ -216,20 +246,20 @@ export async function prepareNativeCapturePhoto(file, { isQaTest = false } = {})
     canvas.height = height
     canvas.getContext('2d')?.drawImage(img, 0, 0, width, height)
     const result = await encodeSmallCanvas(canvas, 0.35)
+    mobilePhotoLog.info('compressed jpeg', {
+      mode: 'image-element',
+      maxDim: 420,
+      quality: 0.35,
+      size: result.sizeBytes,
+      type: result.type,
+      width: result.width,
+      height: result.height,
+    })
     if (result.sizeBytes <= MAX_PHOTO_BYTES || isQaTest) {
       return result
     }
   } catch (error) {
     lastError = error
-  }
-
-  if (isQaTest) {
-    return {
-      dataUrl: QA_PLACEHOLDER_JPEG,
-      sizeBytes: Math.max(1, Math.round(QA_PLACEHOLDER_JPEG.length * 0.75)),
-      width: 1,
-      height: 1,
-    }
   }
 
   throw lastError ?? new Error('PREPARE_FAILED')

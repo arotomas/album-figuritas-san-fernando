@@ -267,7 +267,10 @@ export const useAppStore = create(
           applyFigureUpdate(state, figureId, { obtenida: true }),
         ),
 
-      obtainFigureWithPhoto: (figureId, { foto, fotoSizeBytes, obtenidaEn, captureRecord }) => {
+      obtainFigureWithPhoto: (
+        figureId,
+        { foto, fotoSizeBytes, obtenidaEn, captureRecord, photoSource = null },
+      ) => {
         let saved = false
         const figureKey = String(figureId)
         const isQaFigure =
@@ -301,6 +304,7 @@ export const useAppStore = create(
               figureId,
               foto,
               fotoSizeBytes,
+              photoSource,
               obtenidaEn,
               captureRecord,
               source: isQaFigure ? 'qa' : 'capture',
@@ -343,6 +347,7 @@ export const useAppStore = create(
             figureId,
             foto,
             fotoSizeBytes,
+            photoSource,
             obtenidaEn,
             captureRecord,
             source: isQaFigure ? 'qa' : 'capture',

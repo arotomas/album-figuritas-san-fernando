@@ -5,7 +5,7 @@ import { motion as motionTokens } from '../../theme/motion'
 import { RarityBadge } from '../ui/RarityBadge'
 import { LockedFigureCard } from './LockedFigureCard'
 import { NewBadge } from './NewBadge'
-import { isValidAlbumFigure } from '../../utils/myFiguresLog'
+import { isValidAlbumFigure, myFiguresLog } from '../../utils/myFiguresLog'
 
 export const FigureCarousel = memo(function FigureCarousel({
   figures,
@@ -91,6 +91,14 @@ export const FigureCarousel = memo(function FigureCarousel({
                     loading="lazy"
                     decoding="async"
                     className="aspect-[3/4] w-full object-cover"
+                    onError={(event) => {
+                      myFiguresLog.warn('missing photo fallback', {
+                        figureId: figure.id,
+                        reason: 'thumb-image-load-error',
+                        src: figure.foto,
+                      })
+                      event.currentTarget.style.display = 'none'
+                    }}
                   />
                 ) : (
                   <div className="flex aspect-[3/4] items-center justify-center bg-charcoal/5 text-4xl">

@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import { getRarity } from '../../theme/rarity'
 import { album, albumClasses } from '../../theme/album'
@@ -9,7 +9,7 @@ import { RarityBadge } from '../ui/RarityBadge'
 import { LockedFigureCard } from './LockedFigureCard'
 import { NewBadge } from './NewBadge'
 import { prefersReducedMotion } from '../../utils/performance'
-import { isValidAlbumFigure } from '../../utils/myFiguresLog'
+import { isValidAlbumFigure, myFiguresLog } from '../../utils/myFiguresLog'
 import { AlbumFigureSkeleton } from './AlbumFigureSkeleton'
 
 function FeaturedFigureCardInner({ figure, isNew = false, dragX = 0, compact = false }) {
@@ -28,6 +28,7 @@ function FeaturedFigureCardInner({ figure, isNew = false, dragX = 0, compact = f
 }
 
 function FeaturedFigureCardContent({ figure, isNew = false, dragX = 0, compact = false }) {
+  const [imageFailed, setImageFailed] = useState(false)
   const rarity = getRarity(figure.rareza)
   const reduced = prefersReducedMotion()
   const { cardRef, cardMotionStyle, glareStyle, onPointerMove, onPointerLeave } =
@@ -49,6 +50,23 @@ function FeaturedFigureCardContent({ figure, isNew = false, dragX = 0, compact =
     ? 'font-body text-xs leading-relaxed text-white/55'
     : `${albumClasses.featuredDescription} text-white/55`
   const emojiSize = compact ? 'text-xl' : 'text-2xl'
+  const canShowPhoto = Boolean(figure.foto) && !imageFailed
+
+  useEffect(() => {
+    setImageFailed(false)
+    if (figure.obtenida && !figure.foto) {
+      myFiguresLog.warn('missing photo fallback', { figureId: figure.id })
+    } else if (figure.foto) {
+      myFiguresLog.info('photo source', {
+        figureId: figure.id,
+        source: figure.foto.startsWith('http')
+          ? 'supabase-photo_url'
+          : figure.foto.startsWith('data:')
+            ? 'local-data-url'
+            : 'unknown',
+      })
+    }
+  }, [figure.foto, figure.id, figure.obtenida])
 
   if (!figure.obtenida) {
     return (
@@ -114,13 +132,21 @@ function FeaturedFigureCardContent({ figure, isNew = false, dragX = 0, compact =
 
         <div className={`relative z-10 ${photoMargin}`}>
           <div className={`overflow-hidden rounded-xl border-2 ${rarity.tailwind.border} bg-black/30 p-1`}>
-            {figure.foto ? (
+            {canShowPhoto ? (
               <img
                 src={figure.foto}
                 alt={figure.nombre}
                 loading="lazy"
                 decoding="async"
                 className={imageClass}
+                onError={() => {
+                  myFiguresLog.warn('missing photo fallback', {
+                    figureId: figure.id,
+                    reason: 'image-load-error',
+                    src: figure.foto,
+                  })
+                  setImageFailed(true)
+                }}
               />
             ) : (
               <div className={placeholderClass}>{figure.emoji}</div>
