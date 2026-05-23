@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminFigureLocationPicker } from '../components/admin/AdminFigureLocationPicker'
 import { AdminMap } from '../components/admin/AdminMap'
 import {
@@ -107,7 +107,9 @@ export function AdminScreen() {
   const [editingFigureId, setEditingFigureId] = useState(null)
   const [figureForm, setFigureForm] = useState(DEFAULT_FIGURE_FORM)
   const [figureFormError, setFigureFormError] = useState(null)
+  const [figureFormMessage, setFigureFormMessage] = useState(null)
   const [figureSaving, setFigureSaving] = useState(false)
+  const figureFormRef = useRef(null)
   const [filters, setFilters] = useState({
     user: '',
     figure: '',
@@ -196,13 +198,29 @@ export function AdminScreen() {
     setEditingFigureId(null)
     setFigureForm(DEFAULT_FIGURE_FORM)
     setFigureFormError(null)
+    setFigureFormMessage(null)
     setFigureFormOpen(true)
   }
 
   const openEditFigureForm = (figure) => {
+    console.info('[admin-figures]', 'edit click', { id: figure.id, title: figure.title })
+    const populatedForm = toFigureForm(figure)
     setEditingFigureId(figure.id)
-    setFigureForm(toFigureForm(figure))
+    setFigureForm(populatedForm)
     setFigureFormError(null)
+    setFigureFormMessage(null)
+    setFigureFormOpen(true)
+    console.info('[admin-figures]', 'form populated', { id: figure.id, form: populatedForm })
+    window.setTimeout(() => {
+      figureFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 0)
+  }
+
+  const cancelFigureEdit = () => {
+    setEditingFigureId(null)
+    setFigureForm(DEFAULT_FIGURE_FORM)
+    setFigureFormError(null)
+    setFigureFormMessage(null)
     setFigureFormOpen(true)
   }
 
@@ -220,19 +238,23 @@ export function AdminScreen() {
 
     setFigureSaving(true)
     setFigureFormError(null)
+    setFigureFormMessage(null)
     setError(null)
     try {
+      const wasEditing = Boolean(editingFigureId)
       const saved = editingFigureId
         ? await updateFigureAdmin(editingFigureId, figureForm)
         : await createFigureAdmin(figureForm)
 
-      setFigures((current) => {
-        if (!editingFigureId) return [...current, saved]
-        return current.map((figure) => (figure.id === saved.id ? saved : figure))
-      })
-      setFigureFormOpen(false)
-      setEditingFigureId(null)
-      setFigureForm(DEFAULT_FIGURE_FORM)
+      await loadAdmin({ silent: true })
+      if (wasEditing) {
+        setFigureForm(toFigureForm(saved))
+        setFigureFormMessage('Figurita actualizada')
+      } else {
+        setFigureFormOpen(false)
+        setEditingFigureId(null)
+        setFigureForm(DEFAULT_FIGURE_FORM)
+      }
     } catch (saveError) {
       setFigureFormError(saveError?.message ?? 'No pudimos guardar la figurita.')
     } finally {
@@ -507,6 +529,7 @@ export function AdminScreen() {
 
               {figureFormOpen && (
                 <form
+                  ref={figureFormRef}
                   onSubmit={handleSaveFigure}
                   className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5"
                 >
@@ -516,7 +539,9 @@ export function AdminScreen() {
                         {editingFigureId ? 'Editar figurita' : 'Nueva figurita'}
                       </h3>
                       <p className="mt-1 text-sm text-muted">
-                        Los cambios se guardan directo en Supabase usando la sesión admin.
+                        {editingFigureId
+                          ? `Editando ID original: ${editingFigureId}`
+                          : 'Los cambios se guardan directo en Supabase usando la sesión admin.'}
                       </p>
                     </div>
                     <button
@@ -525,6 +550,7 @@ export function AdminScreen() {
                         setFigureFormOpen(false)
                         setEditingFigureId(null)
                         setFigureFormError(null)
+                        setFigureFormMessage(null)
                       }}
                       className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold"
                     >
@@ -535,6 +561,11 @@ export function AdminScreen() {
                   {figureFormError && (
                     <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                       {figureFormError}
+                    </div>
+                  )}
+                  {figureFormMessage && (
+                    <div className="mt-4 rounded-xl border border-progress/30 bg-progress/10 p-3 text-sm font-semibold text-ink">
+                      {figureFormMessage}
                     </div>
                   )}
 
@@ -762,8 +793,21 @@ export function AdminScreen() {
                         disabled={figureSaving}
                         className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
                       >
-                        {figureSaving ? 'Guardando…' : 'Guardar figurita'}
+                        {figureSaving
+                          ? 'Guardando…'
+                          : editingFigureId
+                            ? 'Guardar cambios'
+                            : 'Guardar figurita'}
                       </button>
+                      {editingFigureId && (
+                        <button
+                          type="button"
+                          onClick={cancelFigureEdit}
+                          className="w-full rounded-xl border border-border bg-white px-5 py-3 text-sm font-bold text-ink"
+                        >
+                          Cancelar edición
+                        </button>
+                      )}
                     </div>
 
                     <AdminFigureLocationPicker
@@ -780,8 +824,8 @@ export function AdminScreen() {
                 </form>
               )}
 
-              <div className="mt-5 overflow-hidden rounded-2xl border border-border">
-                <table className="min-w-full text-left text-sm">
+              <div className="mt-5 overflow-x-auto rounded-2xl border border-border">
+                <table className="min-w-[1540px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <th className="px-4 py-3">Imagen</th>
@@ -796,7 +840,9 @@ export function AdminScreen() {
                       <th className="px-4 py-3">Lng</th>
                       <th className="px-4 py-3">Radio</th>
                       <th className="px-4 py-3">Ícono</th>
-                      <th className="px-4 py-3">Acción</th>
+                      <th className="sticky right-0 z-10 bg-slate-50 px-4 py-3 shadow-[-8px_0_12px_rgba(15,23,42,0.06)]">
+                        Acciones
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -854,23 +900,23 @@ export function AdminScreen() {
                             <span className="text-xs text-muted">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
+                        <td className="sticky right-0 bg-white px-4 py-4 shadow-[-8px_0_12px_rgba(15,23,42,0.06)]">
+                          <div className="flex min-w-[260px] flex-col gap-2">
                             <button
                               type="button"
                               onClick={() => openEditFigureForm(figure)}
-                              className="rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold"
+                              className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white"
                             >
                               Editar
                             </button>
-                          <button
-                            type="button"
-                            disabled={togglingId === figure.id}
-                            onClick={() => handleToggleFigure(figure)}
-                            className="rounded-xl border border-border bg-surface px-4 py-2 text-xs font-bold disabled:opacity-50"
-                          >
-                            {figure.active ? 'Desactivar' : 'Activar'}
-                          </button>
+                            <button
+                              type="button"
+                              disabled={togglingId === figure.id}
+                              onClick={() => handleToggleFigure(figure)}
+                              className="rounded-xl border border-border bg-surface px-4 py-2 text-xs font-bold disabled:opacity-50"
+                            >
+                              {figure.active ? 'Desactivar' : 'Activar'}
+                            </button>
                             <button
                               type="button"
                               disabled={deletingId === figure.id}
