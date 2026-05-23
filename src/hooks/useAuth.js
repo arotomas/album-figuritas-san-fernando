@@ -1,9 +1,11 @@
 import { useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
+import { isQaMode, withQaParam } from '../utils/qaMode'
 
 export function useAuth() {
   const navigate = useNavigate()
+  const location = useLocation()
   const login = useAppStore((state) => state.login)
   const logout = useAppStore((state) => state.logout)
   const isAuthenticated = useAppStore((state) => state.isAuthenticated)
@@ -12,15 +14,15 @@ export function useAuth() {
   const handleLogin = useCallback(
     (credentials) => {
       login(credentials)
-      navigate('/map', { replace: true })
+      navigate(withQaParam('/map', isQaMode(location.search)), { replace: true })
     },
-    [login, navigate],
+    [location.search, login, navigate],
   )
 
   const handleLogout = useCallback(() => {
     logout()
-    navigate('/login', { replace: true })
-  }, [logout, navigate])
+    navigate(withQaParam('/login', isQaMode(location.search)), { replace: true })
+  }, [location.search, logout, navigate])
 
   return {
     isAuthenticated,

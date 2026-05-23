@@ -18,11 +18,11 @@ function App() {
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
 
   useEffect(() => {
-    syncQaModeFromUrl()
+    syncQaModeFromUrl(location.search)
   }, [location.pathname, location.search])
 
   useEffect(() => {
-    if (!isQaMode() && !isDevMode()) {
+    if (!isQaMode(location.search) && !isDevMode()) {
       clearQaTestFigure()
     }
   }, [clearQaTestFigure, location.pathname, location.search])

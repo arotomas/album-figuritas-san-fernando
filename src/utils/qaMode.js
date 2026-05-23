@@ -1,15 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isDevMode } from './devMode'
 
 const QA_SESSION_KEY = 'album-qa-mode'
+const QA_LOCAL_KEY = 'album-qa-mode'
 const QA_SESSION_KEY_LEGACY = 'figuritas-qa-mode'
 
-function readSessionQaFlag() {
+function persistQaFlag() {
+  try {
+    sessionStorage.setItem(QA_SESSION_KEY, '1')
+  } catch {
+    // ignore
+  }
+  try {
+    localStorage.setItem(QA_LOCAL_KEY, '1')
+  } catch {
+    // ignore
+  }
+}
+
+function readPersistedQaFlag() {
   try {
     if (sessionStorage.getItem(QA_SESSION_KEY) === '1') return true
+    if (localStorage.getItem(QA_LOCAL_KEY) === '1') return true
     if (sessionStorage.getItem(QA_SESSION_KEY_LEGACY) === '1') {
-      sessionStorage.setItem(QA_SESSION_KEY, '1')
+      persistQaFlag()
       return true
     }
   } catch {
@@ -18,42 +33,42 @@ function readSessionQaFlag() {
   return false
 }
 
-export function activateQaMode({ log = true } = {}) {
-  try {
-    sessionStorage.setItem(QA_SESSION_KEY, '1')
-    if (log) {
-      console.info('[QA] enabled', true)
-    }
-    return true
-  } catch {
-    return false
-  }
+function parseQaFromSearch(search = '') {
+  if (!search) return false
+  const params = new URLSearchParams(search.startsWith('?') ? search : `?${search}`)
+  return params.get('qa') === '1'
 }
 
-export function isQaMode() {
+export function activateQaMode({ log = true } = {}) {
+  persistQaFlag()
+  if (log) {
+    console.info('[QA] enabled', true)
+  }
+  return true
+}
+
+export function isQaMode(searchString) {
   if (typeof window === 'undefined') return false
 
+  const search =
+    searchString ??
+    window.location.search ??
+    ''
+
   try {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('qa') === '1') {
+    if (parseQaFromSearch(search)) {
       return activateQaMode()
     }
 
-    return readSessionQaFlag()
+    return readPersistedQaFlag()
   } catch {
-    return false
+    return parseQaFromSearch(search)
   }
 }
 
-/** Sincroniza ?qa=1 → sessionStorage en cada navegación. */
-export function syncQaModeFromUrl() {
-  const active = isQaMode()
-  return active
-}
-
-/** @deprecated usar isQaMode */
-export function isQaModeEnabled() {
-  return isQaMode()
+/** Sincroniza ?qa=1 → storage en cada navegación. */
+export function syncQaModeFromUrl(searchString) {
+  return isQaMode(searchString)
 }
 
 export function withQaParam(path, active = isQaMode()) {
@@ -72,10 +87,9 @@ export function canUseTestFigure() {
 
 export function useQaMode() {
   const location = useLocation()
-  const [active, setActive] = useState(() => isQaMode())
 
-  useEffect(() => {
-    setActive(syncQaModeFromUrl())
+  const active = useMemo(() => {
+    return isQaMode(location.search)
   }, [location.search, location.pathname])
 
   return {

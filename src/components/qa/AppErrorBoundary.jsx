@@ -4,7 +4,10 @@ import { PremiumButton } from '../ui/PremiumButton'
 
 function mapPathWithQa() {
   try {
-    if (sessionStorage.getItem('album-qa-mode') === '1') {
+    if (
+      sessionStorage.getItem('album-qa-mode') === '1' ||
+      localStorage.getItem('album-qa-mode') === '1'
+    ) {
       return '/map?qa=1'
     }
   } catch {

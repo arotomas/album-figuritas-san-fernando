@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { Logo } from '../components/Logo'
 import { Button } from '../components/Button'
@@ -9,6 +9,8 @@ import { ParticleLayer } from '../components/ui/ParticleLayer'
 
 export function SplashScreen() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const loginPath = location.search ? `/login${location.search}` : '/login'
 
   return (
     <div className="screen-full safe-top safe-bottom safe-x relative flex flex-col items-center justify-between overflow-hidden bg-warm-white px-8 py-10">
@@ -40,7 +42,7 @@ export function SplashScreen() {
         transition={{ delay: 0.45, duration: 0.5, ease: motionTokens.ease.out }}
         className="relative z-10 w-full max-w-sm"
       >
-        <Button variant="primary" onClick={() => navigate('/login')}>
+        <Button variant="primary" onClick={() => navigate(loginPath)}>
           Ingresar
         </Button>
       </m.div>
