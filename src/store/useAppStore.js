@@ -61,6 +61,12 @@ function resetStoreToDefaults() {
     qaTestFigure: null,
     captureSession: null,
     _hasHydrated: true,
+    supabaseUserId: null,
+    supabaseReady: false,
+    isSupabaseAdmin: false,
+    supabaseUsername: null,
+    supabaseProfileId: null,
+    lastSupabaseSyncWarning: null,
   })
 }
 
@@ -121,15 +127,23 @@ export const useAppStore = create(
       supabaseUserId: null,
       supabaseReady: false,
       isSupabaseAdmin: false,
+      supabaseUsername: null,
+      supabaseProfileId: null,
+      lastSupabaseSyncWarning: null,
 
       setHasHydrated: (value) => set({ _hasHydrated: value }),
 
-      setSupabaseAuth: ({ userId, isAdmin = false }) =>
+      setSupabaseAuth: ({ userId, isAdmin = false, profile = null }) =>
         set({
           supabaseUserId: userId,
           supabaseReady: Boolean(userId),
           isSupabaseAdmin: isAdmin,
+          supabaseUsername: profile?.username ?? null,
+          supabaseProfileId: profile?.id ?? null,
         }),
+
+      setSupabaseSyncWarning: (warning) =>
+        set({ lastSupabaseSyncWarning: warning, lastSavedAt: Date.now() }),
 
       mergeRemoteUserFigures: (remoteRows) =>
         set((state) => {
@@ -171,11 +185,21 @@ export const useAppStore = create(
               : 0
             const localTime = figure.obtenidaEn ?? 0
 
-            if (figure.obtenida && localTime >= remoteTime && figure.foto) {
+            if (
+              figure.obtenida &&
+              localTime >= remoteTime &&
+              figure.foto &&
+              (!remote.photo_url || figure.foto === remote.photo_url)
+            ) {
               return figure
             }
 
             changed = true
+            myFiguresLog.info('photo source', {
+              figureId: figure.id,
+              source: remote.photo_url ? 'supabase-photo_url' : figure.foto ? 'local-existing' : 'none',
+              hasRemotePhoto: Boolean(remote.photo_url),
+            })
             return {
               ...figure,
               obtenida: true,
@@ -269,6 +293,34 @@ export const useAppStore = create(
           if (existing?.obtenida) {
             persistLog.persist('obtain skipped — already obtained', realFigureId)
             saved = true
+            const qaTargetFigureId = isQaFigure
+              ? state.qaTestFigure?.targetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+              : null
+
+            void syncUnlockToSupabase({
+              figureId,
+              foto,
+              fotoSizeBytes,
+              obtenidaEn,
+              captureRecord,
+              source: isQaFigure ? 'qa' : 'capture',
+              qaTargetFigureId,
+            }).then((result) => {
+              if (result.ok && result.remotePhotoUrl) {
+                useAppStore.setState((current) => ({
+                  figures: current.figures.map((f) =>
+                    f.id === realFigureId && f.obtenida
+                      ? { ...f, foto: result.remotePhotoUrl ?? f.foto }
+                      : f,
+                  ),
+                  lastSupabaseSyncWarning: null,
+                }))
+              } else if (result.uploadError || !result.ok) {
+                useAppStore.getState().setSupabaseSyncWarning(
+                  result.uploadError?.reason ?? result.reason ?? 'No se pudo subir la foto a Supabase.',
+                )
+              }
+            })
             return state
           }
 
@@ -303,7 +355,12 @@ export const useAppStore = create(
                     ? { ...f, foto: result.remotePhotoUrl ?? f.foto }
                     : f,
                 ),
+                lastSupabaseSyncWarning: null,
               }))
+            } else if (result.uploadError || !result.ok) {
+              useAppStore.getState().setSupabaseSyncWarning(
+                result.uploadError?.reason ?? result.reason ?? 'No se pudo subir la foto a Supabase.',
+              )
             }
           })
 
@@ -450,6 +507,12 @@ export const useAppStore = create(
           hasSeenSplash: false,
           nearFigure: null,
           qaTestFigure: null,
+          supabaseUserId: null,
+          supabaseReady: false,
+          isSupabaseAdmin: false,
+          supabaseUsername: null,
+          supabaseProfileId: null,
+          lastSupabaseSyncWarning: null,
         })
       },
 

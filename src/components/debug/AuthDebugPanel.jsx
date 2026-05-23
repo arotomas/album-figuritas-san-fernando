@@ -53,9 +53,18 @@ export function AuthDebugPanel({ className = '' }) {
         })
 
         let userResponse = { data: { user: null }, error: null }
+        let profileResponse = { data: null, error: null }
         if (hasSession) {
           userResponse = await supabase.auth.getUser()
           sessionDebug.info('debug panel live refresh — getUser', summarizeAuthResponse(userResponse))
+
+          if (userResponse.data.user?.id) {
+            profileResponse = await supabase
+              .from('profiles')
+              .select('id, username')
+              .eq('id', userResponse.data.user.id)
+              .maybeSingle()
+          }
         }
 
         if (cancelled) return
@@ -73,6 +82,9 @@ export function AuthDebugPanel({ className = '' }) {
               ? userResponse.error?.message ?? null
               : '(expected before login — no session yet)',
             liveSessionError: sessionResponse.error?.message ?? null,
+            profileId: profileResponse.data?.id ?? null,
+            profileUsername: profileResponse.data?.username ?? null,
+            profileError: profileResponse.error?.message ?? null,
             authStorage,
           }),
         )
@@ -129,6 +141,7 @@ export function AuthDebugPanel({ className = '' }) {
         <Row label="User id" value={merged.userId ?? merged.liveUser?.id ?? merged.liveSession?.userId ?? '(none)'} />
         <Row label="Username" value={merged.profileUsername ?? merged.username ?? '(none)'} />
         <Row label="Profile id" value={merged.profileId ?? '(none)'} />
+        <Row label="Profile error" value={merged.profileError ?? '(none)'} />
         <Row label="Step" value={merged.step ?? '(done)'} />
         <Row label="Live user error" value={merged.liveUserError ?? '(none)'} />
         <Row label="Live session error" value={merged.liveSessionError ?? '(none)'} />

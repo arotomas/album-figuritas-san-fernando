@@ -49,15 +49,24 @@ export function useSupabaseBootstrap(enabled) {
         }
 
         const userId = result.session.user.id
+        const profile = await fetchProfile(userId)
+        const profileUsername = profile?.username?.trim()
+        const localUsername = user?.username?.trim()
+
+        if (!profile?.id || !profileUsername) {
+          sessionDebug.error('bootstrap profile missing', {
+            userId,
+            hasProfile: Boolean(profile?.id),
+            profileUsername: profileUsername ?? null,
+          })
+          return
+        }
+
         const admin = await isAdmin(userId)
 
         if (cancelled) return
 
-        setSupabaseAuth({ userId, isAdmin: admin })
-
-        const profile = await fetchProfile(userId)
-        const profileUsername = profile?.username?.trim()
-        const localUsername = user?.username?.trim()
+        setSupabaseAuth({ userId, isAdmin: admin, profile })
 
         if (profileUsername && !localUsername) {
           login({ username: profileUsername })

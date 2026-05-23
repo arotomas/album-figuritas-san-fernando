@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import { MAX_PHOTO_BYTES } from '../../config/persistence'
 import { supabaseLog } from '../../utils/supabaseLog'
+import { captureSyncLog, storageTestLog } from '../../utils/captureSyncLog'
 import { getSessionUserId } from './auth'
 
 export const CAPTURES_BUCKET = 'captures'
@@ -100,6 +101,7 @@ export async function testStorageUpload() {
   if (!sessionUserId) {
     const result = { ok: false, reason: 'NO_SESSION' }
     supabaseLog.upload.warn('test upload skipped', result)
+    storageTestLog.error('error', result)
     return result
   }
 
@@ -107,6 +109,13 @@ export async function testStorageUpload() {
   const path = buildCaptureStoragePath(sessionUserId, Date.now())
 
   supabaseLog.upload.info('test upload start', {
+    bucket: CAPTURES_BUCKET,
+    path,
+    size: blob.size,
+    type: blob.type,
+    sessionUserId,
+  })
+  storageTestLog.info('start', {
     bucket: CAPTURES_BUCKET,
     path,
     size: blob.size,
@@ -126,6 +135,10 @@ export async function testStorageUpload() {
   })
 
   if (error) {
+    storageTestLog.error('error', {
+      path,
+      error: summarizeUploadError(error),
+    })
     return { ok: false, reason: error.message, error: summarizeUploadError(error), path }
   }
 
@@ -133,6 +146,7 @@ export async function testStorageUpload() {
   const publicUrl = publicData?.publicUrl ?? null
 
   supabaseLog.upload.info('test upload public url', { publicUrl })
+  storageTestLog.info('success', { path, publicUrl, data })
 
   return { ok: true, path, publicUrl, data }
 }
@@ -172,6 +186,12 @@ export async function uploadCapturePhoto({
         appMaxPhotoBytes: MAX_PHOTO_BYTES,
         bucketMaxBytes: STORAGE_BUCKET_MAX_BYTES,
       })
+      captureSyncLog.error('upload error', {
+        reason: validation.reason,
+        size: validation.size,
+        type: validation.type,
+        bucketMaxBytes: STORAGE_BUCKET_MAX_BYTES,
+      })
       return { ok: false, reason: validation.reason, ...validation }
     }
 
@@ -186,6 +206,12 @@ export async function uploadCapturePhoto({
       size: uploadBlob.size,
       type: uploadBlob.type,
       sessionUserId: effectiveUserId,
+    })
+    captureSyncLog.info('upload start', {
+      bucket: CAPTURES_BUCKET,
+      path,
+      size: uploadBlob.size,
+      type: uploadBlob.type,
     })
 
     const { data, error } = await supabase.storage.from(CAPTURES_BUCKET).upload(path, uploadBlob, {
@@ -205,6 +231,11 @@ export async function uploadCapturePhoto({
         path,
         error: summarizeUploadError(error),
       })
+      captureSyncLog.error('upload error', {
+        bucket: CAPTURES_BUCKET,
+        path,
+        error: summarizeUploadError(error),
+      })
       return {
         ok: false,
         reason: error.message,
@@ -217,6 +248,11 @@ export async function uploadCapturePhoto({
     const publicUrl = publicData?.publicUrl ?? null
 
     supabaseLog.upload.info('public url', { publicUrl, path, bucket: CAPTURES_BUCKET })
+    captureSyncLog.info('upload success', {
+      bucket: CAPTURES_BUCKET,
+      path,
+      publicUrl,
+    })
 
     if (!publicUrl) {
       return { ok: false, reason: 'NO_PUBLIC_URL', path, data }
@@ -230,6 +266,7 @@ export async function uploadCapturePhoto({
       error: summarizeUploadError(error),
     }
     supabaseLog.upload.warn('upload error', payload)
+    captureSyncLog.error('upload error', payload)
     return payload
   }
 }

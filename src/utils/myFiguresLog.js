@@ -1,4 +1,4 @@
-const TAG = '[MY-FIGURES]'
+const TAG = '[my-figures]'
 
 function emit(level, message, detail) {
   if (detail !== undefined) {

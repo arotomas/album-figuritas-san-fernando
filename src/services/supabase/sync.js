@@ -1,5 +1,6 @@
 import { QA_TEST_FIGURE_ID_PREFIX } from '../../config/qaConstants'
 import { supabaseLog } from '../../utils/supabaseLog'
+import { captureSyncLog } from '../../utils/captureSyncLog'
 import { getSessionUserId, isSupabaseConfigured } from './auth'
 import { fetchUserFigures, upsertUserFigure } from './figures'
 import { insertCapture } from './captures'
@@ -53,6 +54,12 @@ export async function syncUnlockToSupabase({
           : typeof foto,
       fotoSizeBytes,
     })
+    captureSyncLog.info('sync start', {
+      userId,
+      figureId: realFigureId,
+      source: syncSource,
+      hasPhoto: Boolean(foto),
+    })
 
     let remotePhotoUrl = null
     let uploadError = null
@@ -69,6 +76,11 @@ export async function syncUnlockToSupabase({
       } else {
         uploadError = uploadResult
         supabaseLog.sync.warn('unlock sync — photo upload failed', {
+          reason: uploadResult.reason,
+          error: uploadResult.error,
+          path: uploadResult.path,
+        })
+        captureSyncLog.error('upload error', {
           reason: uploadResult.reason,
           error: uploadResult.error,
           path: uploadResult.path,
@@ -90,6 +102,11 @@ export async function syncUnlockToSupabase({
       capturedAt: obtenidaEn ?? Date.now(),
       source: syncSource,
     })
+    captureSyncLog.info('user_figures upsert success', {
+      userId,
+      figureId: realFigureId,
+      photoUrl: remotePhotoUrl,
+    })
 
     if (captureRecord) {
       await insertCapture({
@@ -99,6 +116,11 @@ export async function syncUnlockToSupabase({
         lng: captureRecord.lng,
         photoUrl: remotePhotoUrl,
         createdAt: captureRecord.createdAt ?? obtenidaEn ?? Date.now(),
+      })
+      captureSyncLog.info('captures insert success', {
+        userId,
+        figureId: realFigureId,
+        photoUrl: remotePhotoUrl,
       })
     }
 
@@ -125,6 +147,10 @@ export async function syncUnlockToSupabase({
     return { ok: true, remotePhotoUrl, uploadError }
   } catch (error) {
     supabaseLog.sync.warn('unlock sync failed — local fallback remains', {
+      message: error?.message ?? String(error),
+      figureId,
+    })
+    captureSyncLog.error('sync error', {
       message: error?.message ?? String(error),
       figureId,
     })

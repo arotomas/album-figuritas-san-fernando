@@ -4,7 +4,6 @@ import { Button } from '../components/Button'
 import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { useAuth } from '../hooks/useAuth'
 import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
-import { isWpConfigured } from '../services/api'
 import { getCurrentPosition } from '../services/geoService'
 import { GPS_HIGH_ACCURACY_OPTIONS } from '../config/gps'
 import { isDevMode } from '../utils/devMode'
@@ -26,6 +25,9 @@ export function OptionsScreen() {
   const qaTestFigure = useAppStore((state) => state.qaTestFigure)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastSavedAt = useAppStore((state) => state.lastSavedAt)
+  const supabaseReady = useAppStore((state) => state.supabaseReady)
+  const supabaseUsername = useAppStore((state) => state.supabaseUsername)
+  const lastSupabaseSyncWarning = useAppStore((state) => state.lastSupabaseSyncWarning)
   const progress = useAppStore(selectProgress)
   const [qaMessage, setQaMessage] = useState(null)
   const [qaLoading, setQaLoading] = useState(false)
@@ -85,7 +87,7 @@ export function OptionsScreen() {
         <div>
           <p className="text-xs uppercase tracking-wide text-muted">Usuario</p>
           <p className="mt-1 font-medium text-ink">
-            {user?.username || user?.displayName || 'Explorador'}
+            {supabaseUsername || user?.username || user?.displayName || 'Explorador'}
           </p>
         </div>
 
@@ -112,11 +114,18 @@ export function OptionsScreen() {
         <div>
           <p className="text-xs uppercase tracking-wide text-muted">Backend</p>
           <p className="mt-1 text-sm text-ink">
-            {isWpConfigured()
-              ? 'WordPress Headless conectado'
-              : 'Modo local — WordPress pendiente'}
+            {supabaseReady ? 'Supabase conectado' : 'Supabase sin sesión activa'}
           </p>
         </div>
+
+        {lastSupabaseSyncWarning && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-900">
+              Advertencia Supabase
+            </p>
+            <p className="mt-1 text-xs text-amber-950">{lastSupabaseSyncWarning}</p>
+          </div>
+        )}
       </div>
 
       <AuthDebugPanel className="mt-6" />

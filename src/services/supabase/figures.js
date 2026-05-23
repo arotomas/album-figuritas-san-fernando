@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { supabaseLog } from '../../utils/supabaseLog'
+import { captureSyncLog } from '../../utils/captureSyncLog'
 
 export function toRemoteFigureId(figureId) {
   return String(figureId)
@@ -38,9 +39,12 @@ export async function upsertUserFigure({
   const payload = {
     user_id: userId,
     figure_id: remoteFigureId,
-    photo_url: photoUrl ?? null,
     captured_at: capturedAt ? new Date(capturedAt).toISOString() : new Date().toISOString(),
     source,
+  }
+
+  if (photoUrl) {
+    payload.photo_url = photoUrl
   }
 
   const { data, error } = await supabase
@@ -54,9 +58,19 @@ export async function upsertUserFigure({
       figureId: remoteFigureId,
       message: error.message,
     })
+    captureSyncLog.error('user_figures upsert error', {
+      figureId: remoteFigureId,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    })
     throw error
   }
 
   supabaseLog.figures.info('user figure saved', { figureId: remoteFigureId })
+  captureSyncLog.info('user_figures upsert success', {
+    figureId: remoteFigureId,
+    photoUrl: data.photo_url ?? null,
+  })
   return data
 }

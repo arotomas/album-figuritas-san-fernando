@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { supabaseLog } from '../../utils/supabaseLog'
+import { captureSyncLog } from '../../utils/captureSyncLog'
 import { toRemoteFigureId } from './figures'
 
 function getDeviceLabel() {
@@ -44,9 +45,20 @@ export async function insertCapture({
       figureId: payload.figure_id,
       message: error.message,
     })
+    captureSyncLog.error('captures insert error', {
+      figureId: payload.figure_id,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    })
     throw error
   }
 
   supabaseLog.sync.info('capture row inserted', { captureId: data.id, figureId: data.figure_id })
+  captureSyncLog.info('captures insert success', {
+    captureId: data.id,
+    figureId: data.figure_id,
+    photoUrl: data.photo_url ?? null,
+  })
   return data
 }

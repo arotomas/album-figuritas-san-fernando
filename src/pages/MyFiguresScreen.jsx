@@ -92,6 +92,19 @@ export function MyFiguresScreen() {
     }
   }, [activeFigure, activeId, figures])
 
+  useEffect(() => {
+    if (!activeFigure) return
+    myFiguresLog.info('photo source', {
+      figureId: activeFigure.id,
+      source: activeFigure.foto?.startsWith('http')
+        ? 'supabase-photo_url'
+        : activeFigure.foto?.startsWith('data:')
+          ? 'local-data-url'
+          : 'none',
+      hasPhoto: Boolean(activeFigure.foto),
+    })
+  }, [activeFigure])
+
   const visibleIndices = [
     activeIndex - 1,
     activeIndex,

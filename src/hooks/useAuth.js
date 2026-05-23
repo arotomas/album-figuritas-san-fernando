@@ -72,7 +72,7 @@ export function useAuth() {
         }
 
         const admin = await isAdmin(userId)
-        setSupabaseAuth({ userId, isAdmin: admin })
+        setSupabaseAuth({ userId, isAdmin: admin, profile })
 
         try {
           const remoteRows = await pullRemoteAlbum()
@@ -85,7 +85,7 @@ export function useAuth() {
           })
         }
 
-        login({ username: trimmed })
+        login({ username: profile.username ?? trimmed })
 
         sessionDebug.info('after login store update — before navigation', {
           authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),

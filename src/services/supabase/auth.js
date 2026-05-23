@@ -272,6 +272,12 @@ async function upsertAndVerifyProfile(userId, username) {
 
   if (readResponse.error || !readResponse.data?.id) {
     const err = new Error('PROFILE_READBACK_FAILED')
+    profileLog.error('readback error', {
+      message: readResponse.error?.message ?? err.message,
+      code: readResponse.error?.code,
+      details: readResponse.error?.details,
+      hint: readResponse.error?.hint,
+    })
     profileDebug.error('profile read-back failed', summarizePostgrestResponse(readResponse))
     throw err
   }
@@ -286,6 +292,10 @@ async function upsertAndVerifyProfile(userId, username) {
   }
 
   profileLog.info('upsert success', { userId, username: readResponse.data.username })
+  profileLog.info('readback success', {
+    userId: readResponse.data.id,
+    username: readResponse.data.username,
+  })
   profileDebug.info('upsert verified', readResponse.data)
   return readResponse.data
 }
@@ -336,7 +346,22 @@ export async function fetchProfile(userId) {
     .maybeSingle()
 
   profileDebug.info('fetchProfile response', summarizePostgrestResponse(response))
-  if (response.error) throw response.error
+  if (response.error) {
+    profileLog.error('readback error', {
+      userId,
+      message: response.error.message,
+      code: response.error.code,
+      details: response.error.details,
+      hint: response.error.hint,
+    })
+    throw response.error
+  }
+  if (response.data?.id) {
+    profileLog.info('readback success', {
+      userId: response.data.id,
+      username: response.data.username,
+    })
+  }
   return response.data
 }
 
