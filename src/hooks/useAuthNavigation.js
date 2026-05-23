@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
-import { isAdmin } from '../services/supabase/admin'
+import { isAdmin, isModeratorOrAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { publishAuthSuccessSnapshot } from '../services/supabase/auth'
 import { isProfileComplete } from '../utils/profileValidation'
@@ -17,7 +17,8 @@ export function useAuthNavigation() {
   const finalizeAuth = useCallback(
     async ({ userId, user, session, profile }) => {
       const admin = await isAdmin(userId)
-      setSupabaseAuth({ userId, isAdmin: admin, profile })
+      const moderatorOrAdmin = await isModeratorOrAdmin(userId)
+      setSupabaseAuth({ userId, isAdmin: admin, isModeratorOrAdmin: moderatorOrAdmin, profile })
 
       try {
         const remoteRows = await pullRemoteAlbum()

@@ -7,7 +7,7 @@ import {
 } from '../../utils/profileValidation'
 
 export const PROFILE_BASE_COLUMNS =
-  'id, username, avatar_url, is_admin, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note'
+  'id, username, avatar_url, is_admin, role, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note'
 
 export const PROFILE_IDENTITY_COLUMNS =
   'nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at'
@@ -20,7 +20,7 @@ export const PROFILE_FULL_COLUMNS = `${PROFILE_BASE_COLUMNS}, ${PROFILE_IDENTITY
 const LEGACY_COLUMNS = 'id, username, avatar_url, is_admin, created_at'
 
 function isMissingExtendedColumnError(error) {
-  return /nombre|apellido|dni|email|celular|auth_provider|profile_completed|last_login_at|updated_at|direccion_|localidad|provincia|pais|codigo_postal|album_status|album_review/i.test(
+  return /nombre|apellido|dni|email|celular|auth_provider|profile_completed|last_login_at|updated_at|direccion_|localidad|provincia|pais|codigo_postal|album_status|album_review|\brole\b/i.test(
     error?.message ?? '',
   )
 }
@@ -41,6 +41,7 @@ export function withProfileDefaults(profile) {
   if (!profile) return profile
   return {
     ...profile,
+    role: profile.role ?? (profile.is_admin ? 'admin' : 'user'),
     nombre: profile.nombre ?? null,
     apellido: profile.apellido ?? null,
     dni: profile.dni ?? null,
@@ -74,7 +75,6 @@ function buildProfilePayload(userId, input, address = null) {
     celular: normalizePhone(input.celular) || null,
     username: input.username?.trim() || null,
     auth_provider: input.auth_provider?.trim() || null,
-    is_admin: input.is_admin ?? false,
   }
 
   if (address) {
@@ -140,7 +140,6 @@ export async function upsertUserProfile(userId, input, address = null) {
     const legacyPayload = {
       id: userId,
       username: payload.username,
-      is_admin: false,
     }
     response = await supabase
       .from('profiles')
@@ -237,7 +236,6 @@ export async function ensureProfileFromAuthUser(authUser, provider = 'email') {
     apellido: parts.slice(1).join(' ') || null,
     auth_provider: provider,
     profile_completed: false,
-    is_admin: false,
   })
 }
 

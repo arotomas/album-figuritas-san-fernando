@@ -6,7 +6,7 @@ import {
   signOutSupabase,
 } from '../services/supabase/auth'
 import { touchProfileLogin } from '../services/supabase/profile'
-import { isAdmin } from '../services/supabase/admin'
+import { isAdmin, isModeratorOrAdmin } from '../services/supabase/admin'
 import { fetchPublicFigures } from '../services/supabase/figures'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { supabaseLog } from '../utils/supabaseLog'
@@ -61,12 +61,18 @@ export function useSupabaseBootstrap(enabled) {
         }
 
         const admin = await isAdmin(userId)
+        const moderatorOrAdmin = await isModeratorOrAdmin(userId)
         const remoteCatalog = await fetchPublicFigures()
 
         if (cancelled) return
 
         replaceCatalogFromRemote(remoteCatalog)
-        setSupabaseAuth({ userId, isAdmin: admin, profile })
+        setSupabaseAuth({
+          userId,
+          isAdmin: admin,
+          isModeratorOrAdmin: moderatorOrAdmin,
+          profile,
+        })
 
         const completed = isProfileComplete(profile)
         login({

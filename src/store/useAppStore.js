@@ -102,6 +102,7 @@ function resetStoreToDefaults() {
     supabaseUserId: null,
     supabaseReady: false,
     isSupabaseAdmin: false,
+    isSupabaseModerator: false,
     supabaseUsername: null,
     supabaseProfileId: null,
     supabaseProfileAddress: null,
@@ -171,6 +172,7 @@ export const useAppStore = create(
       supabaseUserId: null,
       supabaseReady: false,
       isSupabaseAdmin: false,
+      isSupabaseModerator: false,
       supabaseUsername: null,
       supabaseProfileId: null,
       supabaseProfileAddress: null,
@@ -191,6 +193,7 @@ export const useAppStore = create(
           supabaseUserId: null,
           supabaseReady: false,
           isSupabaseAdmin: false,
+          isSupabaseModerator: false,
           supabaseUsername: null,
           supabaseProfileId: null,
           supabaseProfileAddress: null,
@@ -198,11 +201,17 @@ export const useAppStore = create(
           supabaseProfile: null,
         }),
 
-      setSupabaseAuth: ({ userId, isAdmin = false, profile = null }) =>
+      setSupabaseAuth: ({
+        userId,
+        isAdmin = false,
+        isModeratorOrAdmin = false,
+        profile = null,
+      }) =>
         set({
           supabaseUserId: userId,
           supabaseReady: Boolean(userId),
           isSupabaseAdmin: isAdmin,
+          isSupabaseModerator: isModeratorOrAdmin,
           supabaseUsername: profile?.username ?? null,
           supabaseProfileId: profile?.id ?? null,
           supabaseProfileAddress: profile?.direccion_texto ?? null,
@@ -361,6 +370,7 @@ export const useAppStore = create(
           supabaseUserId: null,
           supabaseReady: false,
           isSupabaseAdmin: false,
+          isSupabaseModerator: false,
           supabaseUsername: null,
           supabaseProfileId: null,
           supabaseProfileAddress: null,
@@ -782,6 +792,7 @@ export const useAppStore = create(
           supabaseUserId: null,
           supabaseReady: false,
           isSupabaseAdmin: false,
+          isSupabaseModerator: false,
           supabaseUsername: null,
           supabaseProfileId: null,
           supabaseProfileAddress: null,

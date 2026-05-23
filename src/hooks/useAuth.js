@@ -14,6 +14,7 @@ import {
   updatePassword,
 } from '../services/supabase/auth'
 import { completeUserProfile, updateProfileFields } from '../services/supabase/profile'
+import { isAdminProfile, isModeratorOrAdminProfile } from '../utils/roles'
 import { authLog } from '../utils/authLog'
 import { useAuthNavigation } from './useAuthNavigation'
 
@@ -29,7 +30,6 @@ export function useAuth() {
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)
   const supabaseUserId = useAppStore((state) => state.supabaseUserId)
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
-  const isSupabaseAdmin = useAppStore((state) => state.isSupabaseAdmin)
   const loginStore = useAppStore((state) => state.login)
   const { finalizeAuth } = useAuthNavigation()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -152,7 +152,8 @@ export function useAuth() {
 
         setSupabaseAuth({
           userId: supabaseUserId,
-          isAdmin: isSupabaseAdmin,
+          isAdmin: isAdminProfile(profile),
+          isModeratorOrAdmin: isModeratorOrAdminProfile(profile),
           profile,
         })
         loginStore({
@@ -170,7 +171,6 @@ export function useAuth() {
       }
     },
     [
-      isSupabaseAdmin,
       location.search,
       loginStore,
       navigate,
@@ -204,7 +204,8 @@ export function useAuth() {
 
         setSupabaseAuth({
           userId: supabaseUserId,
-          isAdmin: isSupabaseAdmin,
+          isAdmin: isAdminProfile(profile),
+          isModeratorOrAdmin: isModeratorOrAdminProfile(profile),
           profile,
         })
 
@@ -215,7 +216,7 @@ export function useAuth() {
         setIsSubmitting(false)
       }
     },
-    [isSupabaseAdmin, setSupabaseAuth, supabaseProfile, supabaseUserId],
+    [setSupabaseAuth, supabaseProfile, supabaseUserId],
   )
 
   const forgotPassword = useCallback(async (email) => {

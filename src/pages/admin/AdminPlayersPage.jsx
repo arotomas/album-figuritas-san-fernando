@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  deletePlayer,
   getAdminPlayerDetail,
   getAdminPlayers,
   updatePlayerAlbumStatus,
+  updatePlayerRole,
 } from '../../services/supabase/adminPlayers'
 import {
   AdminErrorBanner,
@@ -19,8 +21,78 @@ import {
   AdminPlayerLocationMap,
   AdminPlayersDistributionMap,
 } from '../../components/admin/AdminPlayerLocationMap'
+import { useAppStore } from '../../store/useAppStore'
+import { formatRoleLabel, isSuperAdminProfile, PROFILE_ROLES } from '../../utils/roles'
+
+function RoleBadge({ role }) {
+  const styles = {
+    user: 'bg-slate-100 text-slate-700',
+    moderator: 'bg-sky-100 text-sky-800',
+    admin: 'bg-amber-100 text-amber-900',
+    super_admin: 'bg-violet-100 text-violet-900',
+  }
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+        styles[role] ?? styles.user
+      }`}
+    >
+      {formatRoleLabel(role)}
+    </span>
+  )
+}
+
+function DeleteUserModal({ player, confirmText, onConfirmTextChange, onCancel, onConfirm, busy }) {
+  const expected = player?.username ?? ''
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-6 shadow-2xl">
+        <h3 className="text-xl font-black text-red-700">Eliminar usuario permanentemente</h3>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          Esta acción borra la cuenta, el perfil y todos los datos asociados. No se puede deshacer.
+        </p>
+        <p className="mt-4 text-sm font-semibold text-ink">
+          Usuario: {player?.username ?? 'Sin username'} ({getFullName(player) || player?.email || player?.id})
+        </p>
+        <label className="mt-5 block text-xs font-bold uppercase tracking-wide text-muted">
+          Escribí <span className="font-mono normal-case">{expected}</span> para confirmar
+          <input
+            value={confirmText}
+            onChange={(event) => onConfirmTextChange(event.target.value)}
+            className="mt-2 block w-full rounded-xl border border-border px-3 py-2 text-sm normal-case tracking-normal text-ink"
+            placeholder={expected}
+            autoComplete="off"
+          />
+        </label>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy || confirmText.trim() !== expected}
+            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Eliminando…' : 'Eliminar usuario'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function AdminPlayersPage() {
+  const supabaseProfile = useAppStore((state) => state.supabaseProfile)
+  const supabaseUserId = useAppStore((state) => state.supabaseUserId)
+  const isSuperAdmin = isSuperAdminProfile(supabaseProfile)
   const [players, setPlayers] = useState([])
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
   const [playerDetail, setPlayerDetail] = useState(null)
@@ -29,6 +101,10 @@ export function AdminPlayersPage() {
   const [error, setError] = useState(null)
   const [albumReviewNote, setAlbumReviewNote] = useState('')
   const [photoPreview, setPhotoPreview] = useState(null)
+  const [roleUpdating, setRoleUpdating] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [playerFilters, setPlayerFilters] = useState({
     query: '',
     username: '',
@@ -146,6 +222,57 @@ export function AdminPlayersPage() {
     }
   }
 
+  const handleRoleChange = async (nextRole) => {
+    if (!selectedPlayerId || !isSuperAdmin) return
+    setRoleUpdating(true)
+    setError(null)
+    try {
+      await updatePlayerRole(selectedPlayerId, nextRole)
+      await Promise.all([
+        loadPlayers({ silent: true }),
+        loadPlayerDetail(selectedPlayerId),
+      ])
+    } catch (roleError) {
+      const message = roleError?.message ?? String(roleError)
+      if (message === 'CANNOT_CHANGE_OWN_ROLE') {
+        setError('No podés cambiar tu propio rol.')
+      } else if (message === 'FORBIDDEN') {
+        setError('Solo un super admin puede cambiar roles.')
+      } else {
+        setError('No pudimos actualizar el rol del usuario.')
+      }
+    } finally {
+      setRoleUpdating(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!selectedPlayerId || !isSuperAdmin || !playerDetail) return
+    setDeleteBusy(true)
+    setError(null)
+    try {
+      await deletePlayer(selectedPlayerId)
+      setDeleteModalOpen(false)
+      setDeleteConfirmText('')
+      setSelectedPlayerId(null)
+      setPlayerDetail(null)
+      await loadPlayers({ silent: true })
+    } catch (deleteError) {
+      const message = deleteError?.message ?? String(deleteError)
+      if (message === 'CANNOT_DELETE_SELF') {
+        setError('No podés eliminar tu propia cuenta desde el panel.')
+      } else if (message === 'CANNOT_DELETE_LAST_SUPER_ADMIN') {
+        setError('No se puede eliminar al último super admin.')
+      } else if (message === 'FORBIDDEN') {
+        setError('Solo un super admin puede eliminar usuarios.')
+      } else {
+        setError('No pudimos eliminar el usuario.')
+      }
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
     <>
@@ -259,6 +386,7 @@ export function AdminPlayersPage() {
               <thead className="sticky top-0 bg-white text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3">Jugador</th>
+                  <th className="px-4 py-3">Rol</th>
                   <th className="px-4 py-3">Localidad</th>
                   <th className="px-4 py-3">Alta</th>
                   <th className="px-4 py-3">Principal</th>
@@ -281,6 +409,9 @@ export function AdminPlayersPage() {
                       <p className="font-semibold">{player.username ?? 'Sin usuario'}</p>
                       <p className="text-xs text-muted">{getFullName(player) || player.email || '-'}</p>
                     </td>
+                    <td className="px-4 py-3">
+                      <RoleBadge role={player.role ?? 'user'} />
+                    </td>
                     <td className="px-4 py-3 text-xs">{player.localidad ?? '-'}</td>
                     <td className="px-4 py-3 text-xs">{formatDate(player.created_at)}</td>
                     <td className="px-4 py-3 font-mono text-xs">
@@ -296,7 +427,7 @@ export function AdminPlayersPage() {
                 ))}
                 {!filteredPlayers.length && !loading && (
                   <tr>
-                    <td colSpan="8" className="px-4 py-10 text-center text-muted">
+                    <td colSpan="9" className="px-4 py-10 text-center text-muted">
                       No hay jugadores para los filtros seleccionados.
                     </td>
                   </tr>
@@ -325,6 +456,27 @@ export function AdminPlayersPage() {
                     <p className="mt-1 font-mono text-xs text-muted">{playerDetail.profile.id}</p>
                   </div>
                   <ReviewBadge status={playerDetail.profile.album_status ?? 'pending'} />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <RoleBadge role={playerDetail.profile.role ?? 'user'} />
+                  {isSuperAdmin && selectedPlayerId !== supabaseUserId && (
+                    <label className="text-xs font-bold uppercase tracking-wide text-muted">
+                      Cambiar rol
+                      <select
+                        value={playerDetail.profile.role ?? 'user'}
+                        disabled={roleUpdating}
+                        onChange={(event) => handleRoleChange(event.target.value)}
+                        className="ml-2 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      >
+                        {PROFILE_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {formatRoleLabel(role)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
@@ -376,6 +528,26 @@ export function AdminPlayersPage() {
                   )}
                 </div>
               </div>
+
+              {isSuperAdmin && selectedPlayerId !== supabaseUserId && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 shadow-sm">
+                  <h4 className="text-lg font-black text-red-800">Zona crítica</h4>
+                  <p className="mt-2 text-sm leading-6 text-red-900/80">
+                    Eliminar un usuario borra su cuenta y todo su progreso. Solo super admins pueden
+                    hacerlo.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteConfirmText('')
+                      setDeleteModalOpen(true)
+                    }}
+                    className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
+                  >
+                    Eliminar usuario
+                  </button>
+                </div>
+              )}
 
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <h4 className="text-lg font-black">Revisión de álbum</h4>
@@ -490,6 +662,20 @@ export function AdminPlayersPage() {
       </div>
 
       <PhotoPreviewModal preview={photoPreview} onClose={() => setPhotoPreview(null)} />
+
+      {deleteModalOpen && playerDetail && (
+        <DeleteUserModal
+          player={playerDetail.profile}
+          confirmText={deleteConfirmText}
+          onConfirmTextChange={setDeleteConfirmText}
+          onCancel={() => {
+            setDeleteModalOpen(false)
+            setDeleteConfirmText('')
+          }}
+          onConfirm={handleDeleteUser}
+          busy={deleteBusy}
+        />
+      )}
     </>
     </div>
   )

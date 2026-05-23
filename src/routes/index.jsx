@@ -5,7 +5,7 @@ import { AuthLayout } from '../layouts/AuthLayout'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { ProtectedRoute, GuestRoute, ProfileSetupRoute } from './ProtectedRoute'
 import { RootRedirect } from './RootRedirect'
-import { AdminRoute } from './AdminRoute'
+import { AdminRoute, AdminRoleGate } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
 
 const LoginScreen = lazy(() =>
@@ -187,9 +187,11 @@ export function AppRoutes() {
           <Route
             index
             element={
-              <LazyPage>
-                <AdminDashboardPage />
-              </LazyPage>
+              <AdminRoleGate minRole="admin">
+                <LazyPage>
+                  <AdminDashboardPage />
+                </LazyPage>
+              </AdminRoleGate>
             }
           />
           <Route
@@ -203,9 +205,11 @@ export function AppRoutes() {
           <Route
             path="figures"
             element={
-              <LazyPage>
-                <AdminFiguresPage />
-              </LazyPage>
+              <AdminRoleGate minRole="admin">
+                <LazyPage>
+                  <AdminFiguresPage />
+                </LazyPage>
+              </AdminRoleGate>
             }
           />
           <Route
@@ -219,9 +223,11 @@ export function AppRoutes() {
           <Route
             path="map"
             element={
-              <LazyPage>
-                <AdminMapPage />
-              </LazyPage>
+              <AdminRoleGate minRole="admin">
+                <LazyPage>
+                  <AdminMapPage />
+                </LazyPage>
+              </AdminRoleGate>
             }
           />
         </Route>

@@ -1,15 +1,18 @@
 import { supabase } from '../../lib/supabase'
 import { getSessionUserId } from './auth'
 import { getBonusFigures, getMainProgressState } from '../../utils/figureGameRules'
+import { PROFILE_ROLES } from '../../utils/roles'
 
 const PROFILE_COLUMNS =
-  'id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
+  'id, username, role, is_admin, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
 
 const FIGURE_COLUMNS =
   'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
 
 const CAPTURE_COLUMNS =
   'id, user_id, figure_id, lat, lng, created_at, photo_url, device, validation_status, reviewed_at, reviewed_by, review_note'
+
+const VALID_ROLES = PROFILE_ROLES
 
 const VALID_REVIEW_STATUSES = ['pending', 'approved', 'rejected']
 
@@ -20,6 +23,19 @@ function logAdminPlayers(message, detail) {
 function assertReviewStatus(status) {
   if (!VALID_REVIEW_STATUSES.includes(status)) {
     throw new Error('INVALID_REVIEW_STATUS')
+  }
+}
+
+function assertRole(role) {
+  if (!VALID_ROLES.includes(role)) {
+    throw new Error('INVALID_ROLE')
+  }
+}
+
+function mapRoleFallback(profile) {
+  return {
+    ...profile,
+    role: profile.role ?? (profile.is_admin ? 'admin' : 'user'),
   }
 }
 
@@ -41,6 +57,8 @@ async function fetchProfiles() {
     const fallback = await supabase.from('profiles').select('id, username, created_at')
     data = fallback.data?.map((profile) => ({
       ...profile,
+      role: 'user',
+      is_admin: false,
       album_status: 'pending',
       album_reviewed_at: null,
       album_reviewed_by: null,
@@ -74,6 +92,8 @@ async function fetchProfiles() {
       .select('id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note')
     data = fallback.data?.map((profile) => ({
       ...profile,
+      role: profile.role ?? 'user',
+      is_admin: profile.is_admin ?? false,
       nombre: null,
       apellido: null,
       dni: null,
@@ -95,7 +115,7 @@ async function fetchProfiles() {
   }
 
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map(mapRoleFallback)
 }
 
 async function fetchFigures() {
@@ -285,4 +305,50 @@ export async function updateCaptureValidation(captureId, status, note = '') {
   if (error) throw error
   logAdminPlayers('capture status updated', { captureId, status })
   return data
+}
+
+export async function updatePlayerRole(userId, role) {
+  assertRole(role)
+  if (!userId) throw new Error('MISSING_USER_ID')
+
+  const { data, error } = await supabase.rpc('super_admin_update_user_role', {
+    target_user_id: userId,
+    new_role: role,
+  })
+
+  if (error) {
+    if (/cannot_change_own_role/i.test(error.message ?? '')) {
+      throw new Error('CANNOT_CHANGE_OWN_ROLE')
+    }
+    if (/forbidden/i.test(error.message ?? '')) {
+      throw new Error('FORBIDDEN')
+    }
+    throw error
+  }
+
+  logAdminPlayers('role updated', { userId, role })
+  return mapRoleFallback(data)
+}
+
+export async function deletePlayer(userId) {
+  if (!userId) throw new Error('MISSING_USER_ID')
+
+  const { error } = await supabase.rpc('super_admin_delete_user', {
+    target_user_id: userId,
+  })
+
+  if (error) {
+    if (/cannot_delete_self/i.test(error.message ?? '')) {
+      throw new Error('CANNOT_DELETE_SELF')
+    }
+    if (/cannot_delete_last_super_admin/i.test(error.message ?? '')) {
+      throw new Error('CANNOT_DELETE_LAST_SUPER_ADMIN')
+    }
+    if (/forbidden/i.test(error.message ?? '')) {
+      throw new Error('FORBIDDEN')
+    }
+    throw error
+  }
+
+  logAdminPlayers('user deleted', { userId })
 }

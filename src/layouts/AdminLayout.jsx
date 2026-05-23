@@ -1,11 +1,13 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAppStore } from '../store/useAppStore'
+import { hasMinimumRole } from '../utils/roles'
 
 const NAV_ITEMS = [
-  { to: '/admin', end: true, label: 'Dashboard' },
-  { to: '/admin/players', label: 'Jugadores' },
-  { to: '/admin/figures', label: 'Figuritas' },
-  { to: '/admin/captures', label: 'Capturas' },
-  { to: '/admin/map', label: 'Mapa' },
+  { to: '/admin', end: true, label: 'Dashboard', minRole: 'admin' },
+  { to: '/admin/players', label: 'Jugadores', minRole: 'moderator' },
+  { to: '/admin/figures', label: 'Figuritas', minRole: 'admin' },
+  { to: '/admin/captures', label: 'Capturas', minRole: 'moderator' },
+  { to: '/admin/map', label: 'Mapa', minRole: 'admin' },
 ]
 
 const PAGE_TITLES = {
@@ -24,7 +26,11 @@ function navLinkClass({ isActive }) {
 
 export function AdminLayout() {
   const location = useLocation()
+  const supabaseProfile = useAppStore((state) => state.supabaseProfile)
   const pageTitle = PAGE_TITLES[location.pathname] ?? 'Administración'
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    hasMinimumRole(supabaseProfile, item.minRole),
+  )
 
   return (
     <>
@@ -50,7 +56,7 @@ export function AdminLayout() {
           </div>
 
           <nav className="mt-10 space-y-2 text-sm font-semibold">
-            {NAV_ITEMS.map((item) => (
+            {visibleNavItems.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
                 {item.label}
               </NavLink>

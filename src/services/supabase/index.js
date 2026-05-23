@@ -16,7 +16,7 @@ export {
   formatAuthErrorMessage,
 } from './auth'
 
-export { isAdmin } from './admin'
+export { isAdmin, isModeratorOrAdmin, isSuperAdmin, getProfileAccess } from './admin'
 
 export {
   uploadCapturePhoto,
@@ -47,6 +47,8 @@ export {
   getAdminPlayerDetail,
   updatePlayerAlbumStatus,
   updateCaptureValidation,
+  updatePlayerRole,
+  deletePlayer,
 } from './adminPlayers'
 
 export {

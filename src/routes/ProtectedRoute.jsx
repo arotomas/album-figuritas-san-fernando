@@ -8,6 +8,7 @@ export function ProtectedRoute({ children, requireCompleteProfile = true }) {
   const supabaseUserId = useAppStore((state) => state.supabaseUserId)
   const profileCompleted = useAppStore((state) => state.profileCompleted)
   const isSupabaseAdmin = useAppStore((state) => state.isSupabaseAdmin)
+  const isSupabaseModerator = useAppStore((state) => state.isSupabaseModerator)
   const location = useLocation()
 
   if (!authBootstrapped) {
@@ -18,7 +19,7 @@ export function ProtectedRoute({ children, requireCompleteProfile = true }) {
     return <Navigate to={`/login${location.search}`} replace />
   }
 
-  if (requireCompleteProfile && !profileCompleted && !isSupabaseAdmin) {
+  if (requireCompleteProfile && !profileCompleted && !isSupabaseAdmin && !isSupabaseModerator) {
     return <Navigate to={`/profile-setup${location.search}`} replace />
   }
 
