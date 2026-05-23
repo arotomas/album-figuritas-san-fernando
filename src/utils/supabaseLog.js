@@ -25,6 +25,7 @@ export const supabaseLog = {
   upload: {
     info: (message, detail) => emit('upload', 'info', message, detail),
     warn: (message, detail) => emit('upload', 'warn', message, detail),
+    error: (message, detail) => emit('upload', 'warn', message, detail),
   },
   figures: {
     info: (message, detail) => emit('figures', 'info', message, detail),

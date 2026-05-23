@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { isSupabaseConfigured } from '../../services/supabase/auth'
+import { testStorageUpload } from '../../services/supabase/storage'
 import {
   buildAuthDebugSnapshot,
   getSupabaseProjectRef,
@@ -17,6 +18,21 @@ export function AuthDebugPanel({ className = '' }) {
   const snapshot = useAuthDebugStore((state) => state.snapshot)
   const [live, setLive] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [storageTest, setStorageTest] = useState(null)
+  const [storageTesting, setStorageTesting] = useState(false)
+
+  const handleTestStorage = async () => {
+    setStorageTesting(true)
+    setStorageTest(null)
+    try {
+      const result = await testStorageUpload()
+      setStorageTest(result)
+    } catch (error) {
+      setStorageTest({ ok: false, reason: error?.message ?? String(error) })
+    } finally {
+      setStorageTesting(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -120,6 +136,22 @@ export function AuthDebugPanel({ className = '' }) {
       </dl>
 
       {loading && <p className="mt-2 text-amber-800">Refreshing live auth state…</p>}
+
+      <button
+        type="button"
+        onClick={handleTestStorage}
+        disabled={storageTesting || !isSupabaseConfigured()}
+        className="mt-3 w-full rounded-lg border border-amber-500 bg-amber-100 px-3 py-2 text-[11px] font-semibold text-amber-950 disabled:opacity-50"
+      >
+        {storageTesting ? 'Probando storage…' : 'Test storage upload (JPEG mínimo)'}
+      </button>
+
+      {storageTest && (
+        <p className="mt-2 break-all text-[10px] text-amber-950">
+          Storage test: {storageTest.ok ? 'OK' : 'FAIL'} —{' '}
+          {storageTest.publicUrl ?? storageTest.reason ?? JSON.stringify(storageTest.error ?? storageTest)}
+        </p>
+      )}
     </div>
   )
 }

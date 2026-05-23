@@ -1,6 +1,6 @@
 import { QA_TEST_FIGURE_ID_PREFIX } from '../../config/qaConstants'
 import { supabaseLog } from '../../utils/supabaseLog'
-import { getCurrentUserId, isSupabaseConfigured } from './auth'
+import { getSessionUserId, isSupabaseConfigured } from './auth'
 import { fetchUserFigures, upsertUserFigure } from './figures'
 import { insertCapture } from './captures'
 import { uploadCapturePhoto } from './storage'
@@ -14,7 +14,7 @@ function resolveRealFigureId(figureId, qaTargetFigureId = null) {
 }
 
 /**
- * Sincroniza unlock remoto. No lanza — devuelve { ok, remotePhotoUrl }.
+ * Sincroniza unlock remoto. No lanza — devuelve { ok, remotePhotoUrl, uploadError }.
  */
 export async function syncUnlockToSupabase({
   figureId,
@@ -31,7 +31,7 @@ export async function syncUnlockToSupabase({
   }
 
   try {
-    const userId = await getCurrentUserId()
+    const userId = await getSessionUserId()
     if (!userId) {
       supabaseLog.sync.warn('skipped — no auth session')
       return { ok: false, reason: 'no_session' }
@@ -46,13 +46,41 @@ export async function syncUnlockToSupabase({
       userId,
       figureId: realFigureId,
       source: syncSource,
+      fotoType: foto?.startsWith('data:')
+        ? 'dataUrl'
+        : foto?.startsWith('http')
+          ? 'remoteUrl'
+          : typeof foto,
+      fotoSizeBytes,
     })
 
     let remotePhotoUrl = null
+    let uploadError = null
+
     if (foto?.startsWith('data:')) {
-      remotePhotoUrl = await uploadCapturePhoto({ userId, dataUrl: foto })
+      const uploadResult = await uploadCapturePhoto({ userId, dataUrl: foto })
+
+      if (uploadResult.ok && uploadResult.publicUrl) {
+        remotePhotoUrl = uploadResult.publicUrl
+        supabaseLog.sync.info('unlock sync — photo uploaded', {
+          path: uploadResult.path,
+          publicUrl: remotePhotoUrl,
+        })
+      } else {
+        uploadError = uploadResult
+        supabaseLog.sync.warn('unlock sync — photo upload failed', {
+          reason: uploadResult.reason,
+          error: uploadResult.error,
+          path: uploadResult.path,
+        })
+      }
     } else if (foto?.startsWith('http')) {
       remotePhotoUrl = foto
+      supabaseLog.sync.info('unlock sync — using existing remote url', { publicUrl: remotePhotoUrl })
+    } else if (foto) {
+      supabaseLog.sync.warn('unlock sync — unsupported foto format for upload', {
+        fotoPrefix: String(foto).slice(0, 32),
+      })
     }
 
     await upsertUserFigure({
@@ -74,13 +102,27 @@ export async function syncUnlockToSupabase({
       })
     }
 
+    if (foto?.startsWith('data:') && !remotePhotoUrl) {
+      supabaseLog.sync.warn('unlock sync partial — figure saved without storage photo', {
+        figureId: realFigureId,
+        uploadError,
+      })
+      return {
+        ok: true,
+        remotePhotoUrl: null,
+        uploadError,
+        partial: true,
+        reason: 'upload_failed',
+      }
+    }
+
     supabaseLog.sync.info('unlock sync success', {
       figureId: realFigureId,
       hasRemotePhoto: Boolean(remotePhotoUrl),
       fotoSizeBytes,
     })
 
-    return { ok: true, remotePhotoUrl }
+    return { ok: true, remotePhotoUrl, uploadError }
   } catch (error) {
     supabaseLog.sync.warn('unlock sync failed — local fallback remains', {
       message: error?.message ?? String(error),
@@ -97,7 +139,7 @@ export async function pullRemoteAlbum() {
   if (!isSupabaseConfigured()) return []
 
   try {
-    const userId = await getCurrentUserId()
+    const userId = await getSessionUserId()
     if (!userId) return []
 
     const rows = await fetchUserFigures(userId)

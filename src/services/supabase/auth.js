@@ -61,6 +61,16 @@ export async function getCurrentUserId() {
   return user?.id ?? null
 }
 
+/** ID desde sesión local — para storage/sync sin round-trip extra. */
+export async function getSessionUserId() {
+  const response = await supabase.auth.getSession()
+  if (response.error) {
+    sessionDebug.error('getSessionUserId failed', { message: response.error.message })
+    return null
+  }
+  return response.data.session?.user?.id ?? null
+}
+
 async function clearLocalAuthSession() {
   logSessionPhase('before login — signOut local scope')
   const { error } = await supabase.auth.signOut({ scope: 'local' })
