@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '../layouts/AppLayout'
 import { AuthLayout } from '../layouts/AuthLayout'
 import { ProtectedRoute, GuestRoute } from './ProtectedRoute'
+import { AdminRoute } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
 
 const SplashScreen = lazy(() =>
@@ -25,6 +26,9 @@ const MyFiguresScreen = lazy(() =>
 )
 const OptionsScreen = lazy(() =>
   import('../pages/OptionsScreen').then((m) => ({ default: m.OptionsScreen })),
+)
+const AdminScreen = lazy(() =>
+  import('../pages/AdminScreen').then((m) => ({ default: m.AdminScreen })),
 )
 
 function LazyPage({ children }) {
@@ -108,6 +112,19 @@ export function AppRoutes() {
           }
         />
       </Route>
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <LazyPage>
+                <AdminScreen />
+              </LazyPage>
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
