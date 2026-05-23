@@ -67,6 +67,10 @@ export function mergeFiguresWithTemplate(storedFigures) {
       reveal_radius: 200,
       marker_icon_url: null,
       marker_icon_size: 48,
+      challenge_title: null,
+      challenge_description: null,
+      challenge_type: null,
+      challenge_example_image_url: null,
     }
     if (!stored) return { ...template, ...defaults }
 

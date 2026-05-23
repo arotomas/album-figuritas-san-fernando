@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase'
 import { adminLog } from '../../utils/adminLog'
 
 const FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, created_at'
+  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
 
 function isPermissionError(error) {
   return (
@@ -104,7 +104,7 @@ export async function getFiguresAdmin() {
 
   if (
     error &&
-    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size/i.test(error.message ?? '')
+    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size|challenge_title|challenge_description|challenge_type|challenge_example_image_url/i.test(error.message ?? '')
   ) {
     const fallback = await supabase
       .from('figures')
@@ -122,6 +122,10 @@ export async function getFiguresAdmin() {
       reveal_radius: 200,
       marker_icon_url: null,
       marker_icon_size: 48,
+      challenge_title: null,
+      challenge_description: null,
+      challenge_type: null,
+      challenge_example_image_url: null,
     }))
     error = fallback.error
   }
@@ -154,6 +158,10 @@ function normalizeFigurePayload(figure) {
     reveal_radius: Number(figure.reveal_radius) || 200,
     marker_icon_url: figure.marker_icon_url?.trim() || null,
     marker_icon_size: Number(figure.marker_icon_size) || 48,
+    challenge_title: figure.challenge_title?.trim() || null,
+    challenge_description: figure.challenge_description?.trim() || null,
+    challenge_type: figure.challenge_type?.trim() || null,
+    challenge_example_image_url: figure.challenge_example_image_url?.trim() || null,
     active: Boolean(figure.active),
   }
 }

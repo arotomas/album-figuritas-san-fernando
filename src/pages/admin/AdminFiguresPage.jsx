@@ -22,6 +22,7 @@ import {
   toFigureForm,
   validateFigureForm,
 } from '../../components/admin/adminShared'
+import { CHALLENGE_TYPES, getFigureChallenge } from '../../utils/figureChallenges'
 
 export function AdminFiguresPage() {
   const [figures, setFigures] = useState([])
@@ -79,6 +80,7 @@ export function AdminFiguresPage() {
   )
 
   const figureFormPlacement = useMemo(() => getGamePlacement(figureForm), [figureForm])
+  const challengePreview = useMemo(() => getFigureChallenge(figureForm), [figureForm])
 
   const updateFigureFilter = (key, value) => {
     setFigureFilters((current) => ({ ...current, [key]: value }))
@@ -116,6 +118,16 @@ export function AdminFiguresPage() {
 
   const updateFigureForm = (key, value) => {
     setFigureForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const updateChallengeType = (value) => {
+    const preset = CHALLENGE_TYPES.find((item) => item.id === value)
+    setFigureForm((current) => ({
+      ...current,
+      challenge_type: value,
+      challenge_title: current.challenge_title || preset?.title || '',
+      challenge_description: current.challenge_description || preset?.description || '',
+    }))
   }
 
   const handleToggleFigure = async (figure) => {
@@ -351,6 +363,90 @@ export function AdminFiguresPage() {
                     className="mt-1 block w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
                   />
                 </label>
+
+                <div className="rounded-2xl border border-progress/30 bg-progress/10 p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-muted">
+                    Consigna de captura
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    Misión visual que el jugador verá antes de abrir la cámara.
+                  </p>
+
+                  <div className="mt-4 space-y-3">
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Tipo de challenge
+                      <select
+                        value={figureForm.challenge_type}
+                        onChange={(event) => updateChallengeType(event.target.value)}
+                        className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      >
+                        <option value="">Sin consigna</option>
+                        {CHALLENGE_TYPES.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Título corto
+                      <input
+                        value={figureForm.challenge_title}
+                        onChange={(event) => updateFigureForm('challenge_title', event.target.value)}
+                        placeholder="Ej: Cartel visible"
+                        className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      />
+                    </label>
+
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Instrucción / descripción
+                      <textarea
+                        value={figureForm.challenge_description}
+                        onChange={(event) =>
+                          updateFigureForm('challenge_description', event.target.value)
+                        }
+                        rows="3"
+                        placeholder="Sacá la foto donde se vea el cartel principal completo."
+                        className="mt-1 block w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      />
+                    </label>
+
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Imagen ejemplo URL
+                      <input
+                        value={figureForm.challenge_example_image_url}
+                        onChange={(event) =>
+                          updateFigureForm('challenge_example_image_url', event.target.value)
+                        }
+                        placeholder="https://..."
+                        className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      />
+                    </label>
+                  </div>
+
+                  {challengePreview && (
+                    <div className="mt-4 rounded-2xl border border-border bg-white p-4">
+                      <p className="text-xs font-black uppercase tracking-wide text-muted">
+                        Preview jugador
+                      </p>
+                      <p className="mt-2 text-lg font-black text-ink">{challengePreview.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-muted">
+                        {challengePreview.description}
+                      </p>
+                      {challengePreview.extraTip && (
+                        <p className="mt-2 text-xs text-muted">{challengePreview.extraTip}</p>
+                      )}
+                      {challengePreview.exampleUrl && (
+                        <img
+                          src={challengePreview.exampleUrl}
+                          alt="Preview consigna"
+                          className="mt-3 aspect-[4/3] w-full rounded-xl object-cover ring-1 ring-border"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block text-xs font-bold uppercase tracking-wide text-muted">

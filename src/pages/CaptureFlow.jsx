@@ -7,6 +7,7 @@ import { CameraAccessGate } from '../components/camera/CameraAccessGate'
 import { PermissionFallback } from '../components/qa/PermissionFallback'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useCaptureFlow, CAPTURE_PHASES } from '../hooks/useCaptureFlow'
+import { CaptureChallengeInterstitial } from '../components/camera/CaptureChallengeInterstitial'
 import { useAppLifecycle } from '../hooks/useAppLifecycle'
 import { useAppStore } from '../store/useAppStore'
 import { stopVibration } from '../utils/vibration'
@@ -90,6 +91,7 @@ export function CaptureFlow() {
     capture,
     captureFromFile,
     openNativeCapture,
+    acknowledgeChallenge,
     compressedPhoto,
     captureError,
     rewardFigure,
@@ -123,7 +125,10 @@ export function CaptureFlow() {
     phase === CAPTURE_PHASES.PHOTO_UPDATED ||
     phase === CAPTURE_PHASES.DONE
 
+  const isChallengePhase = phase === CAPTURE_PHASES.CHALLENGE
+
   const isCaptureSessionActive =
+    isChallengePhase ||
     isPostCapturePhase ||
     phase === CAPTURE_PHASES.CAPTURING ||
     phase === CAPTURE_PHASES.COMPRESSING ||
@@ -148,6 +153,7 @@ export function CaptureFlow() {
 
   useLayoutEffect(() => {
     if (!isMobileNative) return
+    if (phase === CAPTURE_PHASES.CHALLENGE) return
     if (nativePickerOpenedRef.current) return
     if (!displayFigure) return
     if (isPostCapturePhase || isProcessing) return
@@ -298,6 +304,16 @@ export function CaptureFlow() {
     geoErrorType === 'timeout' || geoErrorType === 'unavailable'
   const needsGeoUi =
     geoPermissionDenied || (geoSignalIssue && !mapPosition && !geoLoading)
+
+  if (phase === CAPTURE_PHASES.CHALLENGE && displayFigure) {
+    return (
+      <CaptureChallengeInterstitial
+        figure={displayFigure}
+        onContinue={acknowledgeChallenge}
+        onClose={handleClose}
+      />
+    )
+  }
 
   if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
     return (

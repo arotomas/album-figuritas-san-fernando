@@ -21,8 +21,10 @@ import { getQaState, setQaFlag } from '../utils/diagnostics'
 import { cameraLog } from '../utils/cameraLog'
 import { captureLog, albumLog, rewardLog } from '../utils/devLog'
 import { mobilePhotoLog } from '../utils/mobilePhotoLog'
+import { hasCaptureChallenge } from '../utils/figureChallenges'
 
 export const CAPTURE_PHASES = {
+  CHALLENGE: 'challenge',
   CAMERA: 'camera',
   CAPTURING: 'capturing',
   COMPRESSING: 'compressing',
@@ -149,7 +151,9 @@ export function useCaptureFlow({
   const camera = useCamera()
   const isRetake = captureMode === 'retake'
 
-  const [phase, setPhase] = useState(CAPTURE_PHASES.CAMERA)
+  const [phase, setPhase] = useState(() =>
+    hasCaptureChallenge(figure) ? CAPTURE_PHASES.CHALLENGE : CAPTURE_PHASES.CAMERA,
+  )
   const [compressedPhoto, setCompressedPhoto] = useState(null)
   const [pendingFigure, setPendingFigure] = useState(null)
   const [capturedFigure, setCapturedFigure] = useState(null)
@@ -170,6 +174,17 @@ export function useCaptureFlow({
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
+
+  useEffect(() => {
+    if (hasCaptureChallenge(figure)) {
+      setPhase(CAPTURE_PHASES.CHALLENGE)
+      phaseRef.current = CAPTURE_PHASES.CHALLENGE
+      unlockSubmittedRef.current = false
+      return
+    }
+    setPhase(CAPTURE_PHASES.CAMERA)
+    phaseRef.current = CAPTURE_PHASES.CAMERA
+  }, [figure?.id, captureSession?.lockedAt])
 
   const activeFigure = pendingFigureRef.current ?? pendingFigure ?? figure
 
@@ -198,6 +213,11 @@ export function useCaptureFlow({
     phase === CAPTURE_PHASES.CAMERA &&
     !isProcessing &&
     Boolean(figure)
+
+  const acknowledgeChallenge = useCallback(() => {
+    setPhase(CAPTURE_PHASES.CAMERA)
+    phaseRef.current = CAPTURE_PHASES.CAMERA
+  }, [])
 
   const syncPendingState = useCallback((figureSnapshot, locationSnapshot) => {
     pendingFigureRef.current = figureSnapshot
@@ -989,6 +1009,7 @@ export function useCaptureFlow({
     capture,
     captureFromFile,
     openNativeCapture,
+    acknowledgeChallenge,
     retryCapture,
     clearPendingCapture,
     showRewardComplete,

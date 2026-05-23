@@ -2,6 +2,7 @@ import { m, AnimatePresence } from 'framer-motion'
 import { getRarity } from '../../theme/rarity'
 import { typeClasses } from '../../theme/typography'
 import { RarityBadge } from '../ui/RarityBadge'
+import { FigureChallengeCard } from './FigureChallengeCard'
 
 function formatCapturedAt(value) {
   if (!value) return null
@@ -66,6 +67,8 @@ export function FigureDetailSheet({ figure, open, onClose, onRetakePhoto }) {
                   Capturada: {formatCapturedAt(figure.obtenidaEn)}
                 </p>
               )}
+
+              <FigureChallengeCard figure={figure} />
 
               {obtained && (
                 <button

@@ -25,6 +25,10 @@ export const DEFAULT_FIGURE_FORM = {
   reveal_radius: 200,
   marker_icon_url: '',
   marker_icon_size: 48,
+  challenge_title: '',
+  challenge_description: '',
+  challenge_type: '',
+  challenge_example_image_url: '',
   active: true,
 }
 
@@ -127,6 +131,10 @@ export function toFigureForm(figure) {
     reveal_radius: figure.reveal_radius ?? 200,
     marker_icon_url: figure.marker_icon_url ?? '',
     marker_icon_size: figure.marker_icon_size ?? 48,
+    challenge_title: figure.challenge_title ?? '',
+    challenge_description: figure.challenge_description ?? '',
+    challenge_type: figure.challenge_type ?? '',
+    challenge_example_image_url: figure.challenge_example_image_url ?? '',
     active: Boolean(figure.active),
   }
 }

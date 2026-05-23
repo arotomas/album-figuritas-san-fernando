@@ -6,7 +6,7 @@ const PROFILE_COLUMNS =
   'id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note'
 
 const FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, created_at'
+  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
 
 const CAPTURE_COLUMNS =
   'id, user_id, figure_id, lat, lng, created_at, photo_url, device, validation_status, reviewed_at, reviewed_by, review_note'

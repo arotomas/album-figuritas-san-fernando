@@ -13,6 +13,7 @@ import {
   ReviewBadge,
   StatCard,
 } from '../../components/admin/adminShared'
+import { getFigureChallenge } from '../../utils/figureChallenges'
 
 export function AdminPlayersPage() {
   const [players, setPlayers] = useState([])
@@ -317,6 +318,21 @@ export function AdminPlayersPage() {
                               ? `Capturada: ${formatDate(figure.captured_at)}`
                               : 'Pendiente'}
                           </p>
+                          {(() => {
+                            const challenge = getFigureChallenge(figure)
+                            if (!challenge || !figure.obtenida) return null
+                            return (
+                              <div className="rounded-xl border border-progress/25 bg-progress/10 p-2.5">
+                                <p className="text-[10px] font-black uppercase tracking-wide text-ink">
+                                  Consigna
+                                </p>
+                                <p className="mt-1 text-xs font-bold text-ink">{challenge.title}</p>
+                                <p className="mt-1 text-[11px] leading-5 text-muted">
+                                  {challenge.description}
+                                </p>
+                              </div>
+                            )
+                          })()}
                           {figure.last_photo_updated_at && (
                             <p className="text-xs text-muted">
                               Foto actualizada: {formatDate(figure.last_photo_updated_at)}
