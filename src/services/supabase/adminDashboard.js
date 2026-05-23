@@ -1,6 +1,9 @@
 import { supabase } from '../../lib/supabase'
 import { adminLog } from '../../utils/adminLog'
 
+const FIGURE_COLUMNS =
+  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, created_at'
+
 function isPermissionError(error) {
   return (
     error?.code === '42501' ||
@@ -94,14 +97,118 @@ export async function getRecentCaptures(limit = 25) {
 }
 
 export async function getFiguresAdmin() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('figures')
-    .select('id, title, description, rarity, lat, lng, image_url, active, created_at')
+    .select(FIGURE_COLUMNS)
     .order('created_at', { ascending: true })
+
+  if (error && /capture_radius/i.test(error.message ?? '')) {
+    const fallback = await supabase
+      .from('figures')
+      .select('id, title, description, rarity, lat, lng, image_url, active, created_at')
+      .order('created_at', { ascending: true })
+
+    data = fallback.data?.map((figure) => ({ ...figure, capture_radius: 250 }))
+    error = fallback.error
+  }
 
   if (error) handleAdminError('figures', error)
   adminLog.info('figures loaded', { count: data?.length ?? 0 })
   return data ?? []
+}
+
+function logFigureCrud(level, message, detail) {
+  const tag = '[admin-figures]'
+  if (level === 'error') console.error(tag, message, detail)
+  else console.info(tag, message, detail)
+}
+
+function normalizeFigurePayload(figure) {
+  return {
+    title: figure.title.trim(),
+    description: figure.description?.trim() || null,
+    rarity: figure.rarity,
+    image_url: figure.image_url?.trim() || null,
+    lat: Number(figure.lat),
+    lng: Number(figure.lng),
+    capture_radius: Number(figure.capture_radius) || 250,
+    active: Boolean(figure.active),
+  }
+}
+
+function buildFigureId(title) {
+  const slug = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 42)
+
+  const suffix =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID().slice(0, 8)
+      : Date.now().toString(36)
+
+  return `${slug || 'figurita'}-${suffix}`
+}
+
+export async function createFigureAdmin(figure) {
+  const payload = {
+    id: figure.id || buildFigureId(figure.title),
+    ...normalizeFigurePayload(figure),
+  }
+
+  logFigureCrud('info', 'create start', { id: payload.id, title: payload.title })
+
+  const { data, error } = await supabase
+    .from('figures')
+    .insert(payload)
+    .select(FIGURE_COLUMNS)
+    .single()
+
+  if (error) {
+    logFigureCrud('error', 'create error', { message: error.message, code: error.code })
+    handleAdminError('create figure', error)
+  }
+
+  logFigureCrud('info', 'create success', { id: data.id })
+  return data
+}
+
+export async function updateFigureAdmin(id, figure) {
+  const payload = normalizeFigurePayload(figure)
+
+  logFigureCrud('info', 'update start', { id })
+
+  const { data, error } = await supabase
+    .from('figures')
+    .update(payload)
+    .eq('id', id)
+    .select(FIGURE_COLUMNS)
+    .single()
+
+  if (error) {
+    logFigureCrud('error', 'update error', { id, message: error.message, code: error.code })
+    handleAdminError('update figure', error)
+  }
+
+  logFigureCrud('info', 'update success', { id: data.id })
+  return data
+}
+
+export async function deleteFigureAdmin(id) {
+  logFigureCrud('info', 'delete start', { id })
+
+  const { error } = await supabase.from('figures').delete().eq('id', id)
+
+  if (error) {
+    logFigureCrud('error', 'delete error', { id, message: error.message, code: error.code })
+    handleAdminError('delete figure', error)
+  }
+
+  logFigureCrud('info', 'delete success', { id })
+  return { id }
 }
 
 export async function toggleFigureActive(id, nextActive) {

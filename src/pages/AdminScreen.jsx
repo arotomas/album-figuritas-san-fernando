@@ -1,11 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AdminFigureLocationPicker } from '../components/admin/AdminFigureLocationPicker'
 import { AdminMap } from '../components/admin/AdminMap'
 import {
+  createFigureAdmin,
+  deleteFigureAdmin,
   getAdminStats,
   getFiguresAdmin,
   getRecentCaptures,
   toggleFigureActive,
+  updateFigureAdmin,
 } from '../services/supabase/adminDashboard'
+
+const RARITY_OPTIONS = ['común', 'rara', 'épica', 'legendaria']
+const DEFAULT_FIGURE_FORM = {
+  title: '',
+  description: '',
+  rarity: 'común',
+  image_url: '',
+  lat: '',
+  lng: '',
+  capture_radius: 250,
+  active: true,
+}
 
 function formatDate(value) {
   if (!value) return '-'
@@ -25,6 +41,37 @@ function normalizeText(value) {
   return String(value ?? '').trim().toLowerCase()
 }
 
+function toFigureForm(figure) {
+  if (!figure) return DEFAULT_FIGURE_FORM
+
+  return {
+    title: figure.title ?? '',
+    description: figure.description ?? '',
+    rarity: figure.rarity ?? 'común',
+    image_url: figure.image_url ?? '',
+    lat: figure.lat ?? '',
+    lng: figure.lng ?? '',
+    capture_radius: figure.capture_radius ?? 250,
+    active: Boolean(figure.active),
+  }
+}
+
+function validateFigureForm(form) {
+  if (!form.title.trim()) return 'El título es obligatorio.'
+  if (!RARITY_OPTIONS.includes(form.rarity)) return 'La rareza no es válida.'
+  if (form.lat === '' || form.lng === '') return 'Latitud y longitud son obligatorias.'
+
+  const lat = Number(form.lat)
+  const lng = Number(form.lng)
+  const radius = Number(form.capture_radius || 250)
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) return 'La latitud no es válida.'
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) return 'La longitud no es válida.'
+  if (!Number.isFinite(radius) || radius <= 0) return 'El radio de captura no es válido.'
+
+  return null
+}
+
 export function AdminScreen() {
   const [stats, setStats] = useState(null)
   const [captures, setCaptures] = useState([])
@@ -32,6 +79,12 @@ export function AdminScreen() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [togglingId, setTogglingId] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
+  const [figureFormOpen, setFigureFormOpen] = useState(false)
+  const [editingFigureId, setEditingFigureId] = useState(null)
+  const [figureForm, setFigureForm] = useState(DEFAULT_FIGURE_FORM)
+  const [figureFormError, setFigureFormError] = useState(null)
+  const [figureSaving, setFigureSaving] = useState(false)
   const [filters, setFilters] = useState({
     user: '',
     figure: '',
@@ -114,6 +167,79 @@ export function AdminScreen() {
 
   const clearFilters = () => {
     setFilters({ user: '', figure: '', dateFrom: '', dateTo: '' })
+  }
+
+  const openNewFigureForm = () => {
+    setEditingFigureId(null)
+    setFigureForm(DEFAULT_FIGURE_FORM)
+    setFigureFormError(null)
+    setFigureFormOpen(true)
+  }
+
+  const openEditFigureForm = (figure) => {
+    setEditingFigureId(figure.id)
+    setFigureForm(toFigureForm(figure))
+    setFigureFormError(null)
+    setFigureFormOpen(true)
+  }
+
+  const updateFigureForm = (key, value) => {
+    setFigureForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const handleSaveFigure = async (event) => {
+    event.preventDefault()
+    const validationError = validateFigureForm(figureForm)
+    if (validationError) {
+      setFigureFormError(validationError)
+      return
+    }
+
+    setFigureSaving(true)
+    setFigureFormError(null)
+    setError(null)
+    try {
+      const saved = editingFigureId
+        ? await updateFigureAdmin(editingFigureId, figureForm)
+        : await createFigureAdmin(figureForm)
+
+      setFigures((current) => {
+        if (!editingFigureId) return [...current, saved]
+        return current.map((figure) => (figure.id === saved.id ? saved : figure))
+      })
+      setFigureFormOpen(false)
+      setEditingFigureId(null)
+      setFigureForm(DEFAULT_FIGURE_FORM)
+    } catch (saveError) {
+      setFigureFormError(saveError?.message ?? 'No pudimos guardar la figurita.')
+    } finally {
+      setFigureSaving(false)
+    }
+  }
+
+  const handleDeleteFigure = async (figure) => {
+    const confirmed = window.confirm(
+      `¿Eliminar "${figure.title}"? Si ya tiene capturas, Supabase puede impedirlo por seguridad.`,
+    )
+    if (!confirmed) return
+
+    setDeletingId(figure.id)
+    setError(null)
+    try {
+      await deleteFigureAdmin(figure.id)
+      setFigures((current) => current.filter((item) => item.id !== figure.id))
+      if (editingFigureId === figure.id) {
+        setFigureFormOpen(false)
+        setEditingFigureId(null)
+      }
+    } catch (deleteError) {
+      setError(
+        deleteError?.message ??
+          'No pudimos eliminar la figurita. Podés desactivarla si ya tiene capturas.',
+      )
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
@@ -340,22 +466,218 @@ export function AdminScreen() {
               id="figuritas"
               className="rounded-3xl border border-border bg-white p-6 shadow-sm"
             >
-              <h2 className="text-2xl font-black">Figuritas</h2>
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <h2 className="text-2xl font-black">Figuritas</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Administrá puntos reales del catálogo en Supabase.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openNewFigureForm}
+                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white"
+                >
+                  Nueva figurita
+                </button>
+              </div>
+
+              {figureFormOpen && (
+                <form
+                  onSubmit={handleSaveFigure}
+                  className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-black">
+                        {editingFigureId ? 'Editar figurita' : 'Nueva figurita'}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted">
+                        Los cambios se guardan directo en Supabase usando la sesión admin.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFigureFormOpen(false)
+                        setEditingFigureId(null)
+                        setFigureFormError(null)
+                      }}
+                      className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+
+                  {figureFormError && (
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                      {figureFormError}
+                    </div>
+                  )}
+
+                  <div className="mt-5 grid grid-cols-[420px_minmax(0,1fr)] gap-6">
+                    <div className="space-y-4">
+                      <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                        Título
+                        <input
+                          value={figureForm.title}
+                          onChange={(event) => updateFigureForm('title', event.target.value)}
+                          className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          required
+                        />
+                      </label>
+
+                      <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                        Descripción
+                        <textarea
+                          value={figureForm.description}
+                          onChange={(event) =>
+                            updateFigureForm('description', event.target.value)
+                          }
+                          rows="4"
+                          className="mt-1 block w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                        />
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Rareza
+                          <select
+                            value={figureForm.rarity}
+                            onChange={(event) => updateFigureForm('rarity', event.target.value)}
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          >
+                            {RARITY_OPTIONS.map((rarity) => (
+                              <option key={rarity} value={rarity}>
+                                {rarity}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Activa
+                          <select
+                            value={figureForm.active ? 'true' : 'false'}
+                            onChange={(event) =>
+                              updateFigureForm('active', event.target.value === 'true')
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          >
+                            <option value="true">Sí</option>
+                            <option value="false">No</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                        Imagen URL
+                        <input
+                          value={figureForm.image_url}
+                          onChange={(event) => updateFigureForm('image_url', event.target.value)}
+                          placeholder="https://..."
+                          className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                        />
+                      </label>
+
+                      {figureForm.image_url && (
+                        <img
+                          src={figureForm.image_url}
+                          alt="Preview figurita"
+                          className="h-32 w-32 rounded-2xl object-cover ring-1 ring-border"
+                        />
+                      )}
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Lat
+                          <input
+                            type="number"
+                            step="any"
+                            value={figureForm.lat}
+                            onChange={(event) => updateFigureForm('lat', event.target.value)}
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                            required
+                          />
+                        </label>
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Lng
+                          <input
+                            type="number"
+                            step="any"
+                            value={figureForm.lng}
+                            onChange={(event) => updateFigureForm('lng', event.target.value)}
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                            required
+                          />
+                        </label>
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Radio
+                          <input
+                            type="number"
+                            min="1"
+                            value={figureForm.capture_radius}
+                            onChange={(event) =>
+                              updateFigureForm('capture_radius', event.target.value)
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={figureSaving}
+                        className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        {figureSaving ? 'Guardando…' : 'Guardar figurita'}
+                      </button>
+                    </div>
+
+                    <AdminFigureLocationPicker
+                      lat={figureForm.lat}
+                      lng={figureForm.lng}
+                      radius={figureForm.capture_radius}
+                      onChange={({ lat, lng }) => {
+                        updateFigureForm('lat', lat)
+                        updateFigureForm('lng', lng)
+                      }}
+                    />
+                  </div>
+                </form>
+              )}
+
               <div className="mt-5 overflow-hidden rounded-2xl border border-border">
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
                     <tr>
+                      <th className="px-4 py-3">Imagen</th>
                       <th className="px-4 py-3">Title</th>
                       <th className="px-4 py-3">Rarity</th>
                       <th className="px-4 py-3">Active</th>
                       <th className="px-4 py-3">Lat</th>
                       <th className="px-4 py-3">Lng</th>
+                      <th className="px-4 py-3">Radio</th>
                       <th className="px-4 py-3">Acción</th>
                     </tr>
                   </thead>
                   <tbody>
                     {figures.map((figure) => (
                       <tr key={figure.id} className="border-t border-border/70">
+                        <td className="px-4 py-4">
+                          {figure.image_url ? (
+                            <img
+                              src={figure.image_url}
+                              alt={figure.title}
+                              className="h-14 w-14 rounded-xl object-cover ring-1 ring-border"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-xs text-muted">
+                              Sin imagen
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-4 font-semibold">{figure.title}</td>
                         <td className="px-4 py-4">{figure.rarity}</td>
                         <td className="px-4 py-4">
@@ -371,7 +693,18 @@ export function AdminScreen() {
                         </td>
                         <td className="px-4 py-4 font-mono text-xs">{figure.lat}</td>
                         <td className="px-4 py-4 font-mono text-xs">{figure.lng}</td>
+                        <td className="px-4 py-4 font-mono text-xs">
+                          {figure.capture_radius ?? 250}m
+                        </td>
                         <td className="px-4 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditFigureForm(figure)}
+                              className="rounded-xl border border-border bg-white px-4 py-2 text-xs font-bold"
+                            >
+                              Editar
+                            </button>
                           <button
                             type="button"
                             disabled={togglingId === figure.id}
@@ -380,6 +713,15 @@ export function AdminScreen() {
                           >
                             {figure.active ? 'Desactivar' : 'Activar'}
                           </button>
+                            <button
+                              type="button"
+                              disabled={deletingId === figure.id}
+                              onClick={() => handleDeleteFigure(figure)}
+                              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 disabled:opacity-50"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
