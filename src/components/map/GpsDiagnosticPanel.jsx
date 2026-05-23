@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { DEBUG_GPS } from '../../config/gps'
+import { useQaMode } from '../../utils/qaMode'
 import { useGpsDiagnostics } from '../../hooks/useGpsDiagnostics'
 import {
   buildGpsDiagnosticReport,
@@ -46,9 +47,10 @@ function GpsDiagnosticPanelInner({
   rawNearest,
   isNearFigure,
   nearFigure,
+  defaultExpanded = false,
 }) {
   const gps = useGpsDiagnostics() ?? {}
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const [copyState, setCopyState] = useState('idle')
 
   const reading = gps.lastRawReading ?? gps.previewPosition ?? gps.position
@@ -241,6 +243,8 @@ function GpsDiagnosticPanelInner({
 }
 
 export function GpsDiagnosticPanel(props) {
-  if (!DEBUG_GPS) return null
-  return <GpsDiagnosticPanelInner {...props} />
+  const { isQaActive } = useQaMode()
+  const visible = DEBUG_GPS || isQaActive
+  if (!visible) return null
+  return <GpsDiagnosticPanelInner {...props} defaultExpanded={DEBUG_GPS} />
 }

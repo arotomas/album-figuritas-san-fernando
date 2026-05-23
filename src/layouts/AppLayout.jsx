@@ -9,7 +9,10 @@ export function AppLayout() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       {isQaActive && (
-        <div className="safe-top safe-x shrink-0 border-b border-cyan-500/40 bg-cyan-100 px-4 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-900">
+        <div
+          data-qa-banner="true"
+          className="safe-top safe-x shrink-0 border-b border-cyan-500/40 bg-cyan-100 px-4 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-900"
+        >
           QA ENABLED
         </div>
       )}

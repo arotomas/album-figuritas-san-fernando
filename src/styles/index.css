@@ -75,9 +75,54 @@
     --app-height: 100dvh;
     --bottom-nav-height: 4.75rem;
     --bottom-nav-total: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
-    --app-header-height: 3.25rem;
-    --my-figures-header-height: 9.5rem;
-    --my-figures-carousel-height: 7.5rem;
+    --qa-banner-height: 0px;
+  }
+
+  .app-shell:has([data-qa-banner='true']) {
+    --qa-banner-height: 2rem;
+  }
+
+  .my-figures-screen {
+    height: 100%;
+    min-height: 0;
+    background-color: var(--color-warm-white);
+  }
+
+  .my-figures-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+  }
+
+  .my-figures-featured {
+    width: 100%;
+  }
+
+  .my-figures-card-slot {
+    max-width: 100%;
+  }
+
+  .my-figures-carousel-wrap {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .album-featured-image-compact {
+    max-height: min(24dvh, 168px);
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+  }
+
+  .my-figures-card-slot .font-display.text-lg {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  .my-figures-card-slot .font-body.text-xs.leading-relaxed {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .safe-top {
@@ -148,36 +193,6 @@
 
   .bottom-nav {
     min-height: var(--bottom-nav-height);
-  }
-
-  .my-figures-screen {
-    height: 100%;
-    min-height: 0;
-  }
-
-  .my-figures-scroll {
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .my-figures-featured {
-    min-height: min(100%, 100%);
-  }
-
-  .my-figures-card-slot {
-    max-height: calc(
-      100dvh - var(--app-header-height) - var(--bottom-nav-total) -
-        var(--my-figures-header-height) - var(--my-figures-carousel-height) - 2.5rem
-    );
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
-  .album-featured-image-compact {
-    max-height: min(28dvh, 200px);
-    width: 100%;
-    aspect-ratio: 4 / 5;
-    object-fit: cover;
   }
 
   .map-container .leaflet-container {

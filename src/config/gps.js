@@ -1,7 +1,8 @@
 /** Configuración GPS — optimizada para mobile urbano / caminando */
 
-/** Diagnóstico temporal en producción: badge en mapa + logs en consola */
-export const DEBUG_GPS = true
+/** Diagnóstico GPS: false en producción; activar con VITE_DEBUG_GPS=true o ?qa=1 */
+export const DEBUG_GPS =
+  typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEBUG_GPS === 'true'
 
 /** Opciones únicas: alta precisión, sin caché del SO */
 export const GPS_HIGH_ACCURACY_OPTIONS = {

@@ -13,6 +13,7 @@ import { stopVibration } from '../utils/vibration'
 import { PERMISSION_RETRY_DELAY_MS } from '../config/ux'
 import { delay } from '../utils/recovery'
 import { isNativeCameraOnly } from '../utils/device'
+import { useQaMode } from '../utils/qaMode'
 
 const RewardAnimation = lazy(() =>
   import('../components/reward/RewardAnimation').then((m) => ({
@@ -36,6 +37,7 @@ function RewardSkeleton() {
 
 export function CaptureFlow() {
   const navigate = useNavigate()
+  const { withQa } = useQaMode()
   const isMobileNative = isNativeCameraOnly()
   const nearFigure = useAppStore((state) => state.nearFigure)
   const captureSession = useAppStore((state) => state.captureSession)
@@ -226,8 +228,8 @@ export function CaptureFlow() {
     clearQaTestFigure()
     setNearFigure(null)
     nativePickerOpenedRef.current = false
-    navigate('/map', { replace: true })
-  }, [clearCaptureSession, clearQaTestFigure, complete, navigate, setNearFigure])
+    navigate(withQa('/my-figures'), { replace: true })
+  }, [clearCaptureSession, clearQaTestFigure, complete, navigate, setNearFigure, withQa])
 
   const handleRetryGeo = useCallback(async () => {
     requestPermission()

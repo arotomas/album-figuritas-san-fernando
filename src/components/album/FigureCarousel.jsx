@@ -35,7 +35,7 @@ export const FigureCarousel = memo(function FigureCarousel({
     <div
       ref={scrollRef}
       className={`flex shrink-0 gap-3 overflow-x-auto snap-x snap-mandatory ${
-        compact ? 'mt-2 px-4 pb-2 scroll-pl-4' : 'mt-5 px-6 pb-6 scroll-pl-6'
+        compact ? 'px-4 py-2 scroll-pl-4' : 'mt-5 px-6 pb-6 scroll-pl-6'
       }`}
       style={{ WebkitOverflowScrolling: 'touch' }}
     >

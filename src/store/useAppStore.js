@@ -92,8 +92,9 @@ function applyFigureUpdate(state, figureId, patch) {
   return {
     figures,
     lastObtenidaFigureId: figureId,
+    lastViewedFigureId: figureId,
     lastSavedAt: Date.now(),
-    albumStatus: computeAlbumStatus(figures, state.lastViewedFigureId),
+    albumStatus: computeAlbumStatus(figures, figureId),
   }
 }
 

@@ -82,7 +82,7 @@ export function UnlockAnimation({ onComplete }) {
         transition={{ delay: 1.1 }}
         className="relative z-10 mt-8 font-body text-xs text-white/35"
       >
-        Volviendo al mapa…
+        Yendo a tu álbum…
       </m.p>
     </div>
   )
