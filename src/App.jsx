@@ -9,11 +9,13 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QAOverlay } from './components/qa/QAOverlay'
 import { AppSkeleton } from './components/performance/AppSkeleton'
 import { usePersistedAlbum } from './hooks/usePersistedAlbum'
+import { useSupabaseBootstrap } from './hooks/useSupabaseBootstrap'
 import { useAppStore } from './store/useAppStore'
 import { isDevMode } from './utils/devMode'
 
 function App() {
   const { hasHydrated } = usePersistedAlbum()
+  useSupabaseBootstrap(hasHydrated)
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
 

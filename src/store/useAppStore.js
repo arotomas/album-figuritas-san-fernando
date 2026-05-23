@@ -17,9 +17,11 @@ import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
 import { offsetCoordinates } from '../utils/geoOffset'
 import { getDistanceMeters } from '../utils/geo'
+import { syncUnlockToSupabase } from '../services/supabase/sync'
+import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
 import { canUseTestFigure } from '../utils/qaMode'
 
-export const QA_TEST_FIGURE_ID_PREFIX = 'qa-'
+export { QA_TEST_FIGURE_ID_PREFIX }
 
 const zustandStorage = createJSONStorage(() => createZustandStorage())
 
@@ -113,8 +115,62 @@ export const useAppStore = create(
       lastObtenidaFigureId: null,
       lastViewedFigureId: null,
       lastSavedAt: null,
+      supabaseUserId: null,
+      supabaseReady: false,
+      isSupabaseAdmin: false,
 
       setHasHydrated: (value) => set({ _hasHydrated: value }),
+
+      setSupabaseAuth: ({ userId, isAdmin = false }) =>
+        set({
+          supabaseUserId: userId,
+          supabaseReady: Boolean(userId),
+          isSupabaseAdmin: isAdmin,
+        }),
+
+      mergeRemoteUserFigures: (remoteRows) =>
+        set((state) => {
+          if (!Array.isArray(remoteRows) || remoteRows.length === 0) return state
+
+          const remoteById = new Map(
+            remoteRows.map((row) => [Number(row.figure_id) || row.figure_id, row]),
+          )
+
+          let changed = false
+          const figures = state.figures.map((figure) => {
+            const remote = remoteById.get(figure.id) ?? remoteById.get(String(figure.id))
+            if (!remote) return figure
+
+            const remoteTime = remote.captured_at
+              ? new Date(remote.captured_at).getTime()
+              : 0
+            const localTime = figure.obtenidaEn ?? 0
+
+            if (figure.obtenida && localTime >= remoteTime && figure.foto) {
+              return figure
+            }
+
+            changed = true
+            return {
+              ...figure,
+              obtenida: true,
+              obtenidaEn: remoteTime || figure.obtenidaEn || Date.now(),
+              foto: remote.photo_url ?? figure.foto,
+            }
+          })
+
+          if (!changed) return state
+
+          const obtenidas = figures.filter((f) => f.obtenida).length
+          return {
+            figures,
+            albumStatus:
+              obtenidas >= TOTAL_FIGURES
+                ? ALBUM_STATUS.COMPLETADO
+                : computeAlbumStatus(figures, state.lastViewedFigureId),
+            lastSavedAt: Date.now(),
+          }
+        }),
 
       login: ({ username }) =>
         set({
@@ -180,6 +236,31 @@ export const useAppStore = create(
 
           persistLog.persist('figure obtained', realFigureId)
           saved = true
+
+          const qaTargetFigureId = isQaFigure
+            ? state.qaTestFigure?.targetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+            : null
+
+          void syncUnlockToSupabase({
+            figureId,
+            foto,
+            fotoSizeBytes,
+            obtenidaEn,
+            captureRecord,
+            source: isQaFigure ? 'qa' : 'capture',
+            qaTargetFigureId,
+          }).then((result) => {
+            if (result.ok && result.remotePhotoUrl) {
+              useAppStore.setState((current) => ({
+                figures: current.figures.map((f) =>
+                  f.id === realFigureId && f.obtenida
+                    ? { ...f, foto: result.remotePhotoUrl ?? f.foto }
+                    : f,
+                ),
+              }))
+            }
+          })
+
           return applyFigureUpdate(state, realFigureId, patch)
         })
 
