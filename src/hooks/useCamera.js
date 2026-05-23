@@ -210,7 +210,7 @@ export function useCamera() {
 
   const requestCamera = useCallback(async () => {
     if (nativeOnly) {
-      cameraLog.mobileNativeInputOpen()
+      cameraLog.nativeInputOpen()
       fileInputRef.current?.click()
       return
     }
@@ -219,12 +219,12 @@ export function useCamera() {
 
   const useNativeCamera = useCallback(() => {
     enableNativeFallback()
-    cameraLog.mobileNativeInputOpen()
+    cameraLog.nativeInputOpen()
     fileInputRef.current?.click()
   }, [enableNativeFallback])
 
   const openNativePicker = useCallback(() => {
-    cameraLog.mobileNativeInputOpen()
+    cameraLog.nativeInputOpen()
     fileInputRef.current?.click()
   }, [])
 

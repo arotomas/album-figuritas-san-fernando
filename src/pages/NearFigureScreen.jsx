@@ -9,10 +9,11 @@ export function NearFigureScreen() {
   const navigate = useNavigate()
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
+  const startCaptureSession = useAppStore((state) => state.startCaptureSession)
 
   const handleOpenCamera = () => {
     if (nearFigure) {
-      setNearFigure(nearFigure)
+      startCaptureSession({ figure: nearFigure })
       navigate('/capture')
     }
   }

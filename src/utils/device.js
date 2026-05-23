@@ -9,14 +9,20 @@ export function isMobileDevice() {
   )
   const ios = /iPhone|iPad|iPod/i.test(ua)
   const android = /Android/i.test(ua)
-  const touchDevice = navigator.maxTouchPoints > 1
+  const touchDevice = navigator.maxTouchPoints > 0
   const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false
-  const narrowViewport = window.matchMedia?.('(max-width: 900px)').matches ?? false
+  const narrowViewport = window.matchMedia?.('(max-width: 1024px)').matches ?? false
 
-  return Boolean(mobileUa || ios || android || (touchDevice && (coarsePointer || narrowViewport)))
+  return Boolean(
+    mobileUa ||
+      ios ||
+      android ||
+      coarsePointer ||
+      (touchDevice && narrowViewport),
+  )
 }
 
-/** Cámara nativa obligatoria en mobile; evaluar en runtime, no al importar el módulo. */
+/** Cámara nativa obligatoria en mobile; evaluar en runtime. */
 export function isNativeCameraOnly() {
   return isMobileDevice()
 }

@@ -4,9 +4,7 @@ export function NativeCapturePanel({
   figure,
   fileInputRef,
   isProcessing,
-  inCaptureRange,
-  distanceMeters,
-  gpsStatusLabel,
+  isOpening,
   captureError,
   onFileSelected,
   onRetry,
@@ -18,7 +16,7 @@ export function NativeCapturePanel({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Cerrar captura"
+          aria-label="Volver al mapa"
           className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white text-ink shadow-sm"
         >
           <FaXmark size={18} />
@@ -53,25 +51,23 @@ export function NativeCapturePanel({
               Volver al mapa
             </button>
           </>
-        ) : inCaptureRange ? (
-          <>
-            <p className="text-sm text-muted">Listo para sacar la foto.</p>
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-5 min-h-[48px] rounded-full bg-ink px-8 py-3 text-sm font-bold uppercase text-white"
-            >
-              Sacar foto
-            </button>
-          </>
         ) : (
           <>
-            <p className="text-sm font-medium text-ink">Acercate al punto</p>
-            <p className="mt-2 max-w-xs text-xs text-muted">
-              {gpsStatusLabel}
-              {distanceMeters != null ? ` · ~${Math.round(distanceMeters)}m` : ''}
-            </p>
+            <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-lime-400/40 border-t-lime-400" />
+            <p className="mt-4 text-sm font-medium text-ink">Abriendo cámara…</p>
           </>
+        )}
+      </div>
+
+      <div className="pb-2">
+        {!isProcessing && !captureError && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[44px] w-full text-sm font-semibold text-muted underline"
+          >
+            Volver al mapa
+          </button>
         )}
       </div>
 

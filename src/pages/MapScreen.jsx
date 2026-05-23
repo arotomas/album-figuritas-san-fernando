@@ -10,6 +10,7 @@ export function MapScreen() {
   const figures = useAppStore((state) => state.figures)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
+  const startCaptureSession = useAppStore((state) => state.startCaptureSession)
   const { mapFigures } = useQaTestFigure()
 
   const handleNearFigureChange = useCallback((figure) => {
@@ -21,8 +22,10 @@ export function MapScreen() {
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
     const stored = figures.find((f) => f.id === targetId)
     if (stored?.obtenida) return
+
+    startCaptureSession({ figure: nearFigure })
     navigate('/capture')
-  }, [nearFigure, figures, navigate])
+  }, [figures, nearFigure, navigate, startCaptureSession])
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">

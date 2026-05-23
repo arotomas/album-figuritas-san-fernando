@@ -24,7 +24,7 @@ export const CAPTURE_PHASES = {
 }
 
 export const CAPTURE_RECOVERABLE_ERROR =
-  'No pudimos procesar la foto. Probá sacar otra.'
+  'No pudimos procesar la foto. Probá otra vez.'
 
 function getDistanceToFigure(position, figure) {
   if (!position || !figure) return null
@@ -67,7 +67,12 @@ function toProcessingError(error) {
  * Orquesta el flujo: proximidad → foto obligatoria → recompensa.
  * Mobile: cámara nativa directa, sin preview web.
  */
-export function useCaptureFlow({ figure, position, onObtainFigure }) {
+export function useCaptureFlow({
+  figure,
+  position,
+  captureSession,
+  onObtainFigure,
+}) {
   const camera = useCamera()
 
   const [phase, setPhase] = useState(CAPTURE_PHASES.CAMERA)
@@ -82,6 +87,7 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
   const phaseRef = useRef(CAPTURE_PHASES.CAMERA)
   const lastProcessedFileKeyRef = useRef(null)
   const unlockSubmittedRef = useRef(false)
+  const pendingFigureRef = useRef(null)
   const pendingPositionRef = useRef(null)
   const pendingLockedRef = useRef(false)
 
@@ -89,7 +95,7 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     phaseRef.current = phase
   }, [phase])
 
-  const activeFigure = pendingFigure ?? figure
+  const activeFigure = pendingFigureRef.current ?? pendingFigure ?? figure
 
   const distanceMeters = useMemo(
     () => getDistanceToFigure(position, figure),
@@ -115,6 +121,44 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     phase === CAPTURE_PHASES.CAMERA &&
     !isProcessing &&
     Boolean(figure)
+
+  const syncPendingState = useCallback((snapshot, capturePosition) => {
+    pendingFigureRef.current = snapshot
+    pendingPositionRef.current = capturePosition
+    pendingLockedRef.current = true
+    setPendingFigure(snapshot)
+    setCaptureError(null)
+  }, [])
+
+  const lockPendingFromSession = useCallback(
+    (sessionFigure, sessionPosition, source = 'session') => {
+      if (pendingLockedRef.current && pendingFigureRef.current) {
+        return true
+      }
+
+      const snapshot = cloneFigure(sessionFigure)
+      if (!snapshot) return false
+
+      const capturePosition = clonePosition(sessionPosition ?? position)
+      syncPendingState(snapshot, capturePosition)
+      captureLog.pendingFigureSet({
+        figureId: snapshot.id,
+        targetFigureId: snapshot.targetFigureId ?? null,
+        source,
+      })
+      return true
+    },
+    [position, syncPendingState],
+  )
+
+  useEffect(() => {
+    if (!captureSession?.figure) return
+    lockPendingFromSession(
+      captureSession.figure,
+      captureSession.position ?? position,
+      'store',
+    )
+  }, [captureSession, lockPendingFromSession, position])
 
   const resetProcessingState = useCallback(() => {
     processingRef.current = false
@@ -160,9 +204,9 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     [figure, position],
   )
 
-  const lockPendingCapture = useCallback(
+  const lockPendingWithValidation = useCallback(
     (targetFigure = figure, targetPosition = position) => {
-      if (pendingLockedRef.current && pendingFigure) {
+      if (pendingLockedRef.current && pendingFigureRef.current) {
         return true
       }
 
@@ -171,17 +215,15 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
       }
 
       const snapshot = cloneFigure(targetFigure)
-      pendingPositionRef.current = clonePosition(targetPosition)
-      pendingLockedRef.current = true
-      setPendingFigure(snapshot)
-      setCaptureError(null)
+      syncPendingState(snapshot, clonePosition(targetPosition))
       captureLog.pendingFigureSet({
         figureId: snapshot.id,
         targetFigureId: snapshot.targetFigureId ?? null,
+        source: 'validated',
       })
       return true
     },
-    [figure, pendingFigure, position, validateDistanceForOpen],
+    [figure, position, syncPendingState, validateDistanceForOpen],
   )
 
   useEffect(() => {
@@ -297,58 +339,44 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     [position, runObtainAndReward],
   )
 
-  useEffect(() => {
-    if (!import.meta.env.DEV || !getQaState().simulateCaptureSuccess) return
-    if (!figure || !position || phase !== CAPTURE_PHASES.CAMERA) return
-    if (!camera.isReady || !inCaptureRange) return
-
-    setQaFlag('simulateCaptureSuccess', false)
-    captureLog.info('QA simulate capture success')
-
-    const snapshot = cloneFigure(figure)
-    pendingPositionRef.current = clonePosition(position)
-    pendingLockedRef.current = true
-    setPendingFigure(snapshot)
-
-    const distanceToFigure = getDistanceToFigure(position, snapshot)
-    const qaPhoto =
-      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IGZpbGw9IiMzMzMiLz48L3N2Zz4='
-
-    runObtainAndReward(
-      {
-        foto: qaPhoto,
-        fotoSizeBytes: qaPhoto.length,
-        obtenidaEn: Date.now(),
-        captureRecord: {
-          figureId: snapshot.id,
-          lat: position.lat,
-          lng: position.lng,
-          accuracy: position.accuracy,
-          distanceToFigure,
-          photoUrl: qaPhoto,
-          createdAt: Date.now(),
-          validationStatus: 'approved',
-        },
-      },
-      snapshot,
-    )
-  }, [camera.isReady, figure, inCaptureRange, phase, position, runObtainAndReward])
-
   const openNativeCapture = useCallback(() => {
     if (processingRef.current || phaseRef.current !== CAPTURE_PHASES.CAMERA) {
       return false
     }
 
-    if (!figure) return false
+    const sessionFigure = captureSession?.figure
+    const targetFigure = pendingFigureRef.current ?? sessionFigure ?? figure
+    if (!targetFigure) return false
 
-    if (!lockPendingCapture()) {
+    if (pendingLockedRef.current && pendingFigureRef.current) {
+      captureLog.nativeInputOpened({ figureId: pendingFigureRef.current.id })
+      cameraLog.nativeInputOpen()
+      camera.openNativePicker()
+      return true
+    }
+
+    if (sessionFigure || captureSession?.figure) {
+      lockPendingFromSession(
+        sessionFigure ?? captureSession.figure,
+        captureSession?.position ?? position,
+        'store',
+      )
+    } else if (!lockPendingWithValidation(targetFigure, position)) {
       return false
     }
 
-    captureLog.nativeInputOpened({ figureId: figure.id })
+    captureLog.nativeInputOpened({ figureId: pendingFigureRef.current?.id ?? targetFigure.id })
+    cameraLog.nativeInputOpen()
     camera.openNativePicker()
     return true
-  }, [camera, figure, lockPendingCapture])
+  }, [
+    camera,
+    captureSession,
+    figure,
+    lockPendingFromSession,
+    lockPendingWithValidation,
+    position,
+  ])
 
   const capture = useCallback(async () => {
     if (processingRef.current || phaseRef.current !== CAPTURE_PHASES.CAMERA) {
@@ -362,32 +390,31 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
       return
     }
 
-    if (!lockPendingCapture()) return
+    if (!lockPendingWithValidation()) return
 
     const video = camera.getVideoElement?.()
     if (!camera.isReady || !video) return
 
+    const figureSnapshot = pendingFigureRef.current ?? figure
     processingRef.current = true
     setIsProcessing(true)
     setCaptureError(null)
     setPhase(CAPTURE_PHASES.CAPTURING)
-    captureLog.processingStart({ figureId: activeFigure.id, source: 'video' })
+    captureLog.processingStart({ figureId: figureSnapshot.id, source: 'video' })
     vibrateCapture()
 
     try {
       const canvas = captureFrameFromVideo(video)
-      await processCanvas(canvas, pendingFigure ?? figure)
+      await processCanvas(canvas, figureSnapshot)
     } catch (error) {
-      handleRecoverableError(error, { figureId: activeFigure?.id, source: 'video' })
+      handleRecoverableError(error, { figureId: figureSnapshot?.id, source: 'video' })
     }
   }, [
-    activeFigure?.id,
     camera,
     figure,
     handleRecoverableError,
-    lockPendingCapture,
+    lockPendingWithValidation,
     openNativeCapture,
-    pendingFigure,
     processCanvas,
   ])
 
@@ -401,8 +428,18 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
         const fileKey = getFileKey(file)
         if (lastProcessedFileKeyRef.current === fileKey) return
 
-        const figureSnapshot = pendingFigure ?? cloneFigure(figure)
-        if (!figureSnapshot) return
+        const figureSnapshot =
+          pendingFigureRef.current ??
+          cloneFigure(captureSession?.figure) ??
+          cloneFigure(figure)
+
+        if (!figureSnapshot) {
+          throw new Error(CAPTURE_RECOVERABLE_ERROR)
+        }
+
+        if (!pendingFigureRef.current) {
+          syncPendingState(figureSnapshot, pendingPositionRef.current ?? clonePosition(position))
+        }
 
         captureLog.photoReceived({
           name: file.name,
@@ -411,17 +448,16 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
           figureId: figureSnapshot.id,
         })
         captureLog.skipDistanceRecheck({ figureId: figureSnapshot.id })
+        cameraLog.nativeFileAccepted({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        })
 
         setCaptureError(null)
 
         if (!isImageFile(file)) {
           throw new Error(CAPTURE_RECOVERABLE_ERROR)
-        }
-
-        if (!pendingLockedRef.current) {
-          if (!lockPendingCapture(figureSnapshot, pendingPositionRef.current ?? position)) {
-            return
-          }
         }
 
         lastProcessedFileKeyRef.current = fileKey
@@ -445,12 +481,19 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
         await processCanvas(canvas, figureSnapshot)
       } catch (error) {
         handleRecoverableError(error, {
-          figureId: pendingFigure?.id ?? figure?.id,
+          figureId: pendingFigureRef.current?.id ?? figure?.id,
           source: 'native',
         })
       }
     },
-    [figure, handleRecoverableError, lockPendingCapture, pendingFigure, position, processCanvas],
+    [
+      captureSession?.figure,
+      figure,
+      handleRecoverableError,
+      position,
+      processCanvas,
+      syncPendingState,
+    ],
   )
 
   const retryCapture = useCallback(() => {
@@ -463,6 +506,7 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
   const clearPendingCapture = useCallback(() => {
     pendingLockedRef.current = false
+    pendingFigureRef.current = null
     pendingPositionRef.current = null
     setPendingFigure(null)
     lastProcessedFileKeyRef.current = null
@@ -480,7 +524,7 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     setPhase(CAPTURE_PHASES.DONE)
   }, [clearPendingCapture])
 
-  const rewardFigure = capturedFigure ?? pendingFigure ?? figure
+  const rewardFigure = capturedFigure ?? pendingFigureRef.current ?? pendingFigure ?? figure
 
   return {
     phase,
@@ -490,7 +534,7 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     isApproximateGps,
     isReady,
     isProcessing,
-    pendingFigure,
+    pendingFigure: pendingFigureRef.current ?? pendingFigure,
     gpsAccuracy: position?.accuracy ?? null,
     distanceMeters,
     compressedPhoto,

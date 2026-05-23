@@ -26,7 +26,8 @@ export const captureLog = {
   pendingFigureSet: (detail) => logCapture('info', 'pending figure set', detail),
   nativeInputOpened: (detail) => logCapture('info', 'native input opened', detail),
   photoReceived: (detail) => logCapture('info', 'photo received', detail),
-  skipDistanceRecheck: (detail) => logCapture('info', 'skip distance recheck after photo', detail),
+  skipDistanceRecheck: (detail) =>
+    logCapture('info', 'skip distance recheck after native photo', detail),
   fileSelected: (detail) => logCapture('info', 'file selected', detail),
   processingStart: (detail) => logCapture('info', 'processing start', detail),
   compressionSuccess: (detail) => logCapture('info', 'compression success', detail),

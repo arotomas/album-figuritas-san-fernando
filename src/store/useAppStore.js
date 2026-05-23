@@ -53,6 +53,7 @@ function resetStoreToDefaults() {
     hasSeenSplash: false,
     nearFigure: null,
     qaTestFigure: null,
+    captureSession: null,
     _hasHydrated: true,
   })
 }
@@ -104,6 +105,7 @@ export const useAppStore = create(
       figures: createInitialFigures(),
     nearFigure: null,
     qaTestFigure: null,
+    captureSession: null,
     hasSeenSplash: false,
       albumStatus: ALBUM_STATUS.EN_PROGRESO,
       lastObtenidaFigureId: null,
@@ -178,6 +180,25 @@ export const useAppStore = create(
       },
 
       setNearFigure: (figure) => set({ nearFigure: figure }),
+
+      startCaptureSession: ({ figure, position = null }) => {
+        if (!figure) return
+        set({
+          captureSession: {
+            figure: { ...figure },
+            position: position
+              ? {
+                  lat: position.lat,
+                  lng: position.lng,
+                  accuracy: position.accuracy ?? null,
+                }
+              : null,
+            lockedAt: Date.now(),
+          },
+        })
+      },
+
+      clearCaptureSession: () => set({ captureSession: null }),
 
       setQaTestFigureNear: (userLat, userLng) => {
         if (!canUseTestFigure()) return false
