@@ -36,7 +36,7 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
         <div className="border-b border-white/8 px-4 py-3.5">
           <p className={`${typeClasses.label} text-center ${isBonus ? 'text-amber-100' : 'text-progress'}`}>
             {isBonus
-              ? `Estás a ${formatDistance(nearFigure.distanceMeters)} de una figurita ${bonusKind}. ¿Querés intentar agregarla?`
+              ? `Hay algo especial cerca… una figurita ${bonusKind} está a ${formatDistance(nearFigure.distanceMeters)}.`
               : 'Estás cerca. Sacá una foto del lugar para desbloquear la figurita.'}
           </p>
           <p className="mt-1.5 text-center font-body text-xs text-white/50">

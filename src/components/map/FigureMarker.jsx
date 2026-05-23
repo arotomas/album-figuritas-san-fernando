@@ -8,8 +8,11 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
   const rarity = getRarity(figure.rareza)
   const obtained = figure.obtenida
   const reduced = prefersReducedMotion()
+  const isLegendary = figure.rareza === 'legendaria' || figure.bonus_type === 'legendary'
+  const isBonus = Boolean(figure.is_bonus)
   const floatClass = !reduced ? `figure-float-r${rarity.tier}` : ''
   const pulseClass = isPulsing && !reduced ? 'figure-pulse-premium' : ''
+  const specialClass = !reduced && (isLegendary || isBonus) ? 'figure-special-aura' : ''
 
   const cardClass = isQaTest
     ? `relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b from-cyan-900 to-cyan-950 border-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.45)] ${
@@ -25,11 +28,17 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
   const iconSize = Number(figure.marker_icon_size) || 48
 
   return (
-    <div className={`relative flex flex-col items-center ${floatClass} ${pulseClass}`}>
+    <div className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass}`}>
       {isPulsing && !reduced && (
         <span
           className="figure-pulse-ring absolute top-1/2 h-16 w-16 -translate-y-1/2 rounded-full"
           style={{ background: glowColor }}
+        />
+      )}
+      {isLegendary && !obtained && !reduced && (
+        <span
+          className="figure-legendary-spark absolute -top-2 left-1/2 h-20 w-20 -translate-x-1/2 rounded-full"
+          aria-hidden
         />
       )}
 
