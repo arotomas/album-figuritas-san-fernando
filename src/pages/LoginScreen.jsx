@@ -1,105 +1,115 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { FaGoogle } from 'react-icons/fa6'
 import { Logo } from '../components/Logo'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
-import { AddressAutocomplete } from '../components/profile/AddressAutocomplete'
 import { useAuth } from '../hooks/useAuth'
-import { authLog } from '../utils/authLog'
 import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
-import { hasValidAddress } from '../utils/parseGooglePlace'
-
-const SERVER_ERROR_MESSAGE =
-  'No pudimos conectar con el servidor. Probá de nuevo.'
+import { authLog } from '../utils/authLog'
 
 export function LoginScreen() {
-  const { login, isSubmitting } = useAuth()
-  const [username, setUsername] = useState('')
-  const [selectedAddress, setSelectedAddress] = useState(null)
+  const { signIn, signInGoogle, completeOAuthIfNeeded, isSubmitting } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [oauthHandled, setOauthHandled] = useState(false)
+
+  useEffect(() => {
+    if (oauthHandled) return
+    setOauthHandled(true)
+    void completeOAuthIfNeeded().then((result) => {
+      if (!result.ok && result.message) setError(result.message)
+    })
+  }, [completeOAuthIfNeeded, oauthHandled])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError(null)
+    authLog.info('login submit', { email: email.trim() })
+    const result = await signIn({ email: email.trim(), password })
+    if (!result.ok) setError(result.message)
+  }
 
-    const trimmed = username.trim()
-    if (!trimmed) {
-      setError('Escribí tu nombre o apodo para entrar.')
-      return
-    }
-
-    if (!hasValidAddress(selectedAddress)) {
-      setError('Elegí tu dirección de la lista de sugerencias.')
-      return
-    }
-
-    authLog.info('login submit', { username: trimmed })
-
-    const result = await login({ username: trimmed, address: selectedAddress })
-    if (!result.ok) {
-      setError(result.message ?? SERVER_ERROR_MESSAGE)
-    }
+  const handleGoogle = async () => {
+    setError(null)
+    authLog.info('google login click')
+    const result = await signInGoogle()
+    if (!result.ok) setError(result.message)
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-between px-8 py-10">
       <Logo size="lg" className="mb-8 mt-2 shrink-0" />
 
-      <motion.form
+      <motion.div
         variants={staggerContainer}
         initial="initial"
         animate="animate"
-        onSubmit={handleSubmit}
         className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6"
       >
         <motion.div variants={staggerItem} className="text-center">
           <h1 className="font-display text-2xl font-bold text-ink">Entrá al álbum</h1>
           <p className="mt-2 text-sm text-muted">
-            Elegí un nombre y tu dirección para guardar tu progreso en la zona.
+            Ingresá con tu cuenta o continuá con Google.
           </p>
         </motion.div>
 
-        <motion.div variants={staggerItem}>
+        <motion.form variants={staggerItem} onSubmit={handleSubmit} className="space-y-4">
           <Input
-            id="username"
-            label="Nombre o apodo"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="Ej: Toto, Fer, Explorador"
-            autoComplete="nickname"
-            maxLength={32}
+            id="email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="tu@email.com"
+            autoComplete="email"
           />
-        </motion.div>
+          <Input
+            id="password"
+            label="Contraseña"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Tu contraseña"
+            autoComplete="current-password"
+          />
+
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-sm font-medium text-ink underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+
+          {error && <p className="text-center text-sm font-medium text-red-600">{error}</p>}
+
+          <Button type="submit" disabled={isSubmitting || !email.trim() || !password}>
+            {isSubmitting ? 'Ingresando…' : 'Ingresar'}
+          </Button>
+        </motion.form>
 
         <motion.div variants={staggerItem}>
-          <AddressAutocomplete
-            onAddressSelect={setSelectedAddress}
-            required
-            helperText="Buscá calles y barrios de Zona Norte. Elegí una sugerencia."
-          />
-        </motion.div>
-
-        {error && (
-          <motion.div variants={staggerItem} className="space-y-2">
-            <p className="text-center text-sm font-medium text-red-600">{error}</p>
-          </motion.div>
-        )}
-
-        <motion.div variants={staggerItem}>
-          <Button type="submit" disabled={isSubmitting || !username.trim() || !hasValidAddress(selectedAddress)}>
-            {isSubmitting ? 'Verificando con Supabase…' : 'Entrar'}
+          <Button type="button" variant="outline" disabled={isSubmitting} onClick={handleGoogle}>
+            <span className="inline-flex items-center gap-2">
+              <FaGoogle />
+              Continuar con Google
+            </span>
           </Button>
         </motion.div>
+
+        <motion.p variants={staggerItem} className="text-center text-sm text-muted">
+          ¿No tenés cuenta?{' '}
+          <Link to="/register" className="font-semibold text-ink underline">
+            Creá tu perfil de explorador
+          </Link>
+        </motion.p>
 
         <motion.div variants={staggerItem}>
           <AuthDebugPanel />
         </motion.div>
-      </motion.form>
-
-      <p className="mx-auto w-full max-w-sm shrink-0 pb-2 text-center text-xs text-muted">
-        Tu progreso se guarda en este dispositivo y en la nube.
-      </p>
+      </motion.div>
     </div>
   )
 }

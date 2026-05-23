@@ -23,9 +23,7 @@ import { canUseTestFigure } from '../utils/qaMode'
 import { myFiguresLog } from '../utils/myFiguresLog'
 import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
 import { getSupabaseProjectRef } from '../utils/authDebug'
-import {
-  getMainProgressState,
-} from '../utils/figureGameRules'
+import { isProfileComplete } from '../utils/profileValidation'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
@@ -109,6 +107,8 @@ function resetStoreToDefaults() {
     supabaseProfileId: null,
     supabaseProfileAddress: null,
     supabaseProfileLocalidad: null,
+    profileCompleted: false,
+    supabaseProfile: null,
     lastSupabaseSyncWarning: null,
   })
 }
@@ -178,6 +178,8 @@ export const useAppStore = create(
       supabaseProfileId: null,
       supabaseProfileAddress: null,
       supabaseProfileLocalidad: null,
+      profileCompleted: false,
+      supabaseProfile: null,
       lastSupabaseSyncWarning: null,
 
       setHasHydrated: (value) => set({ _hasHydrated: value }),
@@ -187,10 +189,12 @@ export const useAppStore = create(
           supabaseUserId: userId,
           supabaseReady: Boolean(userId),
           isSupabaseAdmin: isAdmin,
-      supabaseUsername: profile?.username ?? null,
-      supabaseProfileId: profile?.id ?? null,
-      supabaseProfileAddress: profile?.direccion_texto ?? null,
-      supabaseProfileLocalidad: profile?.localidad ?? null,
+          supabaseUsername: profile?.username ?? null,
+          supabaseProfileId: profile?.id ?? null,
+          supabaseProfileAddress: profile?.direccion_texto ?? null,
+          supabaseProfileLocalidad: profile?.localidad ?? null,
+          profileCompleted: isProfileComplete(profile),
+          supabaseProfile: profile ?? null,
         }),
 
       setSupabaseSyncWarning: (warning) =>
@@ -322,10 +326,11 @@ export const useAppStore = create(
           }
         }),
 
-      login: ({ username }) => {
+      login: ({ username, profileCompleted = false }) => {
         const trimmed = username?.trim() || 'explorador'
         return set({
           isAuthenticated: true,
+          profileCompleted,
           user: {
             username: trimmed,
             displayName: trimmed,
@@ -337,7 +342,16 @@ export const useAppStore = create(
       logout: () =>
         set({
           isAuthenticated: false,
+          profileCompleted: false,
           user: null,
+          supabaseUserId: null,
+          supabaseReady: false,
+          isSupabaseAdmin: false,
+          supabaseUsername: null,
+          supabaseProfileId: null,
+          supabaseProfileAddress: null,
+          supabaseProfileLocalidad: null,
+          supabaseProfile: null,
           lastSavedAt: Date.now(),
         }),
 
@@ -762,6 +776,8 @@ export const useAppStore = create(
           supabaseProfileId: null,
           supabaseProfileAddress: null,
           supabaseProfileLocalidad: null,
+          profileCompleted: false,
+          supabaseProfile: null,
           lastSupabaseSyncWarning: null,
         })
       },

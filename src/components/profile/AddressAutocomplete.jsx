@@ -3,6 +3,7 @@ import { FaLocationDot, FaMagnifyingGlass } from 'react-icons/fa6'
 import { isGooglePlacesConfigured } from '../../config/googlePlaces'
 import { usePlacesAutocomplete } from '../../hooks/usePlacesAutocomplete'
 import { fetchPlaceDetails } from '../../utils/googlePlacesService'
+import { addressAutocompleteLog } from '../../utils/addressAutocompleteLog'
 import { hasValidAddress } from '../../utils/parseGooglePlace'
 
 export function AddressAutocomplete({
@@ -63,7 +64,10 @@ export function AddressAutocomplete({
       onInputChange?.(address.direccion_texto)
       onAddressSelect?.(address)
       resetSession()
-    } catch {
+    } catch (selectError) {
+      addressAutocompleteLog.error('place details failed', {
+        message: selectError?.message ?? String(selectError),
+      })
       setLocalError('No pudimos confirmar esa dirección. Probá otra sugerencia.')
       setSelected(null)
       onAddressSelect?.(null)

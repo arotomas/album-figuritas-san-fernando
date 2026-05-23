@@ -3,23 +3,22 @@ import { supabaseLog } from '../../utils/supabaseLog'
 import { authLog, profileLog } from '../../utils/authLog'
 import {
   authDebug,
-  profileDebug,
   buildAuthDebugSnapshot,
   summarizeAuthResponse,
-  summarizePostgrestResponse,
   summarizeSession,
   getSupabaseProjectRef,
 } from '../../utils/authDebug'
 import {
   sessionDebug,
   inspectSupabaseAuthStorage,
-  summarizeSignInPayload,
   logSessionPhase,
 } from '../../utils/sessionDebug'
 import { useAuthDebugStore } from '../../store/useAuthDebugStore'
 import {
-  PROFILE_ADDRESS_COLUMNS,
-  withAddressDefaults,
+  ensureProfileFromAuthUser,
+  fetchProfileById,
+  touchProfileLogin,
+  upsertUserProfile,
 } from './profile'
 
 export function isSupabaseConfigured() {
@@ -37,6 +36,35 @@ function publishDebugSnapshot(partial) {
   )
 }
 
+export function formatAuthErrorMessage(error) {
+  const message = error?.message ?? ''
+  const code = error?.code ?? ''
+
+  if (message === 'USERNAME_TAKEN') {
+    return 'Ese username ya está en uso. Probá con otro apodo.'
+  }
+  if (message === 'EMAIL_CONFIRMATION_REQUIRED') {
+    return 'Te enviamos un email para confirmar la cuenta. Revisá tu bandeja.'
+  }
+  if (message === 'PROFILE_COLUMNS_MISSING') {
+    return 'Faltan columnas de perfil en Supabase. Aplicá las migrations 010 y 011.'
+  }
+  if (/invalid login credentials/i.test(message)) {
+    return 'Email o contraseña incorrectos.'
+  }
+  if (/user already registered/i.test(message)) {
+    return 'Ya existe una cuenta con ese email.'
+  }
+  if (/email not confirmed/i.test(message)) {
+    return 'Confirmá tu email antes de ingresar.'
+  }
+  if (/password should be at least/i.test(message)) {
+    return 'La contraseña debe tener al menos 8 caracteres.'
+  }
+
+  return [message, code].filter(Boolean).join(' · ') || 'No pudimos completar la autenticación.'
+}
+
 export async function getCurrentSession() {
   const response = await supabase.auth.getSession()
   sessionDebug.info('getSession response', summarizeAuthResponse(response))
@@ -47,15 +75,10 @@ export async function getCurrentSession() {
 export async function getVerifiedUser() {
   const session = await getCurrentSession()
   if (!session?.access_token) {
-    const err = new Error('Auth session missing!')
-    sessionDebug.error('getUser blocked — no session in storage', {
-      authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-    })
-    throw err
+    throw new Error('Auth session missing!')
   }
 
   const response = await supabase.auth.getUser()
-  authDebug.info('getUser response', summarizeAuthResponse(response))
   if (response.error) throw response.error
   return response.data.user
 }
@@ -65,457 +88,178 @@ export async function getCurrentUserId() {
   return user?.id ?? null
 }
 
-/** ID desde sesión local — para storage/sync sin round-trip extra. */
 export async function getSessionUserId() {
   const response = await supabase.auth.getSession()
-  if (response.error) {
-    sessionDebug.error('getSessionUserId failed', { message: response.error.message })
-    return null
-  }
+  if (response.error) return null
   return response.data.session?.user?.id ?? null
 }
 
 async function clearLocalAuthSession() {
-  logSessionPhase('before login — signOut local scope')
+  logSessionPhase('before auth — signOut local scope')
   const { error } = await supabase.auth.signOut({ scope: 'local' })
-  if (error) {
-    sessionDebug.error('signOut local failed', { message: error.message })
-    throw error
-  }
-  sessionDebug.info('signOut local success', {
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-  })
+  if (error) throw error
 }
 
-async function verifyPersistedSession(expectedUserId, phase) {
-  logSessionPhase(`${phase} — getSession verify`)
-
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-
-  sessionDebug.info(`${phase} — getSession result`, {
-    error: sessionError?.message ?? null,
-    session: summarizeSession(sessionData?.session ?? null),
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-  })
-
-  if (sessionError) {
-    throw sessionError
-  }
-
-  if (!sessionData?.session?.access_token) {
-    const err = new Error('SESSION_NOT_PERSISTED')
-    sessionDebug.error(`${phase} — session missing after auth`, {
-      authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-    })
-    throw err
-  }
-
-  const storage = inspectSupabaseAuthStorage(getSupabaseProjectRef())
-  if (!storage.present || !storage.hasAccessToken) {
-    const err = new Error('SESSION_STORAGE_MISSING')
-    sessionDebug.error(`${phase} — localStorage auth token missing`, { storage })
-    throw err
-  }
-
-  if (expectedUserId && sessionData.session.user?.id !== expectedUserId) {
-    const err = new Error('SESSION_USER_MISMATCH')
-    sessionDebug.error(`${phase} — session user mismatch`, {
-      expectedUserId,
-      actualUserId: sessionData.session.user?.id ?? null,
-    })
-    throw err
-  }
-
-  return sessionData.session
-}
-
-async function signInAnonymouslyVerified() {
-  const projectRef = getSupabaseProjectRef()
-
-  logSessionPhase('before signInAnonymously', {
-    projectRef,
-    authStorage: inspectSupabaseAuthStorage(projectRef),
-  })
-
-  authDebug.info('signInAnonymously start', {
-    projectRef,
-    url: import.meta.env.VITE_SUPABASE_URL,
-  })
-
-  const signInResponse = await supabase.auth.signInAnonymously()
-
-  sessionDebug.info('after signInAnonymously — raw response', {
-    error: signInResponse.error
-      ? {
-          message: signInResponse.error.message,
-          status: signInResponse.error.status,
-          code: signInResponse.error.code,
-        }
-      : null,
-    data: summarizeSignInPayload(signInResponse.data),
-  })
-
-  authDebug.info('signInAnonymously response', summarizeAuthResponse(signInResponse))
-
-  if (signInResponse.error) {
-    authLog.error('signInAnonymously error', { error: signInResponse.error.message })
-    throw signInResponse.error
-  }
-
-  const session = signInResponse.data.session
-  const user = signInResponse.data.user
-
-  if (!user?.id) {
-    const err = new Error('AUTH_NO_USER')
-    authLog.error('signInAnonymously error', { error: err.message })
-    throw err
-  }
-
-  if (!session?.access_token || !session?.refresh_token) {
-    const err = new Error('AUTH_NO_ACCESS_TOKEN')
-    authLog.error('signInAnonymously error', { error: err.message })
-    throw err
-  }
-
-  logSessionPhase('after signIn — setSession explicit')
-  const setSessionResponse = await supabase.auth.setSession({
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-  })
-
-  sessionDebug.info('after setSession', {
-    error: setSessionResponse.error?.message ?? null,
-    session: summarizeSession(setSessionResponse.data.session),
-    authStorage: inspectSupabaseAuthStorage(projectRef),
-  })
-
-  if (setSessionResponse.error) {
-    throw setSessionResponse.error
-  }
-
-  const persistedSession = await verifyPersistedSession(user.id, 'after setSession')
-
-  logSessionPhase('after signIn — getUser server verify')
-  const userResponse = await supabase.auth.getUser()
-
-  sessionDebug.info('after getUser', summarizeAuthResponse(userResponse))
-
-  if (userResponse.error || !userResponse.data.user?.id) {
-    const err = new Error('AUTH_VERIFICATION_FAILED_NO_USER')
-    authDebug.error('getUser verification failed', summarizeAuthResponse(userResponse))
-    throw err
-  }
-
-  if (userResponse.data.user.id !== user.id) {
-    const err = new Error('AUTH_VERIFICATION_USER_MISMATCH')
-    authDebug.error('getUser mismatch', {
-      signInUserId: user.id,
-      verifiedUserId: userResponse.data.user.id,
-    })
-    throw err
-  }
-
-  authLog.info('signInAnonymously success', { userId: user.id })
-  authDebug.info('signInAnonymously verified', {
-    userId: user.id,
-    isAnonymous: userResponse.data.user.is_anonymous,
-    session: summarizeSession(persistedSession),
-    authStorage: inspectSupabaseAuthStorage(projectRef),
-  })
-
-  return { session: persistedSession, user: userResponse.data.user }
-}
-
-async function upsertAndVerifyProfile(userId, username, address = null) {
-  const trimmed = username?.trim()
-  if (!userId || !trimmed) {
-    throw new Error('USERNAME_REQUIRED')
-  }
-
-  profileLog.info('upsert start', { userId, username: trimmed })
-  profileDebug.info('upsert start', { userId, username: trimmed })
-
-  const payload = {
-    id: userId,
-    username: trimmed,
-    is_admin: false,
-  }
-
-  if (address) {
-    Object.assign(payload, {
-      direccion_texto: address.direccion_texto?.trim() || null,
-      direccion_lat: address.direccion_lat ?? null,
-      direccion_lng: address.direccion_lng ?? null,
-      localidad: address.localidad?.trim() || null,
-      provincia: address.provincia?.trim() || null,
-      pais: address.pais?.trim() || null,
-      codigo_postal: address.codigo_postal?.trim() || null,
-    })
-  }
-
-  let upsertResponse = await supabase
-    .from('profiles')
-    .upsert(payload, { onConflict: 'id' })
-    .select(PROFILE_ADDRESS_COLUMNS)
-    .single()
-
-  if (upsertResponse.error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(upsertResponse.error.message ?? '')) {
-    upsertResponse = await supabase
-      .from('profiles')
-      .upsert(
-        { id: userId, username: trimmed, is_admin: false },
-        { onConflict: 'id' },
-      )
-      .select('id, username, avatar_url, is_admin, created_at')
-      .single()
-  }
-
-  profileDebug.info('upsert response', summarizePostgrestResponse(upsertResponse))
-
-  if (upsertResponse.error) {
-    profileLog.error('upsert error', {
-      message: upsertResponse.error.message,
-      code: upsertResponse.error.code,
-      details: upsertResponse.error.details,
-      hint: upsertResponse.error.hint,
-    })
-    throw upsertResponse.error
-  }
-
-  if (!upsertResponse.data?.id) {
-    const err = new Error('PROFILE_UPSERT_EMPTY')
-    profileDebug.error('upsert returned empty data', upsertResponse)
-    throw err
-  }
-
-  const readResponse = await supabase
-    .from('profiles')
-    .select(PROFILE_ADDRESS_COLUMNS)
-    .eq('id', userId)
-    .single()
-
-  if (readResponse.error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(readResponse.error.message ?? '')) {
-    const fallbackRead = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, is_admin, created_at')
-      .eq('id', userId)
-      .single()
-    readResponse.data = withAddressDefaults(fallbackRead.data)
-    readResponse.error = fallbackRead.error
-  }
-
-  profileDebug.info('read-back response', summarizePostgrestResponse(readResponse))
-
-  if (readResponse.error || !readResponse.data?.id) {
-    const err = new Error('PROFILE_READBACK_FAILED')
-    profileLog.error('readback error', {
-      message: readResponse.error?.message ?? err.message,
-      code: readResponse.error?.code,
-      details: readResponse.error?.details,
-      hint: readResponse.error?.hint,
-    })
-    profileDebug.error('profile read-back failed', summarizePostgrestResponse(readResponse))
-    throw err
-  }
-
-  if (readResponse.data.username !== trimmed) {
-    const err = new Error('PROFILE_READBACK_MISMATCH')
-    profileDebug.error('profile username mismatch', {
-      expected: trimmed,
-      actual: readResponse.data.username,
-    })
-    throw err
-  }
-
-  profileLog.info('upsert success', { userId, username: readResponse.data.username })
-  profileLog.info('readback success', {
-    userId: readResponse.data.id,
-    username: readResponse.data.username,
-  })
-  profileDebug.info('upsert verified', readResponse.data)
-  return withAddressDefaults(readResponse.data)
-}
-
-export async function ensureProfile(userId, username, address = null) {
-  return upsertAndVerifyProfile(userId, username, address)
-}
-
-/** Restaura sesión persistida — NO crea usuarios nuevos. */
 export async function restoreSupabaseSession() {
   if (!isSupabaseConfigured()) return null
 
-  sessionDebug.info('restore session — start', {
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-  })
-
-  const session = await verifyPersistedSession(null, 'restore').catch((error) => {
-    sessionDebug.error('restore session — no valid persisted session', {
-      message: error?.message ?? String(error),
-    })
-    return null
-  })
-
-  if (!session) return null
+  const { data, error } = await supabase.auth.getSession()
+  if (error || !data.session?.user?.id) return null
 
   const userResponse = await supabase.auth.getUser()
-  if (userResponse.error || !userResponse.data.user?.id) {
-    sessionDebug.error('restore session — getUser failed', summarizeAuthResponse(userResponse))
-    return null
-  }
-
-  sessionDebug.info('restore session — success', {
-    userId: userResponse.data.user.id,
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-  })
+  if (userResponse.error || !userResponse.data.user?.id) return null
 
   return {
-    session,
+    session: data.session,
     user: userResponse.data.user,
   }
 }
 
 export async function fetchProfile(userId) {
-  let response = await supabase
-    .from('profiles')
-    .select(PROFILE_ADDRESS_COLUMNS)
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (response.error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(response.error.message ?? '')) {
-    response = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, is_admin, created_at')
-      .eq('id', userId)
-      .maybeSingle()
-  }
-
-  profileDebug.info('fetchProfile response', summarizePostgrestResponse(response))
-  if (response.error) {
-    profileLog.error('readback error', {
-      userId,
-      message: response.error.message,
-      code: response.error.code,
-      details: response.error.details,
-      hint: response.error.hint,
-    })
-    throw response.error
-  }
-  if (response.data?.id) {
-    profileLog.info('readback success', {
-      userId: response.data.id,
-      username: response.data.username,
-    })
-  }
-  return withAddressDefaults(response.data)
+  return fetchProfileById(userId)
 }
 
-export async function loginWithUsername(username, address = null) {
-  const trimmed = username?.trim()
-  if (!trimmed) {
-    throw new Error('USERNAME_REQUIRED')
-  }
-
-  if (!isSupabaseConfigured()) {
-    authLog.error('login blocked — missing env vars')
-    publishDebugSnapshot({
-      status: 'blocked',
-      reason: 'SUPABASE_NOT_CONFIGURED',
-    })
-    throw new Error('SUPABASE_NOT_CONFIGURED')
-  }
-
-  authLog.info('login submit', { username: trimmed })
-  authDebug.info('login submit', {
-    username: trimmed,
-    projectRef: getSupabaseProjectRef(),
-  })
-
-  logSessionPhase('login flow start', {
-    username: trimmed,
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-  })
-
-  publishDebugSnapshot({
-    status: 'in_progress',
-    username: trimmed,
-    step: 'signOutLocal',
-  })
+export async function signUpWithEmail({ email, password, profileInput, address }) {
+  authLog.info('signUp start', { email })
 
   await clearLocalAuthSession()
 
-  publishDebugSnapshot({
-    status: 'in_progress',
-    username: trimmed,
-    step: 'signInAnonymously',
-  })
+  const signUpResponse = await supabase.auth.signUp({ email, password })
+  if (signUpResponse.error) throw signUpResponse.error
 
-  const { session, user } = await signInAnonymouslyVerified()
+  const authUser = signUpResponse.data.user
+  if (!authUser?.id) throw new Error('SIGNUP_NO_USER')
 
-  await verifyPersistedSession(user.id, 'before profile upsert')
-
-  publishDebugSnapshot({
-    status: 'in_progress',
-    username: trimmed,
-    step: 'profileUpsert',
-    userId: user.id,
-    session: summarizeSession(session),
-    authStatus: 'authenticated',
-    sessionStatus: 'active',
-  })
-
-  const profile = await upsertAndVerifyProfile(user.id, trimmed, address)
-
-  const finalSession = await verifyPersistedSession(user.id, 'before login complete')
-
-  if (!finalSession?.user?.id || !profile?.id) {
-    const err = new Error('AUTH_INCOMPLETE')
-    authLog.error('login incomplete', {
-      hasSession: Boolean(finalSession?.user?.id),
-      hasProfile: Boolean(profile?.id),
-    })
-    throw err
+  if (!signUpResponse.data.session) {
+    throw new Error('EMAIL_CONFIRMATION_REQUIRED')
   }
 
-  const finalSnapshot = buildAuthDebugSnapshot({
-    status: 'success',
-    username: trimmed,
-    userId: user.id,
-    profileId: profile.id,
-    profileUsername: profile.username,
-    authStatus: 'authenticated',
-    sessionStatus: 'active',
-    session: summarizeSession(finalSession),
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-    supabaseConnection: 'ok',
-  })
+  const profile = await upsertUserProfile(
+    authUser.id,
+    {
+      ...profileInput,
+      email,
+      auth_provider: 'email',
+    },
+    address,
+  )
 
-  publishDebugSnapshot(finalSnapshot)
-  supabaseLog.auth.info('login complete', { userId: user.id, username: trimmed })
-  authDebug.info('login complete verified', finalSnapshot)
-  sessionDebug.info('login flow complete — session persisted', {
-    userId: user.id,
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-  })
+  await touchProfileLogin(authUser.id)
 
+  authLog.info('signUp success', { userId: authUser.id })
   return {
-    userId: user.id,
+    userId: authUser.id,
+    user: authUser,
+    session: signUpResponse.data.session,
     profile,
-    session: finalSession,
-    user,
   }
+}
+
+export async function signInWithEmailPassword({ email, password }) {
+  authLog.info('signIn email start', { email })
+
+  await clearLocalAuthSession()
+
+  const signInResponse = await supabase.auth.signInWithPassword({ email, password })
+  if (signInResponse.error) throw signInResponse.error
+
+  const authUser = signInResponse.data.user
+  const session = signInResponse.data.session
+  if (!authUser?.id || !session) throw new Error('AUTH_INCOMPLETE')
+
+  let profile = await fetchProfileById(authUser.id)
+  if (!profile?.id) {
+    profile = await ensureProfileFromAuthUser(authUser, 'email')
+  }
+
+  await touchProfileLogin(authUser.id)
+
+  authLog.info('signIn email success', { userId: authUser.id })
+  return { userId: authUser.id, user: authUser, session, profile }
+}
+
+export async function signInWithGoogle() {
+  authLog.info('signIn google start')
+
+  const redirectTo = `${window.location.origin}/login`
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo },
+  })
+
+  if (error) throw error
+}
+
+export async function completeOAuthSession() {
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+  if (!data.session?.user?.id) return null
+
+  const authUser = data.session.user
+  let profile = await fetchProfileById(authUser.id)
+  if (!profile?.id) {
+    profile = await ensureProfileFromAuthUser(authUser, 'google')
+  }
+
+  await touchProfileLogin(authUser.id)
+
+  authLog.info('oauth session ready', { userId: authUser.id })
+  return {
+    userId: authUser.id,
+    user: authUser,
+    session: data.session,
+    profile,
+  }
+}
+
+export async function requestPasswordReset(email) {
+  authLog.info('password reset request', { email })
+  const redirectTo = `${window.location.origin}/reset-password`
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) throw error
+}
+
+export async function updatePassword(nextPassword) {
+  authLog.info('password update start')
+  const { data, error } = await supabase.auth.updateUser({ password: nextPassword })
+  if (error) throw error
+  authLog.info('password update success')
+  return data.user
 }
 
 export async function signOutSupabase() {
   authDebug.info('signOut requested')
-  sessionDebug.info('signOut requested')
   const { error } = await supabase.auth.signOut({ scope: 'local' })
-  if (error) {
-    authDebug.error('signOut error', { message: error.message })
-    throw error
-  }
+  if (error) throw error
   useAuthDebugStore.getState().clearSnapshot()
   authDebug.info('signOut success')
-  sessionDebug.info('signOut success', {
-    authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
+}
+
+/** Legacy helper kept for internal bootstrap flows. */
+export async function loginWithUsername(username, address = null) {
+  profileLog.info('legacy anonymous login blocked', { username })
+  throw new Error('ANONYMOUS_LOGIN_DISABLED')
+}
+
+export async function ensureProfile(userId, username, address = null) {
+  return upsertUserProfile(
+    userId,
+    { username, auth_provider: 'anonymous', is_admin: false },
+    address,
+  )
+}
+
+export function publishAuthSuccessSnapshot({ userId, profile, session, email }) {
+  publishDebugSnapshot({
+    status: 'success',
+    userId,
+    profileId: profile?.id ?? null,
+    profileUsername: profile?.username ?? null,
+    username: profile?.username ?? email ?? null,
+    authStatus: 'authenticated',
+    sessionStatus: 'active',
+    session: summarizeSession(session),
+    supabaseConnection: 'ok',
   })
+  supabaseLog.auth.info('auth complete', { userId, email: email ?? profile?.email ?? null })
 }

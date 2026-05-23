@@ -3,7 +3,7 @@ import { getSessionUserId } from './auth'
 import { getBonusFigures, getMainProgressState } from '../../utils/figureGameRules'
 
 const PROFILE_COLUMNS =
-  'id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
+  'id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
 
 const FIGURE_COLUMNS =
   'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
@@ -45,6 +45,15 @@ async function fetchProfiles() {
       album_reviewed_at: null,
       album_reviewed_by: null,
       album_review_note: null,
+      nombre: null,
+      apellido: null,
+      dni: null,
+      email: null,
+      celular: null,
+      auth_provider: 'anonymous',
+      profile_completed: false,
+      last_login_at: null,
+      updated_at: null,
       direccion_texto: null,
       direccion_lat: null,
       direccion_lng: null,
@@ -54,12 +63,26 @@ async function fetchProfiles() {
       codigo_postal: null,
     }))
     error = fallback.error
-  } else if (error && /direccion_|localidad|provincia|pais|codigo_postal/i.test(error.message ?? '')) {
+  } else if (
+    error &&
+    /nombre|apellido|dni|email|celular|auth_provider|profile_completed|last_login_at|updated_at|direccion_|localidad|provincia|pais|codigo_postal/i.test(
+      error.message ?? '',
+    )
+  ) {
     const fallback = await supabase
       .from('profiles')
       .select('id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note')
     data = fallback.data?.map((profile) => ({
       ...profile,
+      nombre: null,
+      apellido: null,
+      dni: null,
+      email: null,
+      celular: null,
+      auth_provider: 'anonymous',
+      profile_completed: false,
+      last_login_at: null,
+      updated_at: null,
       direccion_texto: null,
       direccion_lat: null,
       direccion_lng: null,

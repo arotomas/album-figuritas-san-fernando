@@ -14,6 +14,7 @@ import {
   StatCard,
 } from '../../components/admin/adminShared'
 import { getFigureChallenge } from '../../utils/figureChallenges'
+import { getFullName } from '../../utils/profileValidation'
 import {
   AdminPlayerLocationMap,
   AdminPlayersDistributionMap,
@@ -29,7 +30,13 @@ export function AdminPlayersPage() {
   const [albumReviewNote, setAlbumReviewNote] = useState('')
   const [photoPreview, setPhotoPreview] = useState(null)
   const [playerFilters, setPlayerFilters] = useState({
+    query: '',
     username: '',
+    nombre: '',
+    apellido: '',
+    dni: '',
+    email: '',
+    localidad: '',
     albumStatus: 'all',
     progress: 'all',
   })
@@ -70,8 +77,31 @@ export function AdminPlayersPage() {
   const filteredPlayers = useMemo(
     () =>
       players.filter((player) => {
+        const query = normalizeText(playerFilters.query)
         const username = normalizeText(playerFilters.username)
+        const nombre = normalizeText(playerFilters.nombre)
+        const apellido = normalizeText(playerFilters.apellido)
+        const dni = normalizeText(playerFilters.dni)
+        const email = normalizeText(playerFilters.email)
+        const localidad = normalizeText(playerFilters.localidad)
+
+        const matchesQuery =
+          !query ||
+          [
+            player.username,
+            player.nombre,
+            player.apellido,
+            player.dni,
+            player.email,
+            player.localidad,
+            getFullName(player),
+          ].some((value) => normalizeText(value).includes(query))
         const matchesUsername = !username || normalizeText(player.username).includes(username)
+        const matchesNombre = !nombre || normalizeText(player.nombre).includes(nombre)
+        const matchesApellido = !apellido || normalizeText(player.apellido).includes(apellido)
+        const matchesDni = !dni || normalizeText(player.dni).includes(dni)
+        const matchesEmail = !email || normalizeText(player.email).includes(email)
+        const matchesLocalidad = !localidad || normalizeText(player.localidad).includes(localidad)
         const matchesStatus =
           playerFilters.albumStatus === 'all' ||
           (player.album_status ?? 'pending') === playerFilters.albumStatus
@@ -83,7 +113,17 @@ export function AdminPlayersPage() {
           (playerFilters.progress === 'complete' && complete) ||
           (playerFilters.progress === 'incomplete' && !complete)
 
-        return matchesUsername && matchesStatus && matchesProgress
+        return (
+          matchesQuery &&
+          matchesUsername &&
+          matchesNombre &&
+          matchesApellido &&
+          matchesDni &&
+          matchesEmail &&
+          matchesLocalidad &&
+          matchesStatus &&
+          matchesProgress
+        )
       }),
     [playerFilters, players],
   )
@@ -143,12 +183,48 @@ export function AdminPlayersPage() {
         <div className="min-w-0 rounded-2xl border border-border bg-white shadow-sm">
           <div className="flex flex-wrap items-end gap-3 border-b border-border bg-slate-50 p-4">
             <label className="text-xs font-bold uppercase tracking-wide text-muted">
-              Usuario
+              Buscar
+              <input
+                value={playerFilters.query}
+                onChange={(event) => updatePlayerFilter('query', event.target.value)}
+                placeholder="Nombre, email, DNI..."
+                className="mt-1 block w-52 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-muted">
+              Username
               <input
                 value={playerFilters.username}
                 onChange={(event) => updatePlayerFilter('username', event.target.value)}
-                placeholder="Buscar username"
-                className="mt-1 block w-44 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                placeholder="Apodo"
+                className="mt-1 block w-36 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-muted">
+              Localidad
+              <input
+                value={playerFilters.localidad}
+                onChange={(event) => updatePlayerFilter('localidad', event.target.value)}
+                placeholder="San Fernando"
+                className="mt-1 block w-36 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-muted">
+              DNI
+              <input
+                value={playerFilters.dni}
+                onChange={(event) => updatePlayerFilter('dni', event.target.value)}
+                placeholder="12345678"
+                className="mt-1 block w-32 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+              />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-muted">
+              Email
+              <input
+                value={playerFilters.email}
+                onChange={(event) => updatePlayerFilter('email', event.target.value)}
+                placeholder="email"
+                className="mt-1 block w-40 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
               />
             </label>
             <label className="text-xs font-bold uppercase tracking-wide text-muted">
@@ -182,7 +258,8 @@ export function AdminPlayersPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="sticky top-0 bg-white text-xs uppercase tracking-wide text-muted">
                 <tr>
-                  <th className="px-4 py-3">Username</th>
+                  <th className="px-4 py-3">Jugador</th>
+                  <th className="px-4 py-3">Localidad</th>
                   <th className="px-4 py-3">Alta</th>
                   <th className="px-4 py-3">Principal</th>
                   <th className="px-4 py-3">Bonus</th>
@@ -200,7 +277,11 @@ export function AdminPlayersPage() {
                     }`}
                     onClick={() => loadPlayerDetail(player.id)}
                   >
-                    <td className="px-4 py-3 font-semibold">{player.username ?? 'Sin usuario'}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold">{player.username ?? 'Sin usuario'}</p>
+                      <p className="text-xs text-muted">{getFullName(player) || player.email || '-'}</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs">{player.localidad ?? '-'}</td>
                     <td className="px-4 py-3 text-xs">{formatDate(player.created_at)}</td>
                     <td className="px-4 py-3 font-mono text-xs">
                       {player.mainProgress.obtained}/{player.mainProgress.total}
@@ -215,7 +296,7 @@ export function AdminPlayersPage() {
                 ))}
                 {!filteredPlayers.length && !loading && (
                   <tr>
-                    <td colSpan="7" className="px-4 py-10 text-center text-muted">
+                    <td colSpan="8" className="px-4 py-10 text-center text-muted">
                       No hay jugadores para los filtros seleccionados.
                     </td>
                   </tr>
@@ -238,6 +319,9 @@ export function AdminPlayersPage() {
                     <h3 className="text-2xl font-black">
                       {playerDetail.profile.username ?? 'Sin usuario'}
                     </h3>
+                    <p className="mt-1 text-sm font-semibold text-ink">
+                      {getFullName(playerDetail.profile) || 'Sin nombre'}
+                    </p>
                     <p className="mt-1 font-mono text-xs text-muted">{playerDetail.profile.id}</p>
                   </div>
                   <ReviewBadge status={playerDetail.profile.album_status ?? 'pending'} />
@@ -253,7 +337,13 @@ export function AdminPlayersPage() {
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-muted">
                   <p>Alta: {formatDate(playerDetail.profile.created_at)}</p>
+                  <p>Último acceso: {formatDate(playerDetail.profile.last_login_at)}</p>
                   <p>Última captura: {formatDate(playerDetail.summary.lastActivity)}</p>
+                  <p>Provider: {playerDetail.profile.auth_provider ?? 'anonymous'}</p>
+                  <p>DNI: {playerDetail.profile.dni ?? '-'}</p>
+                  <p>Email: {playerDetail.profile.email ?? '-'}</p>
+                  <p>Celular: {playerDetail.profile.celular ?? '-'}</p>
+                  <p>Perfil completo: {playerDetail.profile.profile_completed ? 'Sí' : 'No'}</p>
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">

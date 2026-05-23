@@ -1,19 +1,17 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import {
-  fetchProfile,
-  isSupabaseConfigured,
-  restoreSupabaseSession,
-} from '../services/supabase/auth'
+import { fetchProfile, restoreSupabaseSession } from '../services/supabase/auth'
+import { touchProfileLogin } from '../services/supabase/profile'
 import { isAdmin } from '../services/supabase/admin'
 import { fetchPublicFigures } from '../services/supabase/figures'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { supabaseLog } from '../utils/supabaseLog'
 import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
 import { getSupabaseProjectRef } from '../utils/authDebug'
+import { isProfileComplete } from '../utils/profileValidation'
 
 /**
- * Restaura sesión remota persistida — nunca crea usuarios anónimos nuevos.
+ * Restaura sesión remota persistida — nunca crea usuarios nuevos.
  */
 export function useSupabaseBootstrap(enabled) {
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
@@ -28,15 +26,6 @@ export function useSupabaseBootstrap(enabled) {
     let cancelled = false
 
     async function bootstrap() {
-      if (!isSupabaseConfigured()) {
-        supabaseLog.auth.warn('bootstrap skipped — not configured')
-        return
-      }
-
-      sessionDebug.info('bootstrap after hydration', {
-        authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-      })
-
       try {
         supabaseLog.sync.info('bootstrap start')
 
@@ -55,12 +44,8 @@ export function useSupabaseBootstrap(enabled) {
         const profileUsername = profile?.username?.trim()
         const localUsername = user?.username?.trim()
 
-        if (!profile?.id || !profileUsername) {
-          sessionDebug.error('bootstrap profile missing', {
-            userId,
-            hasProfile: Boolean(profile?.id),
-            profileUsername: profileUsername ?? null,
-          })
+        if (!profile?.id) {
+          sessionDebug.error('bootstrap profile missing', { userId })
           return
         }
 
@@ -72,9 +57,14 @@ export function useSupabaseBootstrap(enabled) {
         replaceCatalogFromRemote(remoteCatalog)
         setSupabaseAuth({ userId, isAdmin: admin, profile })
 
+        const completed = isProfileComplete(profile)
         if (profileUsername && !localUsername) {
-          login({ username: profileUsername })
+          login({ username: profileUsername, profileCompleted: completed })
+        } else if (localUsername) {
+          login({ username: localUsername, profileCompleted: completed })
         }
+
+        await touchProfileLogin(userId)
 
         const remoteRows = await pullRemoteAlbum()
         if (cancelled) return
@@ -85,6 +75,7 @@ export function useSupabaseBootstrap(enabled) {
 
         sessionDebug.info('bootstrap complete', {
           userId,
+          profileCompleted: completed,
           authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
         })
 
@@ -93,6 +84,7 @@ export function useSupabaseBootstrap(enabled) {
           isAdmin: admin,
           remoteFigures: remoteRows.length,
           remoteCatalog: remoteCatalog.length,
+          profileCompleted: completed,
         })
       } catch (error) {
         sessionDebug.error('bootstrap failed', {

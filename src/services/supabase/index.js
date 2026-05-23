@@ -6,9 +6,15 @@ export {
   getSessionUserId,
   getVerifiedUser,
   isSupabaseConfigured,
-  loginWithUsername,
   restoreSupabaseSession,
   signOutSupabase,
+  signUpWithEmail,
+  signInWithEmailPassword,
+  signInWithGoogle,
+  completeOAuthSession,
+  requestPasswordReset,
+  updatePassword,
+  formatAuthErrorMessage,
 } from './auth'
 
 export { isAdmin } from './admin'
@@ -43,3 +49,11 @@ export {
   updatePlayerAlbumStatus,
   updateCaptureValidation,
 } from './adminPlayers'
+
+export {
+  fetchProfileById,
+  upsertUserProfile,
+  completeUserProfile,
+  updateProfileFields,
+  isUsernameAvailable,
+} from './profile'

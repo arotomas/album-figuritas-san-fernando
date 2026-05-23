@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '../layouts/AppLayout'
 import { AuthLayout } from '../layouts/AuthLayout'
 import { AdminLayout } from '../layouts/AdminLayout'
-import { ProtectedRoute, GuestRoute } from './ProtectedRoute'
+import { ProtectedRoute, GuestRoute, ProfileSetupRoute } from './ProtectedRoute'
 import { AdminRoute } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
 
@@ -12,6 +12,18 @@ const SplashScreen = lazy(() =>
 )
 const LoginScreen = lazy(() =>
   import('../pages/LoginScreen').then((m) => ({ default: m.LoginScreen })),
+)
+const RegisterScreen = lazy(() =>
+  import('../pages/RegisterScreen').then((m) => ({ default: m.RegisterScreen })),
+)
+const ProfileSetupScreen = lazy(() =>
+  import('../pages/ProfileSetupScreen').then((m) => ({ default: m.ProfileSetupScreen })),
+)
+const ForgotPasswordScreen = lazy(() =>
+  import('../pages/ForgotPasswordScreen').then((m) => ({ default: m.ForgotPasswordScreen })),
+)
+const ResetPasswordScreen = lazy(() =>
+  import('../pages/ResetPasswordScreen').then((m) => ({ default: m.ResetPasswordScreen })),
 )
 const MapScreen = lazy(() =>
   import('../pages/MapScreen').then((m) => ({ default: m.MapScreen })),
@@ -52,133 +64,171 @@ export function AppRoutes() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <Routes>
-      <Route
-        path="/"
-        element={
-          <LazyPage>
-            <SplashScreen />
-          </LazyPage>
-        }
-      />
-
-      <Route element={<AuthLayout />}>
         <Route
-          path="/login"
+          path="/"
           element={
-            <GuestRoute>
+            <LazyPage>
+              <SplashScreen />
+            </LazyPage>
+          }
+        />
+
+        <Route element={<AuthLayout />}>
+          <Route
+            path="/login"
+            element={
+              <GuestRoute>
+                <LazyPage>
+                  <LoginScreen />
+                </LazyPage>
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <GuestRoute>
+                <LazyPage>
+                  <RegisterScreen />
+                </LazyPage>
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <GuestRoute>
+                <LazyPage>
+                  <ForgotPasswordScreen />
+                </LazyPage>
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
               <LazyPage>
-                <LoginScreen />
+                <ResetPasswordScreen />
               </LazyPage>
-            </GuestRoute>
-          }
-        />
-      </Route>
+            }
+          />
+          <Route
+            path="/profile-setup"
+            element={
+              <ProfileSetupRoute>
+                <LazyPage>
+                  <ProfileSetupScreen />
+                </LazyPage>
+              </ProfileSetupRoute>
+            }
+          />
+        </Route>
 
-      <Route
-        path="/capture"
-        element={
-          <ProtectedRoute>
-            <LazyPage>
-              <CaptureScreen />
-            </LazyPage>
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/capture"
+          element={
+            <ProtectedRoute>
+              <LazyPage>
+                <CaptureScreen />
+              </LazyPage>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
         <Route
-          path="/map"
           element={
-            <LazyPage>
-              <MapScreen />
-            </LazyPage>
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
           }
-        />
-        <Route
-          path="/near"
-          element={
-            <LazyPage>
-              <NearFigureScreen />
-            </LazyPage>
-          }
-        />
-        <Route
-          path="/my-figures"
-          element={
-            <LazyPage>
-              <MyFiguresScreen />
-            </LazyPage>
-          }
-        />
-        <Route
-          path="/options"
-          element={
-            <LazyPage>
-              <OptionsScreen />
-            </LazyPage>
-          }
-        />
-      </Route>
+        >
+          <Route
+            path="/map"
+            element={
+              <LazyPage>
+                <MapScreen />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/near"
+            element={
+              <LazyPage>
+                <NearFigureScreen />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/my-figures"
+            element={
+              <LazyPage>
+                <MyFiguresScreen />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/options"
+            element={
+              <LazyPage>
+                <OptionsScreen />
+              </LazyPage>
+            }
+          />
+        </Route>
 
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <AdminRoute>
-              <AdminLayout />
-            </AdminRoute>
-          </ProtectedRoute>
-        }
-      >
         <Route
-          index
+          path="/admin"
           element={
-            <LazyPage>
-              <AdminDashboardPage />
-            </LazyPage>
+            <ProtectedRoute requireCompleteProfile={false}>
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            </ProtectedRoute>
           }
-        />
-        <Route
-          path="players"
-          element={
-            <LazyPage>
-              <AdminPlayersPage />
-            </LazyPage>
-          }
-        />
-        <Route
-          path="figures"
-          element={
-            <LazyPage>
-              <AdminFiguresPage />
-            </LazyPage>
-          }
-        />
-        <Route
-          path="captures"
-          element={
-            <LazyPage>
-              <AdminCapturesPage />
-            </LazyPage>
-          }
-        />
-        <Route
-          path="map"
-          element={
-            <LazyPage>
-              <AdminMapPage />
-            </LazyPage>
-          }
-        />
-      </Route>
+        >
+          <Route
+            index
+            element={
+              <LazyPage>
+                <AdminDashboardPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="players"
+            element={
+              <LazyPage>
+                <AdminPlayersPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="figures"
+            element={
+              <LazyPage>
+                <AdminFiguresPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="captures"
+            element={
+              <LazyPage>
+                <AdminCapturesPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="map"
+            element={
+              <LazyPage>
+                <AdminMapPage />
+              </LazyPage>
+            }
+          />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   )
