@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mockFigures, TOTAL_FIGURES } from '../data/mockFigures'
+import { mockFigures } from '../data/mockFigures'
 import {
   ALBUM_STATUS,
   PERSISTED_FIELDS,
@@ -31,11 +31,37 @@ const zustandStorage = createJSONStorage(() => createZustandStorage())
 const createInitialFigures = () =>
   mockFigures.map((figure) => ({
     ...figure,
+    id: String(figure.id),
+    source: 'local-fallback',
+    capture_radius: 250,
     obtenida: false,
     foto: null,
     fotoSizeBytes: null,
     obtenidaEn: null,
   }))
+
+function mergeCatalogWithProgress(catalogFigures, currentFigures) {
+  const catalog = Array.isArray(catalogFigures) ? catalogFigures : []
+  const current = Array.isArray(currentFigures) ? currentFigures : []
+  const progressById = new Map(
+    current
+      .filter((figure) => figure?.id != null)
+      .map((figure) => [String(figure.id), figure]),
+  )
+
+  return catalog.map((figure) => {
+    const stored = progressById.get(String(figure.id))
+    return {
+      ...figure,
+      id: String(figure.id),
+      obtenida: Boolean(stored?.obtenida),
+      foto: stored?.foto ?? null,
+      fotoSizeBytes: stored?.fotoSizeBytes ?? null,
+      obtenidaEn: stored?.obtenidaEn ?? null,
+      captureMeta: stored?.captureMeta ?? null,
+    }
+  })
+}
 
 function pickPersistedFields(source) {
   const picked = {}
@@ -95,9 +121,13 @@ function buildPersistedSnapshot(state) {
   }
 }
 
+function sameFigureId(a, b) {
+  return String(a) === String(b)
+}
+
 function applyFigureUpdate(state, figureId, patch) {
   const figures = (Array.isArray(state.figures) ? state.figures : []).map((figure) =>
-    figure.id === figureId ? { ...figure, ...patch } : figure,
+    sameFigureId(figure.id, figureId) ? { ...figure, ...patch } : figure,
   )
 
   return {
@@ -145,6 +175,41 @@ export const useAppStore = create(
       setSupabaseSyncWarning: (warning) =>
         set({ lastSupabaseSyncWarning: warning, lastSavedAt: Date.now() }),
 
+      replaceCatalogFromRemote: (remoteFigures) =>
+        set((state) => {
+          if (!Array.isArray(remoteFigures) || remoteFigures.length === 0) {
+          console.warn('[figures-fallback]', 'remote catalog empty — keeping current catalog', JSON.stringify({
+              currentCount: state.figures.length,
+              fallback: true,
+            }))
+            return state
+          }
+
+          const figures = mergeCatalogWithProgress(remoteFigures, state.figures)
+          const ids = figures.map((figure) => String(figure.id))
+          const validIds = new Set(ids)
+          const lastViewedFigureId = validIds.has(String(state.lastViewedFigureId))
+            ? state.lastViewedFigureId
+            : null
+          const lastObtenidaFigureId = validIds.has(String(state.lastObtenidaFigureId))
+            ? state.lastObtenidaFigureId
+            : null
+
+          console.info('[figures-bootstrap]', 'catalog applied', JSON.stringify({
+            count: figures.length,
+            ids,
+            fallback: false,
+          }))
+
+          return {
+            figures,
+            lastViewedFigureId,
+            lastObtenidaFigureId,
+            albumStatus: computeAlbumStatus(figures, lastViewedFigureId),
+            lastSavedAt: Date.now(),
+          }
+        }),
+
       mergeRemoteUserFigures: (remoteRows) =>
         set((state) => {
           if (!Array.isArray(remoteRows) || remoteRows.length === 0) return state
@@ -160,7 +225,7 @@ export const useAppStore = create(
               continue
             }
 
-            const remoteKey = String(Number(row.figure_id) || row.figure_id)
+            const remoteKey = String(row.figure_id)
             if (!catalogIds.has(remoteKey)) {
               myFiguresLog.warn('remote figure not in catalog — ignored', {
                 figureId: row.figure_id,
@@ -169,7 +234,7 @@ export const useAppStore = create(
               continue
             }
 
-            remoteById.set(Number(row.figure_id) || row.figure_id, row)
+            remoteById.set(String(row.figure_id), row)
           }
 
           if (remoteById.size === 0) return state
@@ -177,7 +242,7 @@ export const useAppStore = create(
           let changed = false
           const figures = state.figures.map((figure) => {
             const remote =
-              remoteById.get(figure.id) ?? remoteById.get(String(figure.id))
+              remoteById.get(String(figure.id))
             if (!remote) return figure
 
             const remoteTime = remote.captured_at
@@ -232,10 +297,7 @@ export const useAppStore = create(
             figures,
             lastObtenidaFigureId,
             lastViewedFigureId,
-            albumStatus:
-              obtenidas >= TOTAL_FIGURES
-                ? ALBUM_STATUS.COMPLETADO
-                : computeAlbumStatus(figures, lastViewedFigureId),
+            albumStatus: computeAlbumStatus(figures, lastViewedFigureId),
             lastSavedAt: Date.now(),
           }
         }),
@@ -289,15 +351,15 @@ export const useAppStore = create(
           if (isQaFigure) {
             realFigureId =
               state.qaTestFigure?.targetFigureId ??
-              Number(figureKey.replace(/^(qa-|dev-)/, ''))
+              figureKey.replace(/^(qa-|dev-)/, '')
           }
 
-          const existing = state.figures.find((f) => f.id === realFigureId)
+          const existing = state.figures.find((f) => sameFigureId(f.id, realFigureId))
           if (existing?.obtenida) {
             persistLog.persist('obtain skipped — already obtained', realFigureId)
             saved = true
             const qaTargetFigureId = isQaFigure
-              ? state.qaTestFigure?.targetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+              ? state.qaTestFigure?.targetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
               : null
 
             void syncUnlockToSupabase({
@@ -313,7 +375,7 @@ export const useAppStore = create(
               if (result.ok && result.remotePhotoUrl) {
                 useAppStore.setState((current) => ({
                   figures: current.figures.map((f) =>
-                    f.id === realFigureId && f.obtenida
+                    sameFigureId(f.id, realFigureId) && f.obtenida
                       ? { ...f, foto: result.remotePhotoUrl ?? f.foto }
                       : f,
                   ),
@@ -340,7 +402,7 @@ export const useAppStore = create(
           saved = true
 
           const qaTargetFigureId = isQaFigure
-            ? state.qaTestFigure?.targetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+            ? state.qaTestFigure?.targetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
             : null
 
           void syncUnlockToSupabase({
@@ -355,8 +417,8 @@ export const useAppStore = create(
           }).then((result) => {
             if (result.ok && result.remotePhotoUrl) {
               useAppStore.setState((current) => ({
-                figures: current.figures.map((f) =>
-                  f.id === realFigureId && f.obtenida
+                  figures: current.figures.map((f) =>
+                    sameFigureId(f.id, realFigureId) && f.obtenida
                     ? { ...f, foto: result.remotePhotoUrl ?? f.foto }
                     : f,
                 ),
@@ -394,11 +456,11 @@ export const useAppStore = create(
         if (isQaFigure) {
           realFigureId =
             state.qaTestFigure?.targetFigureId ??
-            Number(figureKey.replace(/^(qa-|dev-)/, ''))
+            figureKey.replace(/^(qa-|dev-)/, '')
         }
 
         const qaTargetFigureId = isQaFigure
-          ? state.qaTestFigure?.targetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+          ? state.qaTestFigure?.targetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
           : null
 
         const result = await syncUnlockToSupabase({
@@ -432,9 +494,9 @@ export const useAppStore = create(
         }
 
         set((current) => {
-          const existing = current.figures.find((f) => f.id === realFigureId)
+          const existing = current.figures.find((f) => sameFigureId(f.id, realFigureId))
           const figures = current.figures.map((figure) =>
-            figure.id === realFigureId ? { ...figure, ...patch } : figure,
+            sameFigureId(figure.id, realFigureId) ? { ...figure, ...patch } : figure,
           )
 
           return {
@@ -543,7 +605,7 @@ export const useAppStore = create(
         set((state) => {
           const figures = state.figures
           const obtenidas = figures.filter((f) => f.obtenida).length
-          const isComplete = obtenidas >= TOTAL_FIGURES
+          const isComplete = figures.length > 0 && obtenidas >= figures.length
 
           return {
             lastViewedFigureId: figureId,
@@ -664,7 +726,7 @@ export const useAppStore = create(
       },
       onRehydrateStorage: () => {
         persistLog.hydration('start')
-        return (_state, error) => {
+        return (state, error) => {
           if (error) {
             persistLog.hydrationWarn('rehydrate error — clearing corrupt storage', error)
             sessionDebug.error('hydration rehydrate error — clearing album storage only', {
@@ -673,17 +735,16 @@ export const useAppStore = create(
             })
             try {
               storageService.clearAll()
-              useAppStore.persist.clearStorage()
-              resetStoreToDefaults()
+              setTimeout(() => resetStoreToDefaults(), 0)
             } catch {
-              useAppStore.getState().setHasHydrated(true)
+              state?.setHasHydrated?.(true)
             }
           } else {
             persistLog.hydration('rehydrate complete')
             sessionDebug.info('hydration rehydrate complete', {
               authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
             })
-            useAppStore.getState().setHasHydrated(true)
+            state?.setHasHydrated?.(true)
           }
         }
       },
@@ -718,4 +779,4 @@ export const selectPendientesFigures = (state) =>
     (figure) => !figure.obtenida,
   )
 
-export { TOTAL_FIGURES, ALBUM_STATUS }
+export { ALBUM_STATUS }

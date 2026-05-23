@@ -54,13 +54,15 @@ export function useFigureProximity(
         return
       }
 
+      const figureEnterMeters = Number(figure.capture_radius) || enterMeters
+      const figureExitMeters = Math.max(figureEnterMeters + 30, exitMeters)
       const wasNear = Boolean(nextState[figure.id])
       const dist = figure.distanceMeters
 
-      if (!wasNear && dist <= enterMeters) {
+      if (!wasNear && dist <= figureEnterMeters) {
         nextState[figure.id] = true
         changed = true
-      } else if (wasNear && dist > exitMeters) {
+      } else if (wasNear && dist > figureExitMeters) {
         delete nextState[figure.id]
         changed = true
       }

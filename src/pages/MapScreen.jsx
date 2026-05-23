@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LazyMap } from '../components/performance/LazyMap'
 import { ProgressBar } from '../components/ProgressBar'
@@ -12,6 +12,16 @@ export function MapScreen() {
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const startCaptureSession = useAppStore((state) => state.startCaptureSession)
   const { mapFigures } = useQaTestFigure()
+
+  useEffect(() => {
+    console.info('[map-figures]', 'render input', JSON.stringify({
+      storedCount: figures.length,
+      renderedCount: mapFigures.length,
+      storedIds: figures.map((figure) => String(figure.id)),
+      renderedIds: mapFigures.map((figure) => String(figure.id)),
+      fallback: figures.some((figure) => figure.source === 'local-fallback'),
+    }))
+  }, [figures, mapFigures])
 
   const handleNearFigureChange = useCallback((figure) => {
     setNearFigure(figure)

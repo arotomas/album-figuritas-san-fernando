@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAppStore, selectProgress, TOTAL_FIGURES } from '../../store/useAppStore'
+import { useAppStore, selectProgress } from '../../store/useAppStore'
 import { storageService } from '../../services/storage/storageService'
 import { STORAGE_KEY } from '../../config/persistence'
 import { PerformanceDebugPanel } from '../performance/PerformanceDebugPanel'
@@ -15,6 +15,7 @@ export function DebugPanel() {
   const clearStorage = useAppStore((state) => state.clearStorage)
   const getPersistedSnapshot = useAppStore((state) => state.getPersistedSnapshot)
   const progress = useAppStore(selectProgress)
+  const totalFigures = useAppStore((state) => state.figures.length)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastSavedAt = useAppStore((state) => state.lastSavedAt)
 
@@ -56,7 +57,7 @@ export function DebugPanel() {
             >
               <h2 className="text-lg font-bold">Debug Panel</h2>
               <p className="mt-1 text-xs text-zinc-400">
-                Progreso: {progress}/{TOTAL_FIGURES} · {albumStatus}
+                Progreso: {progress}/{totalFigures} · {albumStatus}
               </p>
               {lastSavedAt && (
                 <p className="mt-1 text-xs text-zinc-500">

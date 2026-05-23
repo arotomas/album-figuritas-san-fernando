@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { m } from 'framer-motion'
-import { useAppStore, selectProgress, TOTAL_FIGURES } from '../../store/useAppStore'
+import { useAppStore, selectProgress } from '../../store/useAppStore'
 import { motion as motionTokens } from '../../theme/motion'
 import { typeClasses } from '../../theme/typography'
 import { ParticleLayer } from '../ui/ParticleLayer'
@@ -8,6 +8,7 @@ import { rewardLog } from '../../utils/devLog'
 
 export function UnlockAnimation({ onComplete }) {
   const progress = useAppStore(selectProgress)
+  const totalFigures = useAppStore((state) => state.figures.length)
   const onCompleteRef = useRef(onComplete)
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export function UnlockAnimation({ onComplete }) {
 
         <div className="flex items-center gap-3">
           <div className="flex flex-1 gap-1">
-            {Array.from({ length: TOTAL_FIGURES }).map((_, index) => (
+            {Array.from({ length: totalFigures }).map((_, index) => (
               <m.div
                 key={index}
                 initial={{ scaleY: 0 }}
@@ -71,7 +72,7 @@ export function UnlockAnimation({ onComplete }) {
             ))}
           </div>
           <span className="font-display min-w-10 text-sm font-bold text-lime-400">
-            {progress}/{TOTAL_FIGURES}
+            {progress}/{totalFigures}
           </span>
         </div>
       </m.div>

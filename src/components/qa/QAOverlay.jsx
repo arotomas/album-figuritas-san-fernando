@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAppStore, selectProgress, TOTAL_FIGURES } from '../../store/useAppStore'
+import { useAppStore, selectProgress } from '../../store/useAppStore'
 import { storageService } from '../../services/storage/storageService'
 import { STORAGE_KEY } from '../../config/persistence'
 import { PerformanceDebugPanel } from '../performance/PerformanceDebugPanel'
@@ -39,6 +39,7 @@ function QAOverlayDev() {
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
   const progress = useAppStore(selectProgress)
+  const totalFigures = useAppStore((state) => state.figures.length)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastSavedAt = useAppStore((state) => state.lastSavedAt)
 
@@ -69,7 +70,7 @@ function QAOverlayDev() {
     const storeFigures = useAppStore.getState().figures
     const pending = storeFigures.find((f) => !f.obtenida)
     if (!pending) return null
-    return mockFigures.find((m) => m.id === pending.id) ?? pending
+    return pending
   }
 
   const handleForceProximity = () => {
@@ -159,7 +160,7 @@ function QAOverlayDev() {
             >
               <h2 className="font-display text-lg font-bold">QA Panel</h2>
               <p className="mt-1 text-xs text-zinc-400">
-                Progreso: {progress}/{TOTAL_FIGURES} · {albumStatus}
+                Progreso: {progress}/{totalFigures} · {albumStatus}
               </p>
               {lastSavedAt && (
                 <p className="mt-1 text-xs text-zinc-500">

@@ -154,6 +154,11 @@ function FigureMarkersLayer({ figures, nearFigureIds }) {
   const cacheRef = useRef({})
 
   useEffect(() => {
+    console.info('[map-figures]', 'markers render', JSON.stringify({
+      count: figures.length,
+      ids: figures.map((figure) => String(figure.id)),
+    }))
+
     markersRef.current.forEach((marker) => marker.remove())
     rootsRef.current.forEach((root) => root.unmount())
     markersRef.current = []

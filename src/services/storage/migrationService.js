@@ -1,5 +1,5 @@
 import { STORAGE_VERSION } from '../../config/persistence'
-import { mockFigures, TOTAL_FIGURES } from '../../data/mockFigures'
+import { mockFigures } from '../../data/mockFigures'
 import { computeAlbumStatus } from '../../store/albumUtils'
 import { persistLog } from '../../utils/persistLog'
 
@@ -51,15 +51,17 @@ export function mergeFiguresWithTemplate(storedFigures) {
   const storedById = new Map(
     list
       .filter((figure) => figure && figure.id != null)
-      .map((figure) => [figure.id, figure]),
+      .map((figure) => [String(figure.id), figure]),
   )
 
   return mockFigures.map((template) => {
-    const stored = storedById.get(template.id)
-    if (!stored) return { ...template }
+    const stored = storedById.get(String(template.id))
+    if (!stored) return { ...template, id: String(template.id), capture_radius: 250 }
 
     return {
       ...template,
+      id: String(template.id),
+      capture_radius: 250,
       obtenida: Boolean(stored.obtenida),
       foto: stored.foto ?? null,
       fotoSizeBytes: stored.fotoSizeBytes ?? null,
@@ -133,7 +135,7 @@ export function migratePersistedState(raw) {
         user: state.user ?? null,
         hasSeenSplash: state.hasSeenSplash ?? false,
         progressSnapshot: obtenidas,
-        totalFigures: TOTAL_FIGURES,
+        totalFigures: figures.length,
       },
     }
   } catch (error) {

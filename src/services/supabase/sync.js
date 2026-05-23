@@ -10,7 +10,7 @@ import { uploadCapturePhoto } from './storage'
 function resolveRealFigureId(figureId, qaTargetFigureId = null) {
   const figureKey = String(figureId)
   if (figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')) {
-    return qaTargetFigureId ?? Number(figureKey.replace(/^(qa-|dev-)/, ''))
+    return qaTargetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
   }
   return figureId
 }

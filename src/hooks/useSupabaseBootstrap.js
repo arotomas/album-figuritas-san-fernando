@@ -6,6 +6,7 @@ import {
   restoreSupabaseSession,
 } from '../services/supabase/auth'
 import { isAdmin } from '../services/supabase/admin'
+import { fetchPublicFigures } from '../services/supabase/figures'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { supabaseLog } from '../utils/supabaseLog'
 import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
@@ -16,6 +17,7 @@ import { getSupabaseProjectRef } from '../utils/authDebug'
  */
 export function useSupabaseBootstrap(enabled) {
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
+  const replaceCatalogFromRemote = useAppStore((state) => state.replaceCatalogFromRemote)
   const mergeRemoteUserFigures = useAppStore((state) => state.mergeRemoteUserFigures)
   const login = useAppStore((state) => state.login)
   const user = useAppStore((state) => state.user)
@@ -63,9 +65,11 @@ export function useSupabaseBootstrap(enabled) {
         }
 
         const admin = await isAdmin(userId)
+        const remoteCatalog = await fetchPublicFigures()
 
         if (cancelled) return
 
+        replaceCatalogFromRemote(remoteCatalog)
         setSupabaseAuth({ userId, isAdmin: admin, profile })
 
         if (profileUsername && !localUsername) {
@@ -88,11 +92,16 @@ export function useSupabaseBootstrap(enabled) {
           userId,
           isAdmin: admin,
           remoteFigures: remoteRows.length,
+          remoteCatalog: remoteCatalog.length,
         })
       } catch (error) {
         sessionDebug.error('bootstrap failed', {
           message: error?.message ?? String(error),
         })
+        console.warn('[figures-fallback]', 'bootstrap failed — keeping local catalog', JSON.stringify({
+          message: error?.message ?? String(error),
+          fallback: true,
+        }))
         supabaseLog.sync.warn('bootstrap failed', {
           message: error?.message ?? String(error),
         })
@@ -104,5 +113,12 @@ export function useSupabaseBootstrap(enabled) {
     return () => {
       cancelled = true
     }
-  }, [enabled, login, mergeRemoteUserFigures, setSupabaseAuth, user?.username])
+  }, [
+    enabled,
+    login,
+    mergeRemoteUserFigures,
+    replaceCatalogFromRemote,
+    setSupabaseAuth,
+    user?.username,
+  ])
 }

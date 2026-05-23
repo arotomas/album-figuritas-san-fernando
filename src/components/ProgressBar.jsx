@@ -1,7 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAppStore, selectProgress, TOTAL_FIGURES } from '../store/useAppStore'
-import { mockFigures } from '../data/mockFigures'
+import { useAppStore, selectProgress } from '../store/useAppStore'
 
 function ProgressBarInner({
   className = '',
@@ -15,6 +14,7 @@ function ProgressBarInner({
   const navigate = useNavigate()
 
   const isDark = variant === 'dark'
+  const totalFigures = figures.length
 
   return (
     <div className={className}>
@@ -30,7 +30,7 @@ function ProgressBarInner({
 
       <div className="flex items-center gap-3">
         <div className="flex flex-1 gap-1">
-          {Array.from({ length: TOTAL_FIGURES }).map((_, index) => (
+          {Array.from({ length: totalFigures }).map((_, index) => (
             <div
               key={index}
               className={`h-3 flex-1 rounded-sm transition-colors duration-300 ${
@@ -48,18 +48,17 @@ function ProgressBarInner({
             isDark ? 'text-white' : 'text-ink'
           }`}
         >
-          {progress}/{TOTAL_FIGURES}
+          {progress}/{totalFigures}
         </span>
       </div>
 
-      {showSimulateLink && progress < TOTAL_FIGURES && (
+      {showSimulateLink && progress < totalFigures && (
         <button
           type="button"
           onClick={() => {
             const next = figures.find((f) => !f.obtenida)
             if (!next) return
-            const template = mockFigures.find((m) => m.id === next.id) ?? next
-            setNearFigure({ ...template, ...next, distanceMeters: 12 })
+            setNearFigure({ ...next, distanceMeters: 12 })
             navigate('/near')
           }}
           className={`mt-3 w-full text-center text-xs underline-offset-2 hover:underline ${

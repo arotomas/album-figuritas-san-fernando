@@ -151,7 +151,7 @@ export function CaptureFlow() {
 
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
     const stored = figures.find(
-      (f) => f.id === targetId || f.id === nearFigure.id,
+      (f) => String(f.id) === String(targetId) || String(f.id) === String(nearFigure.id),
     )
     if (stored?.obtenida) {
       setNearFigure(null)

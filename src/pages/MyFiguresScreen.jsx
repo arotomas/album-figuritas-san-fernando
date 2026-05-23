@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6'
-import { useAppStore, selectProgress, TOTAL_FIGURES, ALBUM_STATUS } from '../store/useAppStore'
+import { useAppStore, selectProgress, ALBUM_STATUS } from '../store/useAppStore'
 import { AlbumBackground } from '../components/album/AlbumBackground'
 import { AlbumProgress } from '../components/album/AlbumProgress'
 import { FeaturedFigureCard } from '../components/album/FeaturedFigureCard'
@@ -141,7 +141,7 @@ export function MyFiguresScreen() {
         </div>
 
         <div className="mt-4">
-          <AlbumProgress progress={progress} total={TOTAL_FIGURES} />
+          <AlbumProgress progress={progress} total={figures.length} />
         </div>
       </header>
 
