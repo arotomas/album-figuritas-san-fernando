@@ -158,7 +158,7 @@ function normalizeFigurePayload(figure) {
   }
 }
 
-function buildFigureId(title) {
+export function buildFigureId(title) {
   const slug = title
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

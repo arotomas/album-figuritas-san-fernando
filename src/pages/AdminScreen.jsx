@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminFigureLocationPicker } from '../components/admin/AdminFigureLocationPicker'
 import { AdminMap } from '../components/admin/AdminMap'
 import {
+  buildFigureId,
   createFigureAdmin,
   deleteFigureAdmin,
   getAdminStats,
@@ -10,9 +11,15 @@ import {
   toggleFigureActive,
   updateFigureAdmin,
 } from '../services/supabase/adminDashboard'
+import {
+  MARKER_ICON_MAX_BYTES,
+  MARKER_ICON_MIME_TYPES,
+  uploadMarkerIcon,
+} from '../services/supabase/storage'
 
 const RARITY_OPTIONS = ['común', 'rara', 'épica', 'legendaria']
 const DEFAULT_FIGURE_FORM = {
+  id: '',
   title: '',
   description: '',
   rarity: 'común',
@@ -54,6 +61,7 @@ function toFigureForm(figure) {
 
   return {
     title: figure.title ?? '',
+    id: figure.id ?? '',
     description: figure.description ?? '',
     rarity: figure.rarity ?? 'común',
     image_url: figure.image_url ?? '',
@@ -109,6 +117,7 @@ export function AdminScreen() {
   const [figureFormError, setFigureFormError] = useState(null)
   const [figureFormMessage, setFigureFormMessage] = useState(null)
   const [figureSaving, setFigureSaving] = useState(false)
+  const [markerIconUploading, setMarkerIconUploading] = useState(false)
   const figureFormRef = useRef(null)
   const [filters, setFilters] = useState({
     user: '',
@@ -226,6 +235,50 @@ export function AdminScreen() {
 
   const updateFigureForm = (key, value) => {
     setFigureForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const handleMarkerIconFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setFigureFormError(null)
+    setFigureFormMessage(null)
+
+    if (!MARKER_ICON_MIME_TYPES.includes(file.type)) {
+      setFigureFormError('El ícono debe ser PNG, WebP o SVG.')
+      return
+    }
+    if (file.size > MARKER_ICON_MAX_BYTES) {
+      setFigureFormError('El ícono no puede superar los 200 KB.')
+      return
+    }
+
+    const figureId = editingFigureId || figureForm.id || buildFigureId(figureForm.title || 'figurita')
+    setMarkerIconUploading(true)
+    setFigureForm((current) => ({ ...current, id: figureId }))
+
+    try {
+      const result = await uploadMarkerIcon({ figureId, file })
+      if (!result.ok) {
+        setFigureFormError(result.reason ?? 'No pudimos subir el ícono del marcador.')
+        return
+      }
+
+      setFigureForm((current) => ({
+        ...current,
+        id: figureId,
+        marker_icon_url: result.publicUrl,
+      }))
+      setFigureFormMessage('Ícono del marcador subido')
+    } catch (uploadError) {
+      console.error('[admin-icons]', 'upload error', {
+        message: uploadError?.message ?? String(uploadError),
+      })
+      setFigureFormError(uploadError?.message ?? 'No pudimos subir el ícono del marcador.')
+    } finally {
+      setMarkerIconUploading(false)
+    }
   }
 
   const handleSaveFigure = async (event) => {
@@ -760,7 +813,7 @@ export function AdminScreen() {
                           />
                         </label>
                         <label className="col-span-2 block text-xs font-bold uppercase tracking-wide text-muted">
-                          Ícono marcador
+                          Ícono marcador URL
                           <input
                             value={figureForm.marker_icon_url}
                             onChange={(event) =>
@@ -770,6 +823,45 @@ export function AdminScreen() {
                             className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
                           />
                         </label>
+                      </div>
+
+                      <div className="rounded-2xl border border-border bg-white p-4">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-border bg-slate-50">
+                            {figureForm.marker_icon_url ? (
+                              <img
+                                src={figureForm.marker_icon_url}
+                                alt="Preview ícono marcador"
+                                className="h-14 w-14 object-contain"
+                              />
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase text-muted">
+                                Sin ícono
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                              Subir ícono del marcador
+                              <input
+                                type="file"
+                                accept={MARKER_ICON_MIME_TYPES.join(',')}
+                                onChange={handleMarkerIconFileChange}
+                                disabled={markerIconUploading}
+                                className="mt-2 block w-full text-sm normal-case tracking-normal text-ink file:mr-3 file:rounded-xl file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:opacity-50"
+                              />
+                            </label>
+                            <p className="mt-2 text-xs leading-5 text-muted">
+                              Recomendado: PNG transparente 256x256 px, máximo 200 KB.
+                              También acepta WebP y SVG.
+                            </p>
+                            {markerIconUploading && (
+                              <p className="mt-2 text-xs font-bold text-progress">
+                                Subiendo ícono…
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       <label className="block text-xs font-bold uppercase tracking-wide text-muted">
@@ -790,10 +882,12 @@ export function AdminScreen() {
 
                       <button
                         type="submit"
-                        disabled={figureSaving}
+                        disabled={figureSaving || markerIconUploading}
                         className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
                       >
-                        {figureSaving
+                        {markerIconUploading
+                          ? 'Subiendo ícono…'
+                          : figureSaving
                           ? 'Guardando…'
                           : editingFigureId
                             ? 'Guardar cambios'

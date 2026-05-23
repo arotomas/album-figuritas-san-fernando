@@ -5,6 +5,9 @@ import { captureSyncLog, storageTestLog } from '../../utils/captureSyncLog'
 import { getSessionUserId } from './auth'
 
 export const CAPTURES_BUCKET = 'captures'
+export const MARKER_ICONS_BUCKET = 'marker-icons'
+export const MARKER_ICON_MAX_BYTES = 200 * 1024
+export const MARKER_ICON_MIME_TYPES = ['image/png', 'image/webp', 'image/svg+xml']
 
 /** Límite del bucket en Supabase (migration 001). */
 export const STORAGE_BUCKET_MAX_BYTES = 524_288
@@ -20,6 +23,16 @@ function summarizeUploadError(error) {
   }
 }
 
+function sanitizeStorageSegment(value, fallback = 'marker') {
+  return String(value || fallback)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || fallback
+}
+
 /**
  * Path relativo al bucket: userId/timestamp.jpg
  * Nunca incluir prefijo "captures/".
@@ -32,6 +45,33 @@ export function buildCaptureStoragePath(userId, timestamp = Date.now()) {
 export function normalizeStoragePath(path) {
   if (!path) return path
   return path.replace(/^captures\//, '')
+}
+
+export function buildMarkerIconStoragePath(figureId, filename, timestamp = Date.now()) {
+  const safeFigureId = sanitizeStorageSegment(figureId, 'temp')
+  const safeFilename = sanitizeStorageSegment(filename, 'marker-icon')
+  return `marker-icons/${safeFigureId}/${timestamp}-${safeFilename}`
+}
+
+export function validateMarkerIconFile(file) {
+  if (!(file instanceof File)) {
+    return { ok: false, reason: 'NOT_A_FILE' }
+  }
+  if (!MARKER_ICON_MIME_TYPES.includes(file.type)) {
+    return { ok: false, reason: 'INVALID_MIME', type: file.type }
+  }
+  if (file.size <= 0) {
+    return { ok: false, reason: 'EMPTY_FILE', size: file.size }
+  }
+  if (file.size > MARKER_ICON_MAX_BYTES) {
+    return {
+      ok: false,
+      reason: 'FILE_TOO_LARGE',
+      size: file.size,
+      maxBytes: MARKER_ICON_MAX_BYTES,
+    }
+  }
+  return { ok: true, size: file.size, type: file.type }
 }
 
 export function dataUrlToBlob(dataUrl) {
@@ -147,6 +187,63 @@ export async function testStorageUpload() {
 
   supabaseLog.upload.info('test upload public url', { publicUrl })
   storageTestLog.info('success', { path, publicUrl, data })
+
+  return { ok: true, path, publicUrl, data }
+}
+
+export async function uploadMarkerIcon({ figureId, file }) {
+  const validation = validateMarkerIconFile(file)
+  const path = buildMarkerIconStoragePath(figureId, file?.name)
+
+  if (!validation.ok) {
+    console.error('[admin-icons]', 'upload error', {
+      figureId,
+      path,
+      ...validation,
+    })
+    return { ok: false, path, ...validation }
+  }
+
+  console.info('[admin-icons]', 'upload start', {
+    bucket: MARKER_ICONS_BUCKET,
+    path,
+    size: file.size,
+    type: file.type,
+  })
+
+  const { data, error } = await supabase.storage.from(MARKER_ICONS_BUCKET).upload(path, file, {
+    contentType: file.type,
+    upsert: true,
+    cacheControl: '31536000',
+  })
+
+  if (error) {
+    console.error('[admin-icons]', 'upload error', {
+      bucket: MARKER_ICONS_BUCKET,
+      path,
+      error: summarizeUploadError(error),
+    })
+    return {
+      ok: false,
+      reason: error.message,
+      error: summarizeUploadError(error),
+      path,
+    }
+  }
+
+  const { data: publicData } = supabase.storage.from(MARKER_ICONS_BUCKET).getPublicUrl(path)
+  const publicUrl = publicData?.publicUrl ?? null
+
+  console.info('[admin-icons]', 'upload success', {
+    bucket: MARKER_ICONS_BUCKET,
+    path,
+    publicUrl,
+    data,
+  })
+
+  if (!publicUrl) {
+    return { ok: false, reason: 'NO_PUBLIC_URL', path, data }
+  }
 
   return { ok: true, path, publicUrl, data }
 }
