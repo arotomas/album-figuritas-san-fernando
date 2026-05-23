@@ -76,6 +76,7 @@ export function CaptureFlow() {
     gpsAccuracy,
     isReady,
     isProcessing,
+    processingMessage,
     inCaptureRange,
     isApproximateGps,
     distanceMeters,
@@ -311,6 +312,7 @@ export function CaptureFlow() {
         figure={displayFigure}
         fileInputRef={camera.fileInputRef}
         isProcessing={isCapturing}
+        processingMessage={processingMessage}
         isOpening={!isCapturing && !showCaptureError}
         captureError={showCaptureError ? captureError : null}
         onFileSelected={handleFileSelected}

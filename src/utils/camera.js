@@ -1,4 +1,5 @@
 import { cameraLog } from './cameraLog'
+import { withTimeout } from './withTimeout'
 
 export const CAMERA_CONSTRAINTS = {
   video: { facingMode: { ideal: 'environment' } },
@@ -6,8 +7,10 @@ export const CAMERA_CONSTRAINTS = {
 }
 
 export const BLACK_PREVIEW_TIMEOUT_MS = 2_000
+export const IMAGE_LOAD_TIMEOUT_MS = 10_000
 
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i
+const MAX_LOAD_DIMENSION = 2048
 
 export function isCameraSupported() {
   return Boolean(
@@ -74,45 +77,65 @@ export function captureFrameFromVideo(video) {
   return canvas
 }
 
-function drawBitmapToCanvas(bitmap) {
+function scaleToMaxDimension(width, height, maxDim = MAX_LOAD_DIMENSION) {
+  if (width <= maxDim && height <= maxDim) {
+    return { width, height }
+  }
+  const ratio = Math.min(maxDim / width, maxDim / height)
+  return {
+    width: Math.max(1, Math.round(width * ratio)),
+    height: Math.max(1, Math.round(height * ratio)),
+  }
+}
+
+function drawSourceToCanvas(drawSource, sourceWidth, sourceHeight) {
+  const { width, height } = scaleToMaxDimension(sourceWidth, sourceHeight)
   const canvas = document.createElement('canvas')
-  canvas.width = bitmap.width
-  canvas.height = bitmap.height
+  canvas.width = width
+  canvas.height = height
 
   const context = canvas.getContext('2d')
   if (!context) {
     throw new Error('CANVAS_CONTEXT_UNAVAILABLE')
   }
 
-  context.drawImage(bitmap, 0, 0)
+  context.drawImage(drawSource, 0, 0, width, height)
   return canvas
 }
 
 function loadImageFromUrl(url) {
   return new Promise((resolve, reject) => {
     const img = new Image()
+    let settled = false
 
-    img.onload = () => {
+    const finish = (handler) => (value) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      handler(value)
+    }
+
+    const timer = window.setTimeout(() => {
+      img.onload = null
+      img.onerror = null
+      finish(reject)(new Error('IMAGE_LOAD_TIMEOUT'))
+    }, IMAGE_LOAD_TIMEOUT_MS)
+
+    img.onload = finish(() => {
       if (!img.naturalWidth || !img.naturalHeight) {
         reject(new Error('IMAGE_EMPTY'))
         return
       }
-
-      const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth
-      canvas.height = img.naturalHeight
-
-      const context = canvas.getContext('2d')
-      if (!context) {
-        reject(new Error('CANVAS_CONTEXT_UNAVAILABLE'))
-        return
+      try {
+        resolve(
+          drawSourceToCanvas(img, img.naturalWidth, img.naturalHeight),
+        )
+      } catch (error) {
+        reject(error)
       }
+    })
 
-      context.drawImage(img, 0, 0)
-      resolve(canvas)
-    }
-
-    img.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'))
+    img.onerror = finish(() => reject(new Error('IMAGE_LOAD_FAILED')))
     img.src = url
   })
 }
@@ -122,15 +145,50 @@ async function loadImageFromFileWithBitmap(file) {
     throw new Error('IMAGE_BITMAP_UNSUPPORTED')
   }
 
-  const bitmap = await createImageBitmap(file)
+  const bitmap = await withTimeout(
+    createImageBitmap(file),
+    IMAGE_LOAD_TIMEOUT_MS,
+    'createImageBitmap',
+  )
+
   try {
     if (!bitmap.width || !bitmap.height) {
       throw new Error('IMAGE_EMPTY')
     }
-    return drawBitmapToCanvas(bitmap)
+    return drawSourceToCanvas(bitmap, bitmap.width, bitmap.height)
   } finally {
     bitmap.close?.()
   }
+}
+
+function loadImageFromFileWithReader(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    let settled = false
+
+    const finish = (handler) => (value) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      handler(value)
+    }
+
+    const timer = window.setTimeout(() => {
+      reader.abort()
+      finish(reject)(new Error('FILE_READ_TIMEOUT'))
+    }, IMAGE_LOAD_TIMEOUT_MS)
+
+    reader.onload = finish(() => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('FILE_READ_EMPTY'))
+        return
+      }
+      loadImageFromUrl(reader.result).then(resolve).catch(reject)
+    })
+    reader.onerror = finish(() => reject(new Error('FILE_READ_FAILED')))
+    reader.onabort = finish(() => reject(new Error('FILE_READ_ABORT')))
+    reader.readAsDataURL(file)
+  })
 }
 
 /**
@@ -153,7 +211,7 @@ export async function loadImageFromFile(file) {
     try {
       return await loadImageFromFileWithBitmap(file)
     } catch {
-      // fallback a Image + object URL
+      // fallback
     }
   }
 
@@ -161,6 +219,8 @@ export async function loadImageFromFile(file) {
 
   try {
     return await loadImageFromUrl(url)
+  } catch {
+    return loadImageFromFileWithReader(file)
   } finally {
     URL.revokeObjectURL(url)
   }

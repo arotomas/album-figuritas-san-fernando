@@ -142,16 +142,21 @@ export const useAppStore = create(
 
       obtainFigureWithPhoto: (figureId, { foto, fotoSizeBytes, obtenidaEn, captureRecord }) => {
         let saved = false
+        const figureKey = String(figureId)
+        const isQaFigure =
+          figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')
 
         set((state) => {
-          if (!foto || !storageService.isPhotoWithinLimit(fotoSizeBytes)) {
+          const withinLimit =
+            isQaFigure || storageService.isPhotoWithinLimit(fotoSizeBytes)
+
+          if (!foto || !withinLimit) {
             persistLog.persist('obtain blocked — photo required or too large', figureId)
             return state
           }
 
           let realFigureId = figureId
-          const figureKey = String(figureId)
-          if (figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')) {
+          if (isQaFigure) {
             realFigureId =
               state.qaTestFigure?.targetFigureId ??
               Number(figureKey.replace(/^(qa-|dev-)/, ''))

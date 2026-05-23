@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCamera } from './useCamera'
 import { captureFrameFromVideo, isImageFile, loadImageFromFile } from '../utils/camera'
-import { compressImage } from '../utils/imageCompression'
+import {
+  compressImageWithFallback,
+  readFileAsDataUrl,
+} from '../utils/imageCompression'
+import { withTimeout } from '../utils/withTimeout'
 import { vibrateCapture, vibrateReady, vibrateUnlock } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
 import { CAPTURE_MAX_DISTANCE_METERS } from '../config/ux'
@@ -9,6 +13,7 @@ import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
 import {
   buildCaptureRecord,
   processCaptureForUnlock,
+  CAPTURE_VALIDATION_STATUS,
 } from '../services/captureService'
 import { getQaState, setQaFlag } from '../utils/diagnostics'
 import { cameraLog } from '../utils/cameraLog'
@@ -25,6 +30,13 @@ export const CAPTURE_PHASES = {
 
 export const CAPTURE_RECOVERABLE_ERROR =
   'No pudimos procesar la foto. Probá otra vez.'
+
+export const CAPTURE_TIMEOUT_ERROR =
+  'La foto tardó demasiado en procesarse. Probá otra vez.'
+
+const PROCESSING_TIMEOUT_MS = 15_000
+const LOAD_IMAGE_TIMEOUT_MS = 12_000
+const UNLOCK_TIMEOUT_MS = 5_000
 
 function getDistanceToFigure(position, figure) {
   if (!position || !figure) return null
@@ -86,10 +98,17 @@ function toProcessingError(error) {
   if (!error?.message) return CAPTURE_RECOVERABLE_ERROR
   if (
     error.message === CAPTURE_RECOVERABLE_ERROR ||
+    error.message === CAPTURE_TIMEOUT_ERROR
+  ) {
+    return error.message
+  }
+  if (
+    error.message.endsWith('_TIMEOUT') ||
     error.message.startsWith('FILE_') ||
     error.message.startsWith('IMAGE_') ||
     error.message.startsWith('CANVAS_') ||
-    error.message.startsWith('COMPRESSION_')
+    error.message.startsWith('COMPRESSION_') ||
+    error.message.startsWith('BLOB_')
   ) {
     return CAPTURE_RECOVERABLE_ERROR
   }
@@ -114,9 +133,11 @@ export function useCaptureFlow({
   const [capturedFigure, setCapturedFigure] = useState(null)
   const [captureError, setCaptureError] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingMessage, setProcessingMessage] = useState(null)
 
   const hasVibratedReadyRef = useRef(false)
   const processingRef = useRef(false)
+  const processingTimeoutRef = useRef(null)
   const phaseRef = useRef(CAPTURE_PHASES.CAMERA)
   const lastProcessedFileKeyRef = useRef(null)
   const unlockSubmittedRef = useRef(false)
@@ -206,10 +227,45 @@ export function useCaptureFlow({
   ])
 
   const resetProcessingState = useCallback(() => {
+    if (processingTimeoutRef.current) {
+      window.clearTimeout(processingTimeoutRef.current)
+      processingTimeoutRef.current = null
+    }
     processingRef.current = false
     setIsProcessing(false)
+    setProcessingMessage(null)
     lastProcessedFileKeyRef.current = null
   }, [])
+
+  const stopProcessingUi = useCallback(() => {
+    if (processingTimeoutRef.current) {
+      window.clearTimeout(processingTimeoutRef.current)
+      processingTimeoutRef.current = null
+    }
+    processingRef.current = false
+    setIsProcessing(false)
+    setProcessingMessage(null)
+  }, [])
+
+  const startProcessingGuard = useCallback(
+    (onTimeout) => {
+      processingRef.current = true
+      setIsProcessing(true)
+      setProcessingMessage('Procesando foto…')
+      setCaptureError(null)
+
+      if (processingTimeoutRef.current) {
+        window.clearTimeout(processingTimeoutRef.current)
+      }
+
+      processingTimeoutRef.current = window.setTimeout(() => {
+        if (!processingRef.current || unlockSubmittedRef.current) return
+        captureLog.timeout({ afterMs: PROCESSING_TIMEOUT_MS })
+        onTimeout(new Error(CAPTURE_TIMEOUT_ERROR))
+      }, PROCESSING_TIMEOUT_MS)
+    },
+    [],
+  )
 
   const handleRecoverableError = useCallback(
     (error, context = {}) => {
@@ -365,44 +421,13 @@ export function useCaptureFlow({
     return buildLocationSnapshot(figureSnapshot, position)
   }, [captureSession?.locationSnapshot, position])
 
-  const processCanvas = useCallback(
-    async (canvas, figureSnapshot, { afterNativePhoto = false } = {}) => {
-      if (!figureSnapshot) {
-        throw new Error(CAPTURE_RECOVERABLE_ERROR)
-      }
-
-      const locationSnapshot = resolveCaptureLocation(figureSnapshot, { afterNativePhoto })
-      const capturePosition = snapshotToPosition(locationSnapshot)
-
-      if (!capturePosition) {
-        if (afterNativePhoto || pendingFigureRef.current) {
-          throw new Error(CAPTURE_RECOVERABLE_ERROR)
-        }
-        throw new Error('Esperá a que el GPS confirme tu ubicación.')
-      }
-
-      if (
-        phaseRef.current !== CAPTURE_PHASES.CAMERA &&
-        phaseRef.current !== CAPTURE_PHASES.CAPTURING &&
-        phaseRef.current !== CAPTURE_PHASES.COMPRESSING
-      ) {
-        return false
-      }
-
-      setCaptureError(null)
-      setPhase(CAPTURE_PHASES.COMPRESSING)
-      captureLog.processingStart({ figureId: figureSnapshot.id })
-
-      const compressed = await compressImage(canvas, {
-        maxWidth: 960,
-        quality: 0.68,
-      })
-
+  const finalizeUnlock = useCallback(
+    async (compressed, figureSnapshot, locationSnapshot, capturePosition) => {
       if (!compressed?.dataUrl) {
         throw new Error(CAPTURE_RECOVERABLE_ERROR)
       }
 
-      captureLog.compressionSuccess({
+      captureLog.compressSuccess({
         figureId: figureSnapshot.id,
         bytes: compressed.sizeBytes,
         width: compressed.width,
@@ -425,9 +450,23 @@ export function useCaptureFlow({
         createdAt: Date.now(),
       })
 
-      const validatedCapture = await processCaptureForUnlock(captureRecord)
+      captureLog.unlockStart({ figureId: figureSnapshot.id, isQaTest: Boolean(figureSnapshot.isQaTest) })
 
-      return runObtainAndReward(
+      let validatedCapture
+      if (figureSnapshot.isQaTest) {
+        validatedCapture = {
+          ...captureRecord,
+          validationStatus: CAPTURE_VALIDATION_STATUS.APPROVED,
+        }
+      } else {
+        validatedCapture = await withTimeout(
+          processCaptureForUnlock(captureRecord),
+          UNLOCK_TIMEOUT_MS,
+          'processCaptureForUnlock',
+        )
+      }
+
+      const unlocked = runObtainAndReward(
         {
           foto: compressed.dataUrl,
           fotoSizeBytes: compressed.sizeBytes,
@@ -436,8 +475,132 @@ export function useCaptureFlow({
         },
         figureSnapshot,
       )
+
+      if (unlocked) {
+        captureLog.finished({ figureId: figureSnapshot.id })
+      }
+
+      return unlocked
     },
-    [resolveCaptureLocation, runObtainAndReward],
+    [runObtainAndReward],
+  )
+
+  const processCanvas = useCallback(
+    async (canvas, figureSnapshot, { afterNativePhoto = false, sourceFile = null } = {}) => {
+      if (!figureSnapshot) {
+        throw new Error(CAPTURE_RECOVERABLE_ERROR)
+      }
+
+      const locationSnapshot = resolveCaptureLocation(figureSnapshot, { afterNativePhoto })
+      const capturePosition = snapshotToPosition(locationSnapshot)
+
+      if (!capturePosition) {
+        if (afterNativePhoto || pendingFigureRef.current || figureSnapshot.isQaTest) {
+          throw new Error(CAPTURE_RECOVERABLE_ERROR)
+        }
+        throw new Error('Esperá a que el GPS confirme tu ubicación.')
+      }
+
+      if (
+        phaseRef.current !== CAPTURE_PHASES.CAMERA &&
+        phaseRef.current !== CAPTURE_PHASES.CAPTURING &&
+        phaseRef.current !== CAPTURE_PHASES.COMPRESSING
+      ) {
+        return false
+      }
+
+      setCaptureError(null)
+      setPhase(CAPTURE_PHASES.COMPRESSING)
+
+      captureLog.compressStart({ figureId: figureSnapshot.id })
+
+      let compressed
+      try {
+        compressed = await compressImageWithFallback(canvas, {
+          maxWidth: 960,
+          quality: 0.68,
+        })
+      } catch (compressError) {
+        if (figureSnapshot.isQaTest && sourceFile) {
+          captureLog.warn('QA compress fallback — raw file', { figureId: figureSnapshot.id })
+          const dataUrl = await withTimeout(
+            readFileAsDataUrl(sourceFile),
+            LOAD_IMAGE_TIMEOUT_MS,
+            'readFileAsDataUrl',
+          )
+          compressed = {
+            dataUrl,
+            sizeBytes: Math.max(1, Math.round(dataUrl.length * 0.75)),
+            width: canvas?.width ?? 0,
+            height: canvas?.height ?? 0,
+          }
+        } else {
+          throw compressError
+        }
+      }
+
+      return finalizeUnlock(compressed, figureSnapshot, locationSnapshot, capturePosition)
+    },
+    [finalizeUnlock, resolveCaptureLocation],
+  )
+
+  const processNativePhoto = useCallback(
+    async (file, figureSnapshot) => {
+      captureLog.fileReceived({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        figureId: figureSnapshot.id,
+      })
+
+      captureLog.loadImageStart({ figureId: figureSnapshot.id })
+      let canvas
+      try {
+        canvas = await withTimeout(
+          loadImageFromFile(file),
+          LOAD_IMAGE_TIMEOUT_MS,
+          'loadImageFromFile',
+        )
+        captureLog.loadImageSuccess({
+          figureId: figureSnapshot.id,
+          width: canvas.width,
+          height: canvas.height,
+        })
+      } catch (loadError) {
+        if (figureSnapshot.isQaTest) {
+          captureLog.warn('QA load fallback — skip canvas', { figureId: figureSnapshot.id })
+          const locationSnapshot = resolveCaptureLocation(figureSnapshot, { afterNativePhoto: true })
+          const capturePosition = snapshotToPosition(locationSnapshot)
+          if (!capturePosition) {
+            throw new Error(CAPTURE_RECOVERABLE_ERROR)
+          }
+          const dataUrl = await withTimeout(
+            readFileAsDataUrl(file),
+            LOAD_IMAGE_TIMEOUT_MS,
+            'readFileAsDataUrl',
+          )
+          captureLog.compressStart({ figureId: figureSnapshot.id, mode: 'qa-raw' })
+          return finalizeUnlock(
+            {
+              dataUrl,
+              sizeBytes: Math.max(1, Math.round(dataUrl.length * 0.75)),
+              width: 0,
+              height: 0,
+            },
+            figureSnapshot,
+            locationSnapshot,
+            capturePosition,
+          )
+        }
+        throw loadError
+      }
+
+      return processCanvas(canvas, figureSnapshot, {
+        afterNativePhoto: true,
+        sourceFile: file,
+      })
+    },
+    [finalizeUnlock, processCanvas, resolveCaptureLocation],
   )
 
   const openNativeCapture = useCallback(() => {
@@ -497,18 +660,23 @@ export function useCaptureFlow({
     if (!camera.isReady || !video) return
 
     const figureSnapshot = pendingFigureRef.current ?? figure
-    processingRef.current = true
-    setIsProcessing(true)
-    setCaptureError(null)
     setPhase(CAPTURE_PHASES.CAPTURING)
     captureLog.processingStart({ figureId: figureSnapshot.id, source: 'video' })
     vibrateCapture()
+
+    startProcessingGuard((timeoutError) => {
+      handleRecoverableError(timeoutError, { figureId: figureSnapshot?.id, source: 'timeout' })
+    })
 
     try {
       const canvas = captureFrameFromVideo(video)
       await processCanvas(canvas, figureSnapshot)
     } catch (error) {
-      handleRecoverableError(error, { figureId: figureSnapshot?.id, source: 'video' })
+      if (!unlockSubmittedRef.current) {
+        handleRecoverableError(error, { figureId: figureSnapshot?.id, source: 'video' })
+      }
+    } finally {
+      stopProcessingUi()
     }
   }, [
     camera,
@@ -517,92 +685,101 @@ export function useCaptureFlow({
     lockPendingWithValidation,
     openNativeCapture,
     processCanvas,
+    startProcessingGuard,
+    stopProcessingUi,
   ])
 
   const captureFromFile = useCallback(
     async (file) => {
-      try {
-        if (!file) return
-        if (phaseRef.current !== CAPTURE_PHASES.CAMERA) return
-        if (processingRef.current || unlockSubmittedRef.current) return
+      if (!file) return
+      if (phaseRef.current !== CAPTURE_PHASES.CAMERA) return
+      if (processingRef.current || unlockSubmittedRef.current) return
 
-        const fileKey = getFileKey(file)
-        if (lastProcessedFileKeyRef.current === fileKey) return
+      const fileKey = getFileKey(file)
+      if (lastProcessedFileKeyRef.current === fileKey) return
 
-        const figureSnapshot =
-          pendingFigureRef.current ??
-          cloneFigure(captureSession?.figure) ??
-          cloneFigure(figure)
+      const figureSnapshot =
+        pendingFigureRef.current ??
+        cloneFigure(captureSession?.figure) ??
+        cloneFigure(figure)
 
-        if (!figureSnapshot) {
-          throw new Error(CAPTURE_RECOVERABLE_ERROR)
-        }
+      if (!figureSnapshot) {
+        handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR), { source: 'native' })
+        return
+      }
 
-        if (pendingFigureRef.current) {
-          captureLog.pendingFigureExistsAfterNativePhoto({
-            figureId: figureSnapshot.id,
-            isQaTest: Boolean(figureSnapshot.isQaTest),
-          })
-        }
-
-        if (!pendingFigureRef.current) {
-          const locationSnapshot =
-            cloneLocationSnapshot(captureSession?.locationSnapshot) ??
-            buildLocationSnapshot(figureSnapshot, position)
-          syncPendingState(figureSnapshot, locationSnapshot)
-        }
-
-        captureLog.photoReceived({
-          name: file.name,
-          type: file.type,
-          size: file.size,
+      if (pendingFigureRef.current) {
+        captureLog.pendingFigureExistsAfterNativePhoto({
           figureId: figureSnapshot.id,
+          isQaTest: Boolean(figureSnapshot.isQaTest),
         })
-        captureLog.skipDistanceRecheck({ figureId: figureSnapshot.id })
-        cameraLog.nativeFileAccepted({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        })
+      }
 
-        setCaptureError(null)
+      if (!pendingFigureRef.current) {
+        const locationSnapshot =
+          cloneLocationSnapshot(captureSession?.locationSnapshot) ??
+          buildLocationSnapshot(figureSnapshot, position)
+        syncPendingState(figureSnapshot, locationSnapshot)
+      }
 
-        if (!isImageFile(file)) {
-          throw new Error(CAPTURE_RECOVERABLE_ERROR)
-        }
+      captureLog.skipDistanceRecheck({ figureId: figureSnapshot.id })
+      cameraLog.nativeFileAccepted({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })
 
-        lastProcessedFileKeyRef.current = fileKey
-        processingRef.current = true
-        setIsProcessing(true)
-        setPhase(CAPTURE_PHASES.CAPTURING)
-
-        captureLog.fileSelected({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        })
-        cameraLog.nativeFileSelected({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        })
-        vibrateCapture()
-
-        const canvas = await loadImageFromFile(file)
-        await processCanvas(canvas, figureSnapshot, { afterNativePhoto: true })
-      } catch (error) {
-        handleRecoverableError(error, {
-          figureId: pendingFigureRef.current?.id ?? figure?.id,
+      if (!isImageFile(file)) {
+        handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR), {
+          figureId: figureSnapshot.id,
           source: 'native',
         })
+        return
+      }
+
+      lastProcessedFileKeyRef.current = fileKey
+      setPhase(CAPTURE_PHASES.CAPTURING)
+      captureLog.fileSelected({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })
+      cameraLog.nativeFileSelected({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })
+      vibrateCapture()
+
+      startProcessingGuard((timeoutError) => {
+        handleRecoverableError(timeoutError, {
+          figureId: figureSnapshot.id,
+          source: 'timeout',
+        })
+      })
+
+      try {
+        await processNativePhoto(file, figureSnapshot)
+      } catch (error) {
+        if (!unlockSubmittedRef.current) {
+          handleRecoverableError(error, {
+            figureId: figureSnapshot.id,
+            source: 'native',
+          })
+        }
+      } finally {
+        stopProcessingUi()
       }
     },
     [
       captureSession?.figure,
+      captureSession?.locationSnapshot,
       figure,
       handleRecoverableError,
       position,
-      processCanvas,
+      processNativePhoto,
+      startProcessingGuard,
+      stopProcessingUi,
       syncPendingState,
     ],
   )
@@ -635,6 +812,14 @@ export function useCaptureFlow({
     setPhase(CAPTURE_PHASES.DONE)
   }, [clearPendingCapture])
 
+  useEffect(() => {
+    return () => {
+      if (processingTimeoutRef.current) {
+        window.clearTimeout(processingTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const rewardFigure = capturedFigure ?? pendingFigureRef.current ?? pendingFigure ?? figure
 
   return {
@@ -645,6 +830,7 @@ export function useCaptureFlow({
     isApproximateGps,
     isReady,
     isProcessing,
+    processingMessage,
     pendingFigure: pendingFigureRef.current ?? pendingFigure,
     gpsAccuracy: position?.accuracy ?? null,
     distanceMeters,
