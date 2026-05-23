@@ -4,13 +4,26 @@ export const DEFAULT_CAPTURE_RADIUS = 250
 export const DEFAULT_REVEAL_RADIUS = 200
 export const DEFAULT_MARKER_ICON_SIZE = 48
 
+function normalizeRarity(figure) {
+  return String(figure?.rareza ?? figure?.rarity ?? '').trim().toLowerCase()
+}
+
+export function isMainAlbumFigure(figure) {
+  if (!figure || figure.is_bonus) return false
+  const rarity = normalizeRarity(figure)
+  return rarity === 'común' || rarity === 'comun' || rarity === 'rara'
+}
+
 export function isBonusFigure(figure) {
-  return Boolean(figure?.is_bonus)
+  if (!figure) return false
+  if (figure.is_bonus) return true
+  const rarity = normalizeRarity(figure)
+  return rarity === 'épica' || rarity === 'epica' || rarity === 'legendaria'
 }
 
 export function getNormalFigures(figures) {
   return (Array.isArray(figures) ? figures : [])
-    .filter((figure) => figure && !isBonusFigure(figure))
+    .filter(isMainAlbumFigure)
     .sort((a, b) => {
       const orderA = Number(a.unlock_order) || Number.MAX_SAFE_INTEGER
       const orderB = Number(b.unlock_order) || Number.MAX_SAFE_INTEGER

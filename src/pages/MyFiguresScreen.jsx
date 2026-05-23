@@ -158,6 +158,7 @@ export function MyFiguresScreen() {
       ),
     [bonusFigures, nearFigure],
   )
+  const obtainedBonusCount = visibleBonusFigures.filter((figure) => figure.obtenida).length
   const nextMissionFigure = mainFigures.find((figure) => !figure.obtenida) ?? null
   const lastObtainedFigure = sanitizedFigures.find(
     (figure) => figure.id === lastObtenidaFigureId,
@@ -231,11 +232,13 @@ export function MyFiguresScreen() {
           <div className="mt-4 rounded-2xl border border-border/60 bg-warm-white/80 px-3 py-2.5">
             <p className={`${typeClasses.micro} text-muted`}>Próxima misión</p>
             <p className="mt-1 font-body text-sm font-bold text-ink">
-              {nearFigure
-                ? `${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
-                : nextMissionFigure
-                  ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
-                  : 'Explorá el mapa para encontrar bonus especiales.'}
+              {nearFigure?.is_bonus
+                ? `Hay algo especial cerca: ${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
+                : nearFigure
+                  ? `${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
+                  : nextMissionFigure
+                    ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
+                    : 'Explorá el mapa para encontrar secretos especiales.'}
             </p>
           </div>
         </div>
@@ -273,7 +276,7 @@ export function MyFiguresScreen() {
             </div>
             {visibleBonusFigures.length > 0 && (
               <span className="rounded-full bg-amber-300/15 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-amber-100">
-                {visibleBonusFigures.filter((figure) => figure.obtenida).length}/{visibleBonusFigures.length}
+                {obtainedBonusCount}/{visibleBonusFigures.length}
               </span>
             )}
           </div>
