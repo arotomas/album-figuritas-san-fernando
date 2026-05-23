@@ -6,7 +6,6 @@ import { Logo } from '../components/Logo'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
-import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
 import { authLog } from '../utils/authLog'
 
@@ -105,10 +104,6 @@ export function LoginScreen() {
             Creá tu perfil de explorador
           </Link>
         </motion.p>
-
-        <motion.div variants={staggerItem}>
-          <AuthDebugPanel />
-        </motion.div>
       </motion.div>
     </div>
   )

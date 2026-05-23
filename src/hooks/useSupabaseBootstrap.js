@@ -1,24 +1,29 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { fetchProfile, restoreSupabaseSession } from '../services/supabase/auth'
+import {
+  fetchProfile,
+  restoreSupabaseSession,
+  signOutSupabase,
+} from '../services/supabase/auth'
 import { touchProfileLogin } from '../services/supabase/profile'
 import { isAdmin } from '../services/supabase/admin'
 import { fetchPublicFigures } from '../services/supabase/figures'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { supabaseLog } from '../utils/supabaseLog'
-import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
-import { getSupabaseProjectRef } from '../utils/authDebug'
+import { authLog } from '../utils/authLog'
 import { isProfileComplete } from '../utils/profileValidation'
 
 /**
- * Restaura sesión remota persistida — nunca crea usuarios nuevos.
+ * Restaura sesión Supabase al iniciar la app.
+ * Solo cuentas reales (email/Google). Sesiones anónimas legacy se cierran.
  */
 export function useSupabaseBootstrap(enabled) {
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
+  const setAuthBootstrapped = useAppStore((state) => state.setAuthBootstrapped)
+  const clearAuthState = useAppStore((state) => state.clearAuthState)
   const replaceCatalogFromRemote = useAppStore((state) => state.replaceCatalogFromRemote)
   const mergeRemoteUserFigures = useAppStore((state) => state.mergeRemoteUserFigures)
   const login = useAppStore((state) => state.login)
-  const user = useAppStore((state) => state.user)
 
   useEffect(() => {
     if (!enabled) return
@@ -26,6 +31,8 @@ export function useSupabaseBootstrap(enabled) {
     let cancelled = false
 
     async function bootstrap() {
+      setAuthBootstrapped(false)
+
       try {
         supabaseLog.sync.info('bootstrap start')
 
@@ -33,19 +40,23 @@ export function useSupabaseBootstrap(enabled) {
         if (cancelled) return
 
         if (!result?.session?.user?.id) {
-          sessionDebug.error('bootstrap aborted — no persisted supabase session', {
-            localUsername: user?.username ?? null,
-          })
+          clearAuthState()
+          return
+        }
+
+        if (result.user?.is_anonymous) {
+          authLog.info('legacy anonymous session cleared — real auth required')
+          await signOutSupabase().catch(() => {})
+          clearAuthState()
           return
         }
 
         const userId = result.session.user.id
         const profile = await fetchProfile(userId)
-        const profileUsername = profile?.username?.trim()
-        const localUsername = user?.username?.trim()
 
         if (!profile?.id) {
-          sessionDebug.error('bootstrap profile missing', { userId })
+          authLog.error('bootstrap profile missing', { userId })
+          clearAuthState()
           return
         }
 
@@ -58,11 +69,10 @@ export function useSupabaseBootstrap(enabled) {
         setSupabaseAuth({ userId, isAdmin: admin, profile })
 
         const completed = isProfileComplete(profile)
-        if (profileUsername && !localUsername) {
-          login({ username: profileUsername, profileCompleted: completed })
-        } else if (localUsername) {
-          login({ username: localUsername, profileCompleted: completed })
-        }
+        login({
+          username: profile.username ?? profile.email ?? result.user.email ?? 'explorador',
+          profileCompleted: completed,
+        })
 
         await touchProfileLogin(userId)
 
@@ -73,12 +83,6 @@ export function useSupabaseBootstrap(enabled) {
           mergeRemoteUserFigures(remoteRows)
         }
 
-        sessionDebug.info('bootstrap complete', {
-          userId,
-          profileCompleted: completed,
-          authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-        })
-
         supabaseLog.sync.info('bootstrap complete', {
           userId,
           isAdmin: admin,
@@ -87,16 +91,12 @@ export function useSupabaseBootstrap(enabled) {
           profileCompleted: completed,
         })
       } catch (error) {
-        sessionDebug.error('bootstrap failed', {
-          message: error?.message ?? String(error),
-        })
-        console.warn('[figures-fallback]', 'bootstrap failed — keeping local catalog', JSON.stringify({
-          message: error?.message ?? String(error),
-          fallback: true,
-        }))
-        supabaseLog.sync.warn('bootstrap failed', {
-          message: error?.message ?? String(error),
-        })
+        authLog.error('bootstrap failed', { message: error?.message ?? String(error) })
+        clearAuthState()
+      } finally {
+        if (!cancelled) {
+          setAuthBootstrapped(true)
+        }
       }
     }
 
@@ -107,10 +107,11 @@ export function useSupabaseBootstrap(enabled) {
     }
   }, [
     enabled,
+    clearAuthState,
     login,
     mergeRemoteUserFigures,
     replaceCatalogFromRemote,
+    setAuthBootstrapped,
     setSupabaseAuth,
-    user?.username,
   ])
 }

@@ -1,5 +1,4 @@
 export {
-  ensureProfile,
   fetchProfile,
   getCurrentSession,
   getCurrentUserId,

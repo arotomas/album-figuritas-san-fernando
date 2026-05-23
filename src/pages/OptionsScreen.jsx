@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { AddressAutocomplete } from '../components/profile/AddressAutocomplete'
-import { AuthDebugPanel } from '../components/debug/AuthDebugPanel'
 import { useAuth } from '../hooks/useAuth'
 import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
 import { getMainProgressState } from '../utils/figureGameRules'
@@ -242,8 +241,6 @@ export function OptionsScreen() {
           </div>
         )}
       </div>
-
-      <AuthDebugPanel className="mt-6" />
 
       {qaEnabled && (
         <div className="mt-6 space-y-3 rounded-2xl border border-cyan-400/40 bg-cyan-50 p-5">

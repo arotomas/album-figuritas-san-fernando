@@ -18,7 +18,4 @@ export const PERSISTED_FIELDS = [
   'lastObtenidaFigureId',
   'lastViewedFigureId',
   'lastSavedAt',
-  'isAuthenticated',
-  'user',
-  'hasSeenSplash',
 ]

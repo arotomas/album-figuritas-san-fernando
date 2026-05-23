@@ -1,19 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { supabaseLog } from '../../utils/supabaseLog'
-import { authLog, profileLog } from '../../utils/authLog'
-import {
-  authDebug,
-  buildAuthDebugSnapshot,
-  summarizeAuthResponse,
-  summarizeSession,
-  getSupabaseProjectRef,
-} from '../../utils/authDebug'
-import {
-  sessionDebug,
-  inspectSupabaseAuthStorage,
-  logSessionPhase,
-} from '../../utils/sessionDebug'
-import { useAuthDebugStore } from '../../store/useAuthDebugStore'
+import { authLog } from '../../utils/authLog'
 import {
   ensureProfileFromAuthUser,
   fetchProfileById,
@@ -24,15 +11,6 @@ import {
 export function isSupabaseConfigured() {
   return Boolean(
     import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
-  )
-}
-
-function publishDebugSnapshot(partial) {
-  useAuthDebugStore.getState().setSnapshot(
-    buildAuthDebugSnapshot({
-      authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-      ...partial,
-    }),
   )
 }
 
@@ -67,7 +45,6 @@ export function formatAuthErrorMessage(error) {
 
 export async function getCurrentSession() {
   const response = await supabase.auth.getSession()
-  sessionDebug.info('getSession response', summarizeAuthResponse(response))
   if (response.error) throw response.error
   return response.data.session
 }
@@ -95,7 +72,6 @@ export async function getSessionUserId() {
 }
 
 async function clearLocalAuthSession() {
-  logSessionPhase('before auth — signOut local scope')
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
 }
@@ -167,6 +143,10 @@ export async function signInWithEmailPassword({ email, password }) {
   const session = signInResponse.data.session
   if (!authUser?.id || !session) throw new Error('AUTH_INCOMPLETE')
 
+  if (authUser.is_anonymous) {
+    throw new Error('ANONYMOUS_LOGIN_DISABLED')
+  }
+
   let profile = await fetchProfileById(authUser.id)
   if (!profile?.id) {
     profile = await ensureProfileFromAuthUser(authUser, 'email')
@@ -196,6 +176,11 @@ export async function completeOAuthSession() {
   if (!data.session?.user?.id) return null
 
   const authUser = data.session.user
+  if (authUser.is_anonymous) {
+    await signOutSupabase()
+    return null
+  }
+
   let profile = await fetchProfileById(authUser.id)
   if (!profile?.id) {
     profile = await ensureProfileFromAuthUser(authUser, 'google')
@@ -228,38 +213,13 @@ export async function updatePassword(nextPassword) {
 }
 
 export async function signOutSupabase() {
-  authDebug.info('signOut requested')
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
-  useAuthDebugStore.getState().clearSnapshot()
-  authDebug.info('signOut success')
 }
 
-/** Legacy helper kept for internal bootstrap flows. */
-export async function loginWithUsername(username, address = null) {
-  profileLog.info('legacy anonymous login blocked', { username })
-  throw new Error('ANONYMOUS_LOGIN_DISABLED')
-}
-
-export async function ensureProfile(userId, username, address = null) {
-  return upsertUserProfile(
+export function publishAuthSuccessSnapshot({ userId, profile, email }) {
+  supabaseLog.auth.info('auth complete', {
     userId,
-    { username, auth_provider: 'anonymous', is_admin: false },
-    address,
-  )
-}
-
-export function publishAuthSuccessSnapshot({ userId, profile, session, email }) {
-  publishDebugSnapshot({
-    status: 'success',
-    userId,
-    profileId: profile?.id ?? null,
-    profileUsername: profile?.username ?? null,
-    username: profile?.username ?? email ?? null,
-    authStatus: 'authenticated',
-    sessionStatus: 'active',
-    session: summarizeSession(session),
-    supabaseConnection: 'ok',
+    email: email ?? profile?.email ?? null,
   })
-  supabaseLog.auth.info('auth complete', { userId, email: email ?? profile?.email ?? null })
 }

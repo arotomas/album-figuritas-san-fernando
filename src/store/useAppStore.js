@@ -95,7 +95,6 @@ function resetStoreToDefaults() {
     lastSavedAt: null,
     isAuthenticated: false,
     user: null,
-    hasSeenSplash: false,
     nearFigure: null,
     qaTestFigure: null,
     captureSession: null,
@@ -109,6 +108,7 @@ function resetStoreToDefaults() {
     supabaseProfileLocalidad: null,
     profileCompleted: false,
     supabaseProfile: null,
+    authBootstrapped: false,
     lastSupabaseSyncWarning: null,
   })
 }
@@ -132,9 +132,6 @@ function buildPersistedSnapshot(state) {
     lastObtenidaFigureId: state.lastObtenidaFigureId,
     lastViewedFigureId: state.lastViewedFigureId,
     lastSavedAt: state.lastSavedAt,
-    isAuthenticated: state.isAuthenticated,
-    user: state.user,
-    hasSeenSplash: state.hasSeenSplash,
   }
 }
 
@@ -165,8 +162,8 @@ export const useAppStore = create(
       figures: createInitialFigures(),
     nearFigure: null,
     qaTestFigure: null,
-    captureSession: null,
-    hasSeenSplash: false,
+      captureSession: null,
+      authBootstrapped: false,
       albumStatus: ALBUM_STATUS.EN_PROGRESO,
       lastObtenidaFigureId: null,
       lastViewedFigureId: null,
@@ -183,6 +180,23 @@ export const useAppStore = create(
       lastSupabaseSyncWarning: null,
 
       setHasHydrated: (value) => set({ _hasHydrated: value }),
+
+      setAuthBootstrapped: (value) => set({ authBootstrapped: value }),
+
+      clearAuthState: () =>
+        set({
+          isAuthenticated: false,
+          profileCompleted: false,
+          user: null,
+          supabaseUserId: null,
+          supabaseReady: false,
+          isSupabaseAdmin: false,
+          supabaseUsername: null,
+          supabaseProfileId: null,
+          supabaseProfileAddress: null,
+          supabaseProfileLocalidad: null,
+          supabaseProfile: null,
+        }),
 
       setSupabaseAuth: ({ userId, isAdmin = false, profile = null }) =>
         set({
@@ -354,9 +368,6 @@ export const useAppStore = create(
           supabaseProfile: null,
           lastSavedAt: Date.now(),
         }),
-
-      completeSplash: () =>
-        set({ hasSeenSplash: true, lastSavedAt: Date.now() }),
 
       obtainFigure: (figureId) =>
         set((state) =>
@@ -766,7 +777,6 @@ export const useAppStore = create(
           lastSavedAt: null,
           isAuthenticated: false,
           user: null,
-          hasSeenSplash: false,
           nearFigure: null,
           qaTestFigure: null,
           supabaseUserId: null,

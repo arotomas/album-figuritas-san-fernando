@@ -25,9 +25,6 @@ export function sanitizePersistedState(raw) {
     ? source.figures.filter((figure) => figure && typeof figure === 'object')
     : []
 
-  const user =
-    source.user && typeof source.user === 'object' ? source.user : null
-
   return {
     figures,
     albumStatus: typeof source.albumStatus === 'string' ? source.albumStatus : null,
@@ -36,9 +33,6 @@ export function sanitizePersistedState(raw) {
     lastViewedFigureId:
       source.lastViewedFigureId != null ? source.lastViewedFigureId : null,
     lastSavedAt: typeof source.lastSavedAt === 'number' ? source.lastSavedAt : null,
-    isAuthenticated: Boolean(source.isAuthenticated),
-    user,
-    hasSeenSplash: Boolean(source.hasSeenSplash),
   }
 }
 
@@ -146,9 +140,6 @@ export function migratePersistedState(raw) {
         lastObtenidaFigureId: state.lastObtenidaFigureId ?? null,
         lastViewedFigureId: state.lastViewedFigureId ?? null,
         lastSavedAt: state.lastSavedAt ?? null,
-        isAuthenticated: state.isAuthenticated ?? false,
-        user: state.user ?? null,
-        hasSeenSplash: state.hasSeenSplash ?? false,
         progressSnapshot: obtenidas,
         totalFigures: figures.filter((f) => !f.is_bonus).length,
       },

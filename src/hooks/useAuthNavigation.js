@@ -37,7 +37,6 @@ export function useAuthNavigation() {
       publishAuthSuccessSnapshot({
         userId,
         profile,
-        session,
         email: user?.email ?? profile?.email ?? null,
       })
 

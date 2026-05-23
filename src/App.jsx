@@ -5,35 +5,18 @@ import { LazyMotion, domAnimation } from 'framer-motion'
 import { AppRoutes } from './routes'
 import { HydrationScreen } from './components/layout/HydrationScreen'
 import { ViewportProvider } from './components/layout/ViewportProvider'
-import { ConnectionStatus } from './components/qa/ConnectionStatus'
-import { QAOverlay } from './components/qa/QAOverlay'
 import { AppSkeleton } from './components/performance/AppSkeleton'
 import { usePersistedAlbum } from './hooks/usePersistedAlbum'
 import { useSupabaseBootstrap } from './hooks/useSupabaseBootstrap'
 import { useAppStore } from './store/useAppStore'
 import { isDevMode } from './utils/devMode'
-import { sessionDebug } from './utils/sessionDebug'
-import { inspectSupabaseAuthStorage } from './utils/sessionDebug'
-import { getSupabaseProjectRef } from './utils/authDebug'
 
 function App() {
   const { hasHydrated } = usePersistedAlbum()
-  const isAuthenticated = useAppStore((state) => state.isAuthenticated)
-  const username = useAppStore((state) => state.user?.username)
-  useSupabaseBootstrap(hasHydrated && isAuthenticated && Boolean(username?.trim()))
+  useSupabaseBootstrap(hasHydrated)
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const isAdminRoute = location.pathname.startsWith('/admin')
-
-  useEffect(() => {
-    if (hasHydrated) {
-      sessionDebug.info('after hydration — app ready', {
-        authStorage: inspectSupabaseAuthStorage(getSupabaseProjectRef()),
-        isAuthenticated,
-        username: username ?? null,
-      })
-    }
-  }, [hasHydrated, isAuthenticated, username])
 
   useEffect(() => {
     syncQaModeFromUrl(location.search)
@@ -63,11 +46,9 @@ function App() {
             isAdminRoute ? 'app-shell-admin' : ''
           }`}
         >
-          <ConnectionStatus />
           <Suspense fallback={<AppSkeleton />}>
             <AppRoutes />
           </Suspense>
-          <QAOverlay />
         </div>
       </LazyMotion>
     </ViewportProvider>

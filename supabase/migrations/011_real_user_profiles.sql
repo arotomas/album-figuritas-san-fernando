@@ -11,7 +11,31 @@ alter table public.profiles
   add column if not exists last_login_at timestamptz,
   add column if not exists updated_at timestamptz default now();
 
-create unique index if not exists profiles_username_unique_idx
+update public.profiles
+set auth_provider = coalesce(nullif(trim(auth_provider), ''), 'anonymous')
+where auth_provider is null or trim(auth_provider) = '';
+
+-- Legacy anonymous signups may share the same username (e.g. "arotomas").
+-- Keep the oldest profile per username; suffix the rest so the unique index can be created.
+with ranked as (
+  select
+    id,
+    row_number() over (
+      partition by lower(trim(username))
+      order by created_at asc nulls last, id asc
+    ) as rn
+  from public.profiles
+  where username is not null and trim(username) <> ''
+)
+update public.profiles p
+set username = trim(p.username) || '_' || left(replace(p.id::text, '-', ''), 6)
+from ranked r
+where p.id = r.id
+  and r.rn > 1;
+
+drop index if exists public.profiles_username_unique_idx;
+
+create unique index profiles_username_unique_idx
   on public.profiles (lower(trim(username)))
   where username is not null and trim(username) <> '';
 
@@ -30,10 +54,6 @@ create trigger profiles_set_updated_at
   before update on public.profiles
   for each row
   execute function public.set_profiles_updated_at();
-
-update public.profiles
-set auth_provider = coalesce(nullif(trim(auth_provider), ''), 'anonymous')
-where auth_provider is null or trim(auth_provider) = '';
 
 create or replace function public.is_username_available(candidate text, for_user_id uuid default null)
 returns boolean

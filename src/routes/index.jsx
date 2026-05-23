@@ -4,12 +4,10 @@ import { AppLayout } from '../layouts/AppLayout'
 import { AuthLayout } from '../layouts/AuthLayout'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { ProtectedRoute, GuestRoute, ProfileSetupRoute } from './ProtectedRoute'
+import { RootRedirect } from './RootRedirect'
 import { AdminRoute } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
 
-const SplashScreen = lazy(() =>
-  import('../pages/SplashScreen').then((m) => ({ default: m.SplashScreen })),
-)
 const LoginScreen = lazy(() =>
   import('../pages/LoginScreen').then((m) => ({ default: m.LoginScreen })),
 )
@@ -68,7 +66,7 @@ export function AppRoutes() {
           path="/"
           element={
             <LazyPage>
-              <SplashScreen />
+              <RootRedirect />
             </LazyPage>
           }
         />
@@ -228,7 +226,7 @@ export function AppRoutes() {
           />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </div>
   )
