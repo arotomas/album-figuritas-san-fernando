@@ -103,6 +103,7 @@ export function CaptureFlow() {
     onVisible: async () => {
       requestPermission()
       if (
+        !camera.nativeOnly &&
         phase === CAPTURE_PHASES.CAMERA &&
         !camera.isReady &&
         !camera.isLoading &&
@@ -116,7 +117,9 @@ export function CaptureFlow() {
     },
     onHidden: () => {
       stopVibration()
-      camera.stop()
+      if (!camera.nativeOnly) {
+        camera.stop()
+      }
     },
   })
 
@@ -169,7 +172,6 @@ export function CaptureFlow() {
 
   const handleUseNativeCamera = useCallback(() => {
     camera.useNativeCamera()
-    camera.openNativePicker()
   }, [camera])
 
   const geoPermissionDenied = geoErrorType === 'denied'
@@ -239,10 +241,14 @@ export function CaptureFlow() {
     phase === CAPTURE_PHASES.COMPRESSING
 
   const showCamera =
+    camera.nativeOnly ||
     camera.isLoading ||
     camera.isReady ||
     camera.useNativeFallback ||
     phase === CAPTURE_PHASES.CAMERA
+
+  const showCaptureError =
+    Boolean(captureError) && phase === CAPTURE_PHASES.CAMERA
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -264,6 +270,7 @@ export function CaptureFlow() {
           gpsAccuracy={gpsAccuracy}
           isReady={isReady}
           isCapturing={isCapturing}
+          nativeOnly={camera.nativeOnly}
           useNativeFallback={camera.useNativeFallback}
           showBlackPreviewFallback={camera.showBlackPreviewFallback}
           inCaptureRange={inCaptureRange}
@@ -275,7 +282,7 @@ export function CaptureFlow() {
         />
       )}
 
-      {camera.isLoading && (
+      {camera.isLoading && !camera.nativeOnly && (
         <div className="safe-top safe-bottom pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-black/60">
           <p className="map-skeleton-pulse text-sm text-white/90">Abriendo cámara…</p>
         </div>
@@ -310,7 +317,7 @@ export function CaptureFlow() {
         </div>
       )}
 
-      {captureError && (
+      {showCaptureError && (
         <div className="safe-bottom absolute inset-x-4 bottom-28 z-50 rounded-xl bg-red-950/90 px-4 py-3 text-center">
           <p className="text-sm text-red-200">{captureError}</p>
           <button

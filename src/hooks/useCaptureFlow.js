@@ -28,6 +28,10 @@ function getDistanceToFigure(position, figure) {
   return getDistanceMeters(position.lat, position.lng, figure.lat, figure.lng)
 }
 
+function getFileKey(file) {
+  return `${file.name}-${file.size}-${file.lastModified}`
+}
+
 /**
  * Orquesta el flujo: cámara → proximidad flexible → foto obligatoria → recompensa.
  */
@@ -40,6 +44,8 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
   const hasVibratedReadyRef = useRef(false)
   const capturingRef = useRef(false)
   const phaseRef = useRef(CAPTURE_PHASES.CAMERA)
+  const lastProcessedFileKeyRef = useRef(null)
+  const unlockSubmittedRef = useRef(false)
 
   useEffect(() => {
     phaseRef.current = phase
@@ -64,9 +70,10 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
   }, [distanceMeters, inCaptureRange, position])
 
   const isReady =
-    (camera.isReady || camera.useNativeFallback) &&
+    camera.isReady &&
     inCaptureRange &&
-    phase === CAPTURE_PHASES.CAMERA
+    phase === CAPTURE_PHASES.CAMERA &&
+    !capturingRef.current
 
   const validateDistance = useCallback(() => {
     if (!position || !figure) {
@@ -102,6 +109,10 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
   const runObtainAndReward = useCallback(
     (photoPayload) => {
+      if (unlockSubmittedRef.current) {
+        return
+      }
+
       if (!photoPayload?.foto) {
         captureLog.warn('blocked — photo required', { figureId: figure?.id })
         setCaptureError('Tenés que sacar una foto para desbloquear la figurita.')
@@ -109,6 +120,9 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
         capturingRef.current = false
         return
       }
+
+      unlockSubmittedRef.current = true
+      setCaptureError(null)
 
       albumLog.info('saving figure', { figureId: figure?.id })
       onObtainFigure?.(figure.id, photoPayload)
@@ -125,7 +139,13 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
         throw new Error('Ubicación no disponible para registrar la captura.')
       }
 
+      if (phaseRef.current !== CAPTURE_PHASES.CAMERA && phaseRef.current !== CAPTURE_PHASES.CAPTURING) {
+        return
+      }
+
+      setCaptureError(null)
       setPhase(CAPTURE_PHASES.COMPRESSING)
+
       const compressed = await compressImage(canvas, {
         maxWidth: 960,
         quality: 0.68,
@@ -197,7 +217,8 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
     if (!inCaptureRange || !figure) return
 
-    if (camera.useNativeFallback) {
+    if (camera.nativeOnly || camera.useNativeFallback) {
+      setCaptureError(null)
       camera.openNativePicker()
       return
     }
@@ -225,18 +246,30 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
   const captureFromFile = useCallback(
     async (file) => {
-      if (capturingRef.current || !file || !figure || !inCaptureRange) return
+      if (!file || !figure) return
+      if (phaseRef.current !== CAPTURE_PHASES.CAMERA) return
+      if (capturingRef.current || unlockSubmittedRef.current) return
+
+      const fileKey = getFileKey(file)
+      if (lastProcessedFileKeyRef.current === fileKey) return
+
+      if (!inCaptureRange) {
+        setCaptureError('Estás lejos del punto. Acercate para capturar.')
+        return
+      }
+
       if (!validateDistance()) return
+
+      lastProcessedFileKeyRef.current = fileKey
+      capturingRef.current = true
+      setCaptureError(null)
+      setPhase(CAPTURE_PHASES.CAPTURING)
 
       cameraLog.nativeFileSelected({
         name: file.name,
         type: file.type,
         size: file.size,
       })
-
-      capturingRef.current = true
-      setCaptureError(null)
-      setPhase(CAPTURE_PHASES.CAPTURING)
       captureLog.info('native capture started', { figureId: figure.id })
       vibrateCapture()
 
@@ -244,10 +277,13 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
         const canvas = await loadImageFromFile(file)
         await processCanvas(canvas)
       } catch (err) {
-        capturingRef.current = false
-        captureLog.warn('native capture failed', err?.message)
-        setCaptureError('No pudimos usar esa foto. Reintentá.')
-        setPhase(CAPTURE_PHASES.CAMERA)
+        if (!unlockSubmittedRef.current) {
+          capturingRef.current = false
+          lastProcessedFileKeyRef.current = null
+          captureLog.warn('native capture failed', err?.message)
+          setCaptureError('No pudimos usar esa foto. Reintentá.')
+          setPhase(CAPTURE_PHASES.CAMERA)
+        }
       }
     },
     [figure, inCaptureRange, processCanvas, validateDistance],

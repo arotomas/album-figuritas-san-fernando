@@ -12,6 +12,7 @@ export function CameraView({
   gpsAccuracy,
   isReady,
   isCapturing,
+  nativeOnly = false,
   useNativeFallback = false,
   showBlackPreviewFallback = false,
   inCaptureRange = false,
@@ -23,10 +24,12 @@ export function CameraView({
 }) {
   const localInputRef = useRef(null)
   const inputRef = fileInputRef ?? localInputRef
+  const showNativeUi = nativeOnly || useNativeFallback
+  const showSecondaryNativeButton = !nativeOnly && !useNativeFallback
 
   return (
     <div className="capture-screen relative flex h-full flex-col overflow-hidden bg-black">
-      {!useNativeFallback && (
+      {!showNativeUi && (
         <video
           ref={videoRef}
           autoPlay
@@ -36,13 +39,17 @@ export function CameraView({
         />
       )}
 
-      {useNativeFallback && (
+      {showNativeUi && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 px-8 text-center">
-          <p className="text-lg font-semibold text-white">Cámara del celular</p>
+          <p className="text-lg font-semibold text-white">
+            {nativeOnly ? 'Sacá la foto' : 'Cámara del celular'}
+          </p>
           <p className="mt-2 text-sm text-white/60">
-            {showBlackPreviewFallback
-              ? 'La vista previa web no funcionó. Usá la cámara nativa para sacar la foto.'
-              : 'Tocá capturar o el botón de abajo para abrir la cámara nativa.'}
+            {nativeOnly
+              ? 'Tocá capturar para abrir la cámara y desbloquear la figurita.'
+              : showBlackPreviewFallback
+                ? 'La vista previa web no funcionó. Usá la cámara nativa para sacar la foto.'
+                : 'Tocá capturar para abrir la cámara nativa.'}
           </p>
         </div>
       )}
@@ -112,13 +119,15 @@ export function CameraView({
           isReady={isReady}
           onCapture={onCapture}
         />
-        <button
-          type="button"
-          onClick={onUseNativeCamera}
-          className="min-h-[44px] rounded-full border border-white/25 bg-black/45 px-5 py-2 text-xs font-semibold text-white/90 backdrop-blur-sm"
-        >
-          Usar cámara del celular
-        </button>
+        {showSecondaryNativeButton && (
+          <button
+            type="button"
+            onClick={onUseNativeCamera}
+            className="min-h-[44px] rounded-full border border-white/25 bg-black/45 px-5 py-2 text-xs font-semibold text-white/90 backdrop-blur-sm"
+          >
+            Usar cámara del celular
+          </button>
+        )}
       </div>
 
       <AnimatePresence>

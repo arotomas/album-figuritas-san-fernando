@@ -11,6 +11,7 @@ export const FigureCarousel = memo(function FigureCarousel({
   activeId,
   lastObtenidaId,
   onSelect,
+  compact = false,
 }) {
   const scrollRef = useRef(null)
   const itemRefs = useRef(new Map())
@@ -33,7 +34,9 @@ export const FigureCarousel = memo(function FigureCarousel({
   return (
     <div
       ref={scrollRef}
-      className="mt-5 flex gap-3 overflow-x-auto px-6 pb-6 snap-x snap-mandatory scroll-pl-6"
+      className={`flex shrink-0 gap-3 overflow-x-auto snap-x snap-mandatory ${
+        compact ? 'mt-2 px-4 pb-2 scroll-pl-4' : 'mt-5 px-6 pb-6 scroll-pl-6'
+      }`}
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {figures.map((figure) => {
@@ -58,7 +61,9 @@ export const FigureCarousel = memo(function FigureCarousel({
               y: isActive ? -4 : 0,
             }}
             transition={motionTokens.spring.soft}
-            className={`relative flex w-[148px] shrink-0 snap-center flex-col overflow-hidden rounded-2xl border-2 text-left transition-[filter,box-shadow] duration-300 ${
+            className={`relative flex shrink-0 snap-center flex-col overflow-hidden rounded-2xl border-2 text-left transition-[filter,box-shadow] duration-300 ${
+              compact ? 'w-[120px]' : 'w-[148px]'
+            } ${
               isActive
                 ? `${rarity.tailwind.frame} ${rarity.tailwind.glow}`
                 : 'border-border/80 bg-surface/80'
