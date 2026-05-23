@@ -3,6 +3,7 @@ import { FaLocationDot, FaMagnifyingGlass } from 'react-icons/fa6'
 import { isGooglePlacesConfigured } from '../../config/googlePlaces'
 import { usePlacesAutocomplete } from '../../hooks/usePlacesAutocomplete'
 import { fetchPlaceDetails } from '../../utils/googlePlacesService'
+import { isAllowedZonaNorteAddress } from '../../config/googlePlaces'
 import { addressAutocompleteLog } from '../../utils/addressAutocompleteLog'
 import { hasValidAddress } from '../../utils/parseGooglePlace'
 
@@ -14,7 +15,7 @@ export function AddressAutocomplete({
   placeholder = 'Buscá tu dirección…',
   disabled = false,
   required = false,
-  helperText = 'Elegí una dirección de la lista para confirmar tu zona.',
+  helperText = 'Buscá calles de Zona Norte (San Fernando, Tigre, San Isidro, Vicente López y alrededores). Elegí una sugerencia.',
 }) {
   const listId = useId()
   const rootRef = useRef(null)
@@ -58,6 +59,20 @@ export function AddressAutocomplete({
       if (!hasValidAddress(address)) {
         throw new Error('INVALID_ADDRESS')
       }
+      if (!isAllowedZonaNorteAddress(address)) {
+        addressAutocompleteLog.info('rejected prediction', {
+          description: prediction.description,
+          reason: 'outside_zona_norte_after_details',
+          localidad: address.localidad,
+        })
+        throw new Error('OUTSIDE_ZONA_NORTE')
+      }
+
+      addressAutocompleteLog.info('accepted prediction', {
+        description: prediction.description,
+        localidad: address.localidad,
+        stage: 'confirmed',
+      })
 
       setInputValue(address.direccion_texto)
       setSelected(address)
@@ -68,7 +83,11 @@ export function AddressAutocomplete({
       addressAutocompleteLog.error('place details failed', {
         message: selectError?.message ?? String(selectError),
       })
-      setLocalError('No pudimos confirmar esa dirección. Probá otra sugerencia.')
+      setLocalError(
+        selectError?.message === 'OUTSIDE_ZONA_NORTE'
+          ? 'Esa dirección está fuera de Zona Norte. Elegí una calle de San Fernando, Tigre, San Isidro, Vicente López o municipios cercanos.'
+          : 'No pudimos confirmar esa dirección. Probá otra sugerencia.',
+      )
       setSelected(null)
       onAddressSelect?.(null)
     } finally {
@@ -156,7 +175,13 @@ export function AddressAutocomplete({
 
       {(loading || resolving) && (
         <p className="text-xs text-muted">
-          {resolving ? 'Confirmando dirección…' : 'Buscando sugerencias…'}
+          {resolving ? 'Confirmando dirección…' : 'Buscando en Zona Norte…'}
+        </p>
+      )}
+
+      {open && configured && ready && !loading && inputValue.trim().length >= 3 && predictions.length === 0 && (
+        <p className="text-xs text-muted">
+          No encontramos direcciones en Zona Norte para esa búsqueda.
         </p>
       )}
     </div>
