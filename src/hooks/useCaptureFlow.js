@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCamera } from './useCamera'
-import { captureFrameFromVideo, loadImageFromFile } from '../utils/camera'
+import { captureFrameFromVideo, isImageFile, loadImageFromFile } from '../utils/camera'
 import { compressImage } from '../utils/imageCompression'
 import { vibrateCapture, vibrateReady, vibrateUnlock } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
@@ -23,6 +23,9 @@ export const CAPTURE_PHASES = {
   DONE: 'done',
 }
 
+export const CAPTURE_RECOVERABLE_ERROR =
+  'No pudimos procesar la foto. Probá sacar otra.'
+
 function getDistanceToFigure(position, figure) {
   if (!position || !figure) return null
   return getDistanceMeters(position.lat, position.lng, figure.lat, figure.lng)
@@ -30,6 +33,20 @@ function getDistanceToFigure(position, figure) {
 
 function getFileKey(file) {
   return `${file.name}-${file.size}-${file.lastModified}`
+}
+
+function toProcessingError(error) {
+  if (!error?.message) return CAPTURE_RECOVERABLE_ERROR
+  if (
+    error.message === CAPTURE_RECOVERABLE_ERROR ||
+    error.message.startsWith('FILE_') ||
+    error.message.startsWith('IMAGE_') ||
+    error.message.startsWith('CANVAS_') ||
+    error.message.startsWith('COMPRESSION_')
+  ) {
+    return CAPTURE_RECOVERABLE_ERROR
+  }
+  return error.message
 }
 
 /**
@@ -40,9 +57,12 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
   const [phase, setPhase] = useState(CAPTURE_PHASES.CAMERA)
   const [compressedPhoto, setCompressedPhoto] = useState(null)
+  const [capturedFigure, setCapturedFigure] = useState(null)
   const [captureError, setCaptureError] = useState(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+
   const hasVibratedReadyRef = useRef(false)
-  const capturingRef = useRef(false)
+  const processingRef = useRef(false)
   const phaseRef = useRef(CAPTURE_PHASES.CAMERA)
   const lastProcessedFileKeyRef = useRef(null)
   const unlockSubmittedRef = useRef(false)
@@ -73,7 +93,33 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     camera.isReady &&
     inCaptureRange &&
     phase === CAPTURE_PHASES.CAMERA &&
-    !capturingRef.current
+    !isProcessing
+
+  const resetProcessingState = useCallback(() => {
+    processingRef.current = false
+    setIsProcessing(false)
+    lastProcessedFileKeyRef.current = null
+  }, [])
+
+  const handleRecoverableError = useCallback(
+    (error, context = {}) => {
+      if (unlockSubmittedRef.current) return
+
+      captureLog.processingError({
+        message: error?.message ?? String(error),
+        ...context,
+      })
+
+      resetProcessingState()
+      setCaptureError(toProcessingError(error))
+      setPhase(CAPTURE_PHASES.CAMERA)
+    },
+    [resetProcessingState],
+  )
+
+  const clearCaptureError = useCallback(() => {
+    setCaptureError(null)
+  }, [])
 
   const validateDistance = useCallback(() => {
     if (!position || !figure) {
@@ -108,43 +154,59 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
   }, [isReady, figure?.id])
 
   const runObtainAndReward = useCallback(
-    (photoPayload) => {
+    (photoPayload, figureSnapshot) => {
       if (unlockSubmittedRef.current) {
-        return
+        return true
       }
 
-      if (!photoPayload?.foto) {
-        captureLog.warn('blocked — photo required', { figureId: figure?.id })
-        setCaptureError('Tenés que sacar una foto para desbloquear la figurita.')
-        setPhase(CAPTURE_PHASES.CAMERA)
-        capturingRef.current = false
-        return
+      if (!photoPayload?.foto || !figureSnapshot) {
+        captureLog.warn('blocked — photo or figure missing', { figureId: figureSnapshot?.id })
+        handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR))
+        return false
+      }
+
+      albumLog.info('saving figure', { figureId: figureSnapshot.id })
+      const saved = onObtainFigure?.(figureSnapshot.id, photoPayload)
+
+      if (saved === false) {
+        captureLog.processingError({ stage: 'obtainFigureWithPhoto', figureId: figureSnapshot.id })
+        handleRecoverableError(new Error(CAPTURE_RECOVERABLE_ERROR))
+        return false
       }
 
       unlockSubmittedRef.current = true
       setCaptureError(null)
-
-      albumLog.info('saving figure', { figureId: figure?.id })
-      onObtainFigure?.(figure.id, photoPayload)
+      setCapturedFigure(figureSnapshot)
       camera.stop()
       setPhase(CAPTURE_PHASES.REWARD)
-      rewardLog.info('enter reward phase', { figureId: figure?.id })
+      captureLog.unlockSuccess({ figureId: figureSnapshot.id })
+      rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
+      return true
     },
-    [camera, figure, onObtainFigure],
+    [camera, handleRecoverableError, onObtainFigure],
   )
 
   const processCanvas = useCallback(
-    async (canvas) => {
-      if (!position || !figure) {
-        throw new Error('Ubicación no disponible para registrar la captura.')
+    async (canvas, figureSnapshot) => {
+      if (!figureSnapshot) {
+        throw new Error(CAPTURE_RECOVERABLE_ERROR)
       }
 
-      if (phaseRef.current !== CAPTURE_PHASES.CAMERA && phaseRef.current !== CAPTURE_PHASES.CAPTURING) {
-        return
+      if (!position) {
+        throw new Error('Esperá a que el GPS confirme tu ubicación.')
+      }
+
+      if (
+        phaseRef.current !== CAPTURE_PHASES.CAMERA &&
+        phaseRef.current !== CAPTURE_PHASES.CAPTURING &&
+        phaseRef.current !== CAPTURE_PHASES.COMPRESSING
+      ) {
+        return false
       }
 
       setCaptureError(null)
       setPhase(CAPTURE_PHASES.COMPRESSING)
+      captureLog.processingStart({ figureId: figureSnapshot.id })
 
       const compressed = await compressImage(canvas, {
         maxWidth: 960,
@@ -152,15 +214,21 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
       })
 
       if (!compressed?.dataUrl) {
-        throw new Error('No pudimos procesar la foto.')
+        throw new Error(CAPTURE_RECOVERABLE_ERROR)
       }
 
-      setCompressedPhoto(compressed.dataUrl)
-      captureLog.info('capture compressed', { bytes: compressed.sizeBytes })
+      captureLog.compressionSuccess({
+        figureId: figureSnapshot.id,
+        bytes: compressed.sizeBytes,
+        width: compressed.width,
+        height: compressed.height,
+      })
 
-      const distanceToFigure = getDistanceToFigure(position, figure)
+      setCompressedPhoto(compressed.dataUrl)
+
+      const distanceToFigure = getDistanceToFigure(position, figureSnapshot)
       const captureRecord = buildCaptureRecord({
-        figureId: figure.id,
+        figureId: figureSnapshot.id,
         lat: position.lat,
         lng: position.lng,
         accuracy: position.accuracy,
@@ -171,14 +239,17 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
 
       const validatedCapture = await processCaptureForUnlock(captureRecord)
 
-      runObtainAndReward({
-        foto: compressed.dataUrl,
-        fotoSizeBytes: compressed.sizeBytes,
-        obtenidaEn: Date.now(),
-        captureRecord: validatedCapture,
-      })
+      return runObtainAndReward(
+        {
+          foto: compressed.dataUrl,
+          fotoSizeBytes: compressed.sizeBytes,
+          obtenidaEn: Date.now(),
+          captureRecord: validatedCapture,
+        },
+        figureSnapshot,
+      )
     },
-    [figure, position, runObtainAndReward],
+    [position, runObtainAndReward],
   )
 
   useEffect(() => {
@@ -193,25 +264,28 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     const qaPhoto =
       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IGZpbGw9IiMzMzMiLz48L3N2Zz4='
 
-    runObtainAndReward({
-      foto: qaPhoto,
-      fotoSizeBytes: qaPhoto.length,
-      obtenidaEn: Date.now(),
-      captureRecord: {
-        figureId: figure.id,
-        lat: position.lat,
-        lng: position.lng,
-        accuracy: position.accuracy,
-        distanceToFigure,
-        photoUrl: qaPhoto,
-        createdAt: Date.now(),
-        validationStatus: 'approved',
+    runObtainAndReward(
+      {
+        foto: qaPhoto,
+        fotoSizeBytes: qaPhoto.length,
+        obtenidaEn: Date.now(),
+        captureRecord: {
+          figureId: figure.id,
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy,
+          distanceToFigure,
+          photoUrl: qaPhoto,
+          createdAt: Date.now(),
+          validationStatus: 'approved',
+        },
       },
-    })
+      figure,
+    )
   }, [camera.isReady, figure, inCaptureRange, phase, position, runObtainAndReward])
 
   const capture = useCallback(async () => {
-    if (capturingRef.current || phaseRef.current !== CAPTURE_PHASES.CAMERA) {
+    if (processingRef.current || phaseRef.current !== CAPTURE_PHASES.CAMERA) {
       return
     }
 
@@ -227,67 +301,83 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     if (!camera.isReady || !video) return
     if (!validateDistance()) return
 
-    capturingRef.current = true
+    processingRef.current = true
+    setIsProcessing(true)
     setCaptureError(null)
     setPhase(CAPTURE_PHASES.CAPTURING)
-    captureLog.info('capture started', { figureId: figure.id })
+    captureLog.processingStart({ figureId: figure.id, source: 'video' })
     vibrateCapture()
 
     try {
       const canvas = captureFrameFromVideo(video)
-      await processCanvas(canvas)
-    } catch (err) {
-      capturingRef.current = false
-      captureLog.warn('capture failed', err?.message)
-      setCaptureError(err.message || 'Error al capturar la foto.')
-      setPhase(CAPTURE_PHASES.CAMERA)
+      await processCanvas(canvas, figure)
+    } catch (error) {
+      handleRecoverableError(error, { figureId: figure.id, source: 'video' })
     }
-  }, [camera, figure, inCaptureRange, processCanvas, validateDistance])
+  }, [camera, figure, handleRecoverableError, inCaptureRange, processCanvas, validateDistance])
 
   const captureFromFile = useCallback(
     async (file) => {
-      if (!file || !figure) return
-      if (phaseRef.current !== CAPTURE_PHASES.CAMERA) return
-      if (capturingRef.current || unlockSubmittedRef.current) return
-
-      const fileKey = getFileKey(file)
-      if (lastProcessedFileKeyRef.current === fileKey) return
-
-      if (!inCaptureRange) {
-        setCaptureError('Estás lejos del punto. Acercate para capturar.')
-        return
-      }
-
-      if (!validateDistance()) return
-
-      lastProcessedFileKeyRef.current = fileKey
-      capturingRef.current = true
-      setCaptureError(null)
-      setPhase(CAPTURE_PHASES.CAPTURING)
-
-      cameraLog.nativeFileSelected({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-      })
-      captureLog.info('native capture started', { figureId: figure.id })
-      vibrateCapture()
-
       try {
-        const canvas = await loadImageFromFile(file)
-        await processCanvas(canvas)
-      } catch (err) {
-        if (!unlockSubmittedRef.current) {
-          capturingRef.current = false
-          lastProcessedFileKeyRef.current = null
-          captureLog.warn('native capture failed', err?.message)
-          setCaptureError('No pudimos usar esa foto. Reintentá.')
-          setPhase(CAPTURE_PHASES.CAMERA)
+        if (!file) return
+        if (!figure) return
+        if (phaseRef.current !== CAPTURE_PHASES.CAMERA) return
+        if (processingRef.current || unlockSubmittedRef.current) return
+
+        const fileKey = getFileKey(file)
+        if (lastProcessedFileKeyRef.current === fileKey) return
+
+        setCaptureError(null)
+
+        if (!isImageFile(file)) {
+          throw new Error(CAPTURE_RECOVERABLE_ERROR)
         }
+
+        if (!inCaptureRange) {
+          setCaptureError('Estás lejos del punto. Acercate para capturar.')
+          return
+        }
+
+        if (!validateDistance()) return
+
+        lastProcessedFileKeyRef.current = fileKey
+        processingRef.current = true
+        setIsProcessing(true)
+        setPhase(CAPTURE_PHASES.CAPTURING)
+
+        captureLog.fileSelected({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        })
+        cameraLog.nativeFileSelected({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        })
+        captureLog.processingStart({ figureId: figure.id, source: 'native' })
+        vibrateCapture()
+
+        const figureSnapshot = { ...figure }
+        const canvas = await loadImageFromFile(file)
+        await processCanvas(canvas, figureSnapshot)
+      } catch (error) {
+        handleRecoverableError(error, {
+          figureId: figure?.id,
+          source: 'native',
+        })
       }
     },
-    [figure, inCaptureRange, processCanvas, validateDistance],
+    [figure, handleRecoverableError, inCaptureRange, processCanvas, validateDistance],
   )
+
+  const retryCapture = useCallback(() => {
+    if (unlockSubmittedRef.current) return
+    resetProcessingState()
+    setCaptureError(null)
+    setPhase(CAPTURE_PHASES.CAMERA)
+    camera.openNativePicker()
+  }, [camera, resetProcessingState])
 
   const showRewardComplete = useCallback(() => {
     rewardLog.info('reward complete → unlock')
@@ -300,6 +390,8 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     setPhase(CAPTURE_PHASES.DONE)
   }, [])
 
+  const rewardFigure = capturedFigure ?? figure
+
   return {
     phase,
     camera,
@@ -307,12 +399,16 @@ export function useCaptureFlow({ figure, position, onObtainFigure }) {
     inCaptureRange,
     isApproximateGps,
     isReady,
+    isProcessing,
     gpsAccuracy: position?.accuracy ?? null,
     distanceMeters,
     compressedPhoto,
     captureError,
+    rewardFigure,
     capture,
     captureFromFile,
+    retryCapture,
+    clearCaptureError,
     showRewardComplete,
     complete,
     figure,

@@ -2,6 +2,14 @@ import { Component } from 'react'
 import { logDiagnostic } from '../../utils/diagnostics'
 import { PremiumButton } from '../ui/PremiumButton'
 
+function resetBrokenCaptureState() {
+  try {
+    sessionStorage.removeItem('album-qa-mode')
+  } catch {
+    // ignore
+  }
+}
+
 export class AppErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -14,10 +22,19 @@ export class AppErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     logDiagnostic('error-boundary', { error: error?.message, info })
+    console.error('[CAPTURE] fatal render error', error?.message, info)
   }
 
   handleRetry = () => {
+    resetBrokenCaptureState()
     this.setState({ hasError: false, error: null })
+    window.location.assign('/map')
+  }
+
+  handleGoToMap = () => {
+    resetBrokenCaptureState()
+    this.setState({ hasError: false, error: null })
+    window.location.assign('/map')
   }
 
   handleReload = () => {
@@ -32,7 +49,7 @@ export class AppErrorBoundary extends Component {
             Algo salió mal
           </p>
           <p className="mt-3 max-w-sm font-body text-sm leading-relaxed text-white/55">
-            La app encontró un error inesperado. Podés reintentar o recargar para continuar.
+            La app encontró un error inesperado. Podés volver al mapa o recargar para continuar.
           </p>
           {import.meta.env.DEV && this.state.error && (
             <pre className="mt-4 max-h-32 w-full overflow-auto rounded-xl bg-black/40 p-3 text-left text-[10px] text-red-300">
@@ -40,7 +57,10 @@ export class AppErrorBoundary extends Component {
             </pre>
           )}
           <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
-            <PremiumButton variant="lime" onClick={this.handleRetry}>
+            <PremiumButton variant="lime" onClick={this.handleGoToMap}>
+              Volver al mapa
+            </PremiumButton>
+            <PremiumButton variant="outline" onClick={this.handleRetry}>
               Reintentar
             </PremiumButton>
             <PremiumButton variant="ghost" onClick={this.handleReload}>

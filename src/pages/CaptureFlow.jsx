@@ -51,7 +51,7 @@ export function CaptureFlow() {
 
   const handleObtain = useCallback(
     (figureId, photoData) => {
-      obtainFigureWithPhoto(figureId, photoData)
+      return obtainFigureWithPhoto(figureId, photoData)
     },
     [obtainFigureWithPhoto],
   )
@@ -63,12 +63,15 @@ export function CaptureFlow() {
     captureFromFile,
     compressedPhoto,
     captureError,
+    rewardFigure,
     gpsProgress,
     gpsAccuracy,
     isReady,
+    isProcessing,
     inCaptureRange,
     isApproximateGps,
     distanceMeters,
+    retryCapture,
     showRewardComplete,
     complete,
   } = useCaptureFlow({
@@ -76,6 +79,11 @@ export function CaptureFlow() {
     position: proximityPosition ?? mapPosition,
     onObtainFigure: handleObtain,
   })
+
+  const isPostCapturePhase =
+    phase === CAPTURE_PHASES.REWARD ||
+    phase === CAPTURE_PHASES.UNLOCK ||
+    phase === CAPTURE_PHASES.DONE
 
   useEffect(() => {
     camera.initPermission()
@@ -87,7 +95,7 @@ export function CaptureFlow() {
   }, [])
 
   useEffect(() => {
-    if (!nearFigure) return
+    if (!nearFigure || isPostCapturePhase) return
 
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
     const stored = figures.find(
@@ -97,7 +105,7 @@ export function CaptureFlow() {
       setNearFigure(null)
       navigate('/map', { replace: true })
     }
-  }, [nearFigure, figures, navigate, setNearFigure])
+  }, [nearFigure, figures, isPostCapturePhase, navigate, setNearFigure])
 
   useAppLifecycle({
     onVisible: async () => {
@@ -124,10 +132,10 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
-    if (!nearFigure) {
+    if (!nearFigure && !isPostCapturePhase) {
       navigate('/map', { replace: true })
     }
-  }, [nearFigure, navigate])
+  }, [nearFigure, isPostCapturePhase, navigate])
 
   useEffect(() => {
     const lockPortrait = async () => {
@@ -152,13 +160,15 @@ export function CaptureFlow() {
   const handleClose = useCallback(() => {
     stopVibration()
     camera.stop()
+    setNearFigure(null)
     navigate('/map')
-  }, [camera, navigate])
+  }, [camera, navigate, setNearFigure])
 
   const handleComplete = useCallback(() => {
     complete()
+    setNearFigure(null)
     navigate('/map', { replace: true })
-  }, [complete, navigate])
+  }, [complete, navigate, setNearFigure])
 
   const handleRetryGeo = useCallback(async () => {
     requestPermission()
@@ -174,11 +184,40 @@ export function CaptureFlow() {
     camera.useNativeCamera()
   }, [camera])
 
+  const handleFileSelected = useCallback(
+    (file) => {
+      void captureFromFile(file).catch(() => {
+        // Errores recuperables ya se manejan dentro del hook.
+      })
+    },
+    [captureFromFile],
+  )
+
   const geoPermissionDenied = geoErrorType === 'denied'
   const geoSignalIssue =
     geoErrorType === 'timeout' || geoErrorType === 'unavailable'
   const needsGeoUi =
     geoPermissionDenied || (geoSignalIssue && !mapPosition && !geoLoading)
+
+  if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
+    return (
+      <Suspense fallback={<RewardSkeleton />}>
+        <RewardAnimation
+          figure={rewardFigure}
+          photoUrl={compressedPhoto}
+          onComplete={showRewardComplete}
+        />
+      </Suspense>
+    )
+  }
+
+  if (phase === CAPTURE_PHASES.UNLOCK) {
+    return (
+      <Suspense fallback={<RewardSkeleton />}>
+        <UnlockAnimation onComplete={handleComplete} />
+      </Suspense>
+    )
+  }
 
   if (!nearFigure) return null
 
@@ -216,29 +255,10 @@ export function CaptureFlow() {
     )
   }
 
-  if (phase === CAPTURE_PHASES.REWARD) {
-    return (
-      <Suspense fallback={<RewardSkeleton />}>
-        <RewardAnimation
-          figure={nearFigure}
-          photoUrl={compressedPhoto}
-          onComplete={showRewardComplete}
-        />
-      </Suspense>
-    )
-  }
-
-  if (phase === CAPTURE_PHASES.UNLOCK) {
-    return (
-      <Suspense fallback={<RewardSkeleton />}>
-        <UnlockAnimation onComplete={handleComplete} />
-      </Suspense>
-    )
-  }
-
   const isCapturing =
     phase === CAPTURE_PHASES.CAPTURING ||
-    phase === CAPTURE_PHASES.COMPRESSING
+    phase === CAPTURE_PHASES.COMPRESSING ||
+    isProcessing
 
   const showCamera =
     camera.nativeOnly ||
@@ -248,7 +268,7 @@ export function CaptureFlow() {
     phase === CAPTURE_PHASES.CAMERA
 
   const showCaptureError =
-    Boolean(captureError) && phase === CAPTURE_PHASES.CAMERA
+    Boolean(captureError) && phase === CAPTURE_PHASES.CAMERA && !isProcessing
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -276,7 +296,7 @@ export function CaptureFlow() {
           inCaptureRange={inCaptureRange}
           distanceMeters={distanceMeters}
           onCapture={capture}
-          onFileSelected={captureFromFile}
+          onFileSelected={handleFileSelected}
           onUseNativeCamera={handleUseNativeCamera}
           onClose={handleClose}
         />
@@ -318,15 +338,24 @@ export function CaptureFlow() {
       )}
 
       {showCaptureError && (
-        <div className="safe-bottom absolute inset-x-4 bottom-28 z-50 rounded-xl bg-red-950/90 px-4 py-3 text-center">
+        <div className="safe-bottom absolute inset-x-4 bottom-28 z-50 rounded-xl bg-red-950/90 px-4 py-4 text-center">
           <p className="text-sm text-red-200">{captureError}</p>
-          <button
-            type="button"
-            onClick={() => capture()}
-            className="mt-2 min-h-[44px] text-xs font-bold uppercase text-white underline"
-          >
-            Reintentar captura
-          </button>
+          <div className="mt-3 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={retryCapture}
+              className="min-h-[44px] rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase text-white"
+            >
+              Volver a intentar
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="min-h-[44px] text-xs font-semibold text-white/75 underline"
+            >
+              Volver al mapa
+            </button>
+          </div>
         </div>
       )}
     </div>

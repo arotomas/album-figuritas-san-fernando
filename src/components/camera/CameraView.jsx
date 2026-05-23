@@ -61,9 +61,14 @@ export function CameraView({
         capture="environment"
         className="hidden"
         onChange={(event) => {
-          const file = event.target.files?.[0]
-          if (file) onFileSelected?.(file)
-          event.target.value = ''
+          try {
+            const file = event.target.files?.[0]
+            if (file) onFileSelected?.(file)
+          } catch (error) {
+            console.warn('[CAPTURE] file input handler error', error?.message)
+          } finally {
+            event.target.value = ''
+          }
         }}
       />
 

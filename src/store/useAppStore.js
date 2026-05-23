@@ -138,7 +138,9 @@ export const useAppStore = create(
         ),
 
       obtainFigureWithPhoto: (figureId, { foto, fotoSizeBytes, obtenidaEn, captureRecord }) => {
-        return set((state) => {
+        let saved = false
+
+        set((state) => {
           if (!foto || !storageService.isPhotoWithinLimit(fotoSizeBytes)) {
             persistLog.persist('obtain blocked — photo required or too large', figureId)
             return state
@@ -155,10 +157,10 @@ export const useAppStore = create(
           const existing = state.figures.find((f) => f.id === realFigureId)
           if (existing?.obtenida) {
             persistLog.persist('obtain skipped — already obtained', realFigureId)
+            saved = true
             return {
               ...state,
               qaTestFigure: null,
-              nearFigure: null,
             }
           }
 
@@ -171,12 +173,14 @@ export const useAppStore = create(
           }
 
           persistLog.persist('figure obtained', realFigureId)
+          saved = true
           return {
             ...applyFigureUpdate(state, realFigureId, patch),
-            nearFigure: null,
             qaTestFigure: null,
           }
         })
+
+        return saved
       },
 
       setNearFigure: (figure) => set({ nearFigure: figure }),

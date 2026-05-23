@@ -19,7 +19,7 @@ const PHASES = {
 
 export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const [phase, setPhase] = useState(PHASES.ENTER)
-  const rarity = getRarity(figure.rareza)
+  const rarity = getRarity(figure?.rareza)
   const reduced = prefersReducedMotion()
   const onCompleteRef = useRef(onComplete)
 
@@ -47,6 +47,14 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
 
     return () => timers.forEach(clearTimeout)
   }, [figure?.id, reduced])
+
+  if (!figure) {
+    return (
+      <div className="safe-top safe-bottom flex h-full items-center justify-center bg-[#0a0a0b] px-6 text-center">
+        <p className="font-body text-sm text-white/70">Cargando recompensa…</p>
+      </div>
+    )
+  }
 
   const photoRevealed = phase !== PHASES.ENTER && phase !== PHASES.FLIP
 

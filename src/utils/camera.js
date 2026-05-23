@@ -7,11 +7,19 @@ export const CAMERA_CONSTRAINTS = {
 
 export const BLACK_PREVIEW_TIMEOUT_MS = 2_000
 
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i
+
 export function isCameraSupported() {
   return Boolean(
     typeof navigator !== 'undefined' &&
       navigator.mediaDevices?.getUserMedia,
   )
+}
+
+export function isImageFile(file) {
+  if (!file) return false
+  if (file.type?.startsWith('image/')) return true
+  return IMAGE_EXTENSIONS.test(file.name ?? '')
 }
 
 export async function queryCameraPermission() {
@@ -58,38 +66,104 @@ export function captureFrameFromVideo(video) {
   canvas.height = video.videoHeight
 
   const context = canvas.getContext('2d')
-  context.drawImage(video, 0, 0, canvas.width, canvas.height)
+  if (!context) {
+    throw new Error('CANVAS_CONTEXT_UNAVAILABLE')
+  }
 
+  context.drawImage(video, 0, 0, canvas.width, canvas.height)
   return canvas
 }
 
-export function loadImageFromFile(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      reject(new Error('FILE_MISSING'))
-      return
-    }
+function drawBitmapToCanvas(bitmap) {
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
 
-    const url = URL.createObjectURL(file)
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('CANVAS_CONTEXT_UNAVAILABLE')
+  }
+
+  context.drawImage(bitmap, 0, 0)
+  return canvas
+}
+
+function loadImageFromUrl(url) {
+  return new Promise((resolve, reject) => {
     const img = new Image()
 
     img.onload = () => {
+      if (!img.naturalWidth || !img.naturalHeight) {
+        reject(new Error('IMAGE_EMPTY'))
+        return
+      }
+
       const canvas = document.createElement('canvas')
       canvas.width = img.naturalWidth
       canvas.height = img.naturalHeight
+
       const context = canvas.getContext('2d')
+      if (!context) {
+        reject(new Error('CANVAS_CONTEXT_UNAVAILABLE'))
+        return
+      }
+
       context.drawImage(img, 0, 0)
-      URL.revokeObjectURL(url)
       resolve(canvas)
     }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('IMAGE_LOAD_FAILED'))
-    }
-
+    img.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'))
     img.src = url
   })
+}
+
+async function loadImageFromFileWithBitmap(file) {
+  if (typeof createImageBitmap !== 'function') {
+    throw new Error('IMAGE_BITMAP_UNSUPPORTED')
+  }
+
+  const bitmap = await createImageBitmap(file)
+  try {
+    if (!bitmap.width || !bitmap.height) {
+      throw new Error('IMAGE_EMPTY')
+    }
+    return drawBitmapToCanvas(bitmap)
+  } finally {
+    bitmap.close?.()
+  }
+}
+
+/**
+ * Convierte un File de cámara nativa en canvas listo para comprimir.
+ */
+export async function loadImageFromFile(file) {
+  if (!file) {
+    throw new Error('FILE_MISSING')
+  }
+
+  if (!isImageFile(file)) {
+    throw new Error('FILE_NOT_IMAGE')
+  }
+
+  if (file.size <= 0) {
+    throw new Error('FILE_EMPTY')
+  }
+
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await loadImageFromFileWithBitmap(file)
+    } catch {
+      // fallback a Image + object URL
+    }
+  }
+
+  const url = URL.createObjectURL(file)
+
+  try {
+    return await loadImageFromUrl(url)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
 export function isBlackVideoPreview(video) {
