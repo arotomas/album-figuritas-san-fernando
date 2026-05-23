@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AppErrorBoundary } from './components/qa/AppErrorBoundary.jsx'
 import { syncQaModeFromUrl } from './utils/qaMode'
+import './lib/supabase.js'
 import './styles/index.css'
 
 syncQaModeFromUrl()
