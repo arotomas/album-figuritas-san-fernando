@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Outlet } from 'react-router-dom'
 import { pageVariants } from '../animations/pageTransition'
+import { LegalNotice } from '../components/legal/LegalNotice'
 
 export function AuthLayout() {
   return (
@@ -14,6 +15,7 @@ export function AuthLayout() {
       >
         <Outlet />
       </motion.main>
+      <LegalNotice className="safe-x shrink-0 px-8 pb-6 pt-2" />
     </div>
   )
 }

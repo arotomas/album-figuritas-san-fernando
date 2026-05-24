@@ -53,6 +53,12 @@ const AdminCapturesPage = lazy(() =>
 const AdminMapPage = lazy(() =>
   import('../pages/admin/AdminMapPage').then((m) => ({ default: m.AdminMapPage })),
 )
+const PrivacyPage = lazy(() =>
+  import('../pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })),
+)
+const TermsPage = lazy(() =>
+  import('../pages/TermsPage').then((m) => ({ default: m.TermsPage })),
+)
 
 function LazyPage({ children }) {
   return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
@@ -67,6 +73,23 @@ export function AppRoutes() {
           element={
             <LazyPage>
               <RootRedirect />
+            </LazyPage>
+          }
+        />
+
+        <Route
+          path="/privacy"
+          element={
+            <LazyPage>
+              <PrivacyPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="/terms"
+          element={
+            <LazyPage>
+              <TermsPage />
             </LazyPage>
           }
         />

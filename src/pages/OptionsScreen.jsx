@@ -12,6 +12,7 @@ import { isDevMode } from '../utils/devMode'
 import { useQaMode, withQaParam } from '../utils/qaMode'
 import { getFullName } from '../utils/profileValidation'
 import { hasValidAddress } from '../utils/parseGooglePlace'
+import { LegalNotice } from '../components/legal/LegalNotice'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -306,6 +307,7 @@ export function OptionsScreen() {
         <Button variant="ghost" onClick={logout}>
           Cerrar sesión
         </Button>
+        <LegalNotice className="pt-4" />
       </div>
     </div>
   )
