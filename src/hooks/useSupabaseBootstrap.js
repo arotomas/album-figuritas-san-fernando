@@ -1,17 +1,78 @@
 import { useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { useAppStore } from '../store/useAppStore'
 import {
   fetchProfile,
   restoreSupabaseSession,
   signOutSupabase,
 } from '../services/supabase/auth'
-import { touchProfileLogin } from '../services/supabase/profile'
+import { ensureProfileFromAuthUser, touchProfileLogin } from '../services/supabase/profile'
 import { isAdmin, isModeratorOrAdmin } from '../services/supabase/admin'
 import { fetchPublicFigures } from '../services/supabase/figures'
 import { pullRemoteAlbum } from '../services/supabase/sync'
+import { hasStoredSupabaseSession } from '../services/supabase/sessionRestore'
 import { supabaseLog } from '../utils/supabaseLog'
 import { authLog } from '../utils/authLog'
+import { authRestoreLog } from '../utils/authRestoreLog'
 import { isProfileComplete } from '../utils/profileValidation'
+
+async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, replaceCatalogFromRemote, mergeRemoteUserFigures }) {
+  const userId = session.user.id
+  let profile = await fetchProfile(userId)
+
+  if (!profile?.id) {
+    const provider =
+      user.app_metadata?.provider === 'google' || user.identities?.some((i) => i.provider === 'google')
+        ? 'google'
+        : 'email'
+    profile = await ensureProfileFromAuthUser(user, provider)
+  }
+
+  const admin = await isAdmin(userId)
+  const moderatorOrAdmin = await isModeratorOrAdmin(userId)
+  const remoteCatalog = await fetchPublicFigures()
+
+  replaceCatalogFromRemote(remoteCatalog)
+  setSupabaseAuth({
+    userId,
+    isAdmin: admin,
+    isModeratorOrAdmin: moderatorOrAdmin,
+    profile,
+  })
+
+  const completed = isProfileComplete(profile)
+  login({
+    username: profile?.username ?? profile?.email ?? user.email ?? 'explorador',
+    profileCompleted: completed,
+  })
+
+  authRestoreLog.info('profile loaded', {
+    userId,
+    profileCompleted: completed,
+    role: profile?.role ?? null,
+  })
+
+  await touchProfileLogin(userId)
+
+  const remoteRows = await pullRemoteAlbum()
+  if (remoteRows.length > 0) {
+    mergeRemoteUserFigures(remoteRows)
+  }
+
+  if (!completed) {
+    authRestoreLog.info('redirect profile setup', { userId })
+  } else {
+    authRestoreLog.info('redirect app', { userId })
+  }
+
+  supabaseLog.sync.info('bootstrap complete', {
+    userId,
+    isAdmin: admin,
+    remoteFigures: remoteRows.length,
+    remoteCatalog: remoteCatalog.length,
+    profileCompleted: completed,
+  })
+}
 
 /**
  * Restaura sesión Supabase al iniciar la app.
@@ -31,8 +92,6 @@ export function useSupabaseBootstrap(enabled) {
     let cancelled = false
 
     async function bootstrap() {
-      setAuthBootstrapped(false)
-
       try {
         supabaseLog.sync.info('bootstrap start')
 
@@ -40,6 +99,7 @@ export function useSupabaseBootstrap(enabled) {
         if (cancelled) return
 
         if (!result?.session?.user?.id) {
+          authRestoreLog.info('no session')
           clearAuthState()
           return
         }
@@ -51,54 +111,47 @@ export function useSupabaseBootstrap(enabled) {
           return
         }
 
-        const userId = result.session.user.id
-        const profile = await fetchProfile(userId)
-
-        if (!profile?.id) {
-          authLog.error('bootstrap profile missing', { userId })
-          clearAuthState()
-          return
-        }
-
-        const admin = await isAdmin(userId)
-        const moderatorOrAdmin = await isModeratorOrAdmin(userId)
-        const remoteCatalog = await fetchPublicFigures()
-
-        if (cancelled) return
-
-        replaceCatalogFromRemote(remoteCatalog)
-        setSupabaseAuth({
-          userId,
-          isAdmin: admin,
-          isModeratorOrAdmin: moderatorOrAdmin,
-          profile,
-        })
-
-        const completed = isProfileComplete(profile)
-        login({
-          username: profile.username ?? profile.email ?? result.user.email ?? 'explorador',
-          profileCompleted: completed,
-        })
-
-        await touchProfileLogin(userId)
-
-        const remoteRows = await pullRemoteAlbum()
-        if (cancelled) return
-
-        if (remoteRows.length > 0) {
-          mergeRemoteUserFigures(remoteRows)
-        }
-
-        supabaseLog.sync.info('bootstrap complete', {
-          userId,
-          isAdmin: admin,
-          remoteFigures: remoteRows.length,
-          remoteCatalog: remoteCatalog.length,
-          profileCompleted: completed,
+        await hydrateAuthFromSession({
+          session: result.session,
+          user: result.user,
+          setSupabaseAuth,
+          login,
+          replaceCatalogFromRemote,
+          mergeRemoteUserFigures,
         })
       } catch (error) {
         authLog.error('bootstrap failed', { message: error?.message ?? String(error) })
-        clearAuthState()
+
+        const sessionStillPresent = await hasStoredSupabaseSession()
+        if (sessionStillPresent) {
+          authRestoreLog.info('session found', {
+            recoveredAfterError: true,
+            message: error?.message ?? String(error),
+          })
+
+          try {
+            const retry = await restoreSupabaseSession()
+            if (!cancelled && retry?.session?.user?.id && !retry.user?.is_anonymous) {
+              await hydrateAuthFromSession({
+                session: retry.session,
+                user: retry.user,
+                setSupabaseAuth,
+                login,
+                replaceCatalogFromRemote,
+                mergeRemoteUserFigures,
+              })
+              return
+            }
+          } catch (retryError) {
+            authRestoreLog.error('bootstrap retry failed', {
+              message: retryError?.message ?? String(retryError),
+            })
+          }
+        } else {
+          authRestoreLog.info('no session')
+        }
+
+        if (!cancelled) clearAuthState()
       } finally {
         if (!cancelled) {
           setAuthBootstrapped(true)
@@ -120,4 +173,26 @@ export function useSupabaseBootstrap(enabled) {
     setAuthBootstrapped,
     setSupabaseAuth,
   ])
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        authRestoreLog.info('no session', { reason: 'signed_out_event' })
+        clearAuthState()
+      }
+
+      if (event === 'TOKEN_REFRESHED' && session?.user?.id) {
+        authRestoreLog.info('session found', {
+          reason: 'token_refreshed',
+          userId: session.user.id,
+        })
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [clearAuthState, enabled])
 }

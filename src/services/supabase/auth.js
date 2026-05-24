@@ -8,6 +8,8 @@ import {
   upsertUserProfile,
 } from './profile'
 
+export { restoreSupabaseSession, hasStoredSupabaseSession } from './sessionRestore'
+
 export function isSupabaseConfigured() {
   return Boolean(
     import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -74,21 +76,6 @@ export async function getSessionUserId() {
 async function clearLocalAuthSession() {
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
-}
-
-export async function restoreSupabaseSession() {
-  if (!isSupabaseConfigured()) return null
-
-  const { data, error } = await supabase.auth.getSession()
-  if (error || !data.session?.user?.id) return null
-
-  const userResponse = await supabase.auth.getUser()
-  if (userResponse.error || !userResponse.data.user?.id) return null
-
-  return {
-    session: data.session,
-    user: userResponse.data.user,
-  }
 }
 
 export async function fetchProfile(userId) {
@@ -213,7 +200,7 @@ export async function updatePassword(nextPassword) {
 }
 
 export async function signOutSupabase() {
-  const { error } = await supabase.auth.signOut({ scope: 'local' })
+  const { error } = await supabase.auth.signOut()
   if (error) throw error
 }
 
