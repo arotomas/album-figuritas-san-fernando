@@ -15,8 +15,8 @@ import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
-import { VIBRATION_NEAR_COOLDOWN_MS } from '../../config/ux'
-import { vibrateNearFigure } from '../../utils/vibration'
+import { FIGURE_ALERT_COOLDOWN_MS } from '../../config/proximity'
+import { vibrateFigureProximityAlert } from '../../utils/vibration'
 import { prefersReducedMotion } from '../../utils/performance'
 import { FigureMarker } from './FigureMarker'
 import { UserLocationDot } from './UserLocationDot'
@@ -322,14 +322,15 @@ function LeafletMapViewInner({
         onBonusDiscovered?.(nearFigure)
       }
 
+      const phase = nearFigure.proximity?.phase ?? 'medium'
       if (lastVibratedFigureIdRef.current !== nearFigure.id) {
-        if (vibrateNearFigure(VIBRATION_NEAR_COOLDOWN_MS)) {
+        if (vibrateFigureProximityAlert(nearFigure, phase, FIGURE_ALERT_COOLDOWN_MS)) {
           lastVibratedFigureIdRef.current = nearFigure.id
         }
       }
 
       if (nearFigure.is_bonus && !bonusVibratedIdsRef.current.has(String(nearFigure.id))) {
-        navigator.vibrate?.([150, 80, 150])
+        vibrateFigureProximityAlert(nearFigure, 'close', FIGURE_ALERT_COOLDOWN_MS)
         bonusVibratedIdsRef.current.add(String(nearFigure.id))
       }
     } else {

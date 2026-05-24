@@ -1,6 +1,12 @@
 import { prefersReducedMotion } from './performance'
+import { FIGURE_ALERT_COOLDOWN_MS } from '../config/proximity'
+import { PROXIMITY_PHASES } from '../config/proximity'
+import { normalizeFigureRarity } from './proximityExperience'
 
-const NEAR_FIGURE_PATTERN = [120, 60, 120, 60, 200]
+const NEAR_FAR_PATTERN = [40, 120, 40]
+const NEAR_MEDIUM_PATTERN = [60, 50, 80]
+const NEAR_CLOSE_PATTERN = [80, 40, 100, 40, 120]
+const NEAR_CAPTURE_PATTERN = [120, 60, 120, 60, 200]
 const READY_PATTERN = [40, 30, 40]
 const CAPTURE_PATTERN = [30, 20, 60]
 const UNLOCK_PATTERN = [80, 40, 120, 40, 200]
@@ -10,7 +16,10 @@ const lastVibrationAt = {
   near: 0,
   ready: 0,
   album: 0,
+  pulse: 0,
 }
+
+const figureAlertCooldowns = new Map()
 
 function canVibrate() {
   return typeof navigator !== 'undefined' && 'vibrate' in navigator
@@ -31,8 +40,47 @@ function vibrateWithCooldown(key, pattern, cooldownMs) {
   return true
 }
 
-export function vibrateNearFigure(cooldownMs = 12_000) {
-  return vibrateWithCooldown('near', NEAR_FIGURE_PATTERN, cooldownMs)
+function patternForPhase(phase, rarity) {
+  if (phase === PROXIMITY_PHASES.CAPTURE) return NEAR_CAPTURE_PATTERN
+  if (phase === PROXIMITY_PHASES.CLOSE) return NEAR_CLOSE_PATTERN
+  if (phase === PROXIMITY_PHASES.MEDIUM) return NEAR_MEDIUM_PATTERN
+
+  if (rarity === 'legendaria' || rarity === 'épica') {
+    return [30, 180, 30]
+  }
+  return NEAR_FAR_PATTERN
+}
+
+export function vibrateNearFigure(cooldownMs = FIGURE_ALERT_COOLDOWN_MS) {
+  return vibrateWithCooldown('near', NEAR_CAPTURE_PATTERN, cooldownMs)
+}
+
+/** Aviso por figurita con cooldown de 2 min y patrón según fase/rareza. */
+export function vibrateFigureProximityAlert(figure, phase, cooldownMs = FIGURE_ALERT_COOLDOWN_MS) {
+  if (!canVibrate() || shouldSkipHaptics() || !figure?.id) return false
+  if (phase === PROXIMITY_PHASES.NONE) return false
+
+  const figureKey = String(figure.id)
+  const now = Date.now()
+  if (now - (figureAlertCooldowns.get(figureKey) ?? 0) < cooldownMs) return false
+
+  const rarity = normalizeFigureRarity(figure)
+  navigator.vibrate(patternForPhase(phase, rarity))
+  figureAlertCooldowns.set(figureKey, now)
+  lastVibrationAt.near = now
+  return true
+}
+
+/** Pulso suave mientras se acerca en cámara (cooldown corto). */
+export function vibrateProximityPulse(phase, cooldownMs = 8_000) {
+  if (phase === PROXIMITY_PHASES.NONE || phase === PROXIMITY_PHASES.CAPTURE) return false
+  const pattern =
+    phase === PROXIMITY_PHASES.CLOSE
+      ? [25, 35, 25]
+      : phase === PROXIMITY_PHASES.MEDIUM
+        ? [18, 50, 18]
+        : [12, 70, 12]
+  return vibrateWithCooldown('pulse', pattern, cooldownMs)
 }
 
 export function vibrateReady(cooldownMs = 6_000) {
@@ -57,4 +105,8 @@ export function stopVibration() {
   if (canVibrate()) {
     navigator.vibrate(0)
   }
+}
+
+export function resetFigureProximityAlerts() {
+  figureAlertCooldowns.clear()
 }

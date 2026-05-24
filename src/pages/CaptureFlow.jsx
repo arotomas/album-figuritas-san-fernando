@@ -103,7 +103,8 @@ export function CaptureFlow() {
     processingMessage,
     inCaptureRange,
     isApproximateGps,
-    distanceMeters,
+    proximityPhase,
+    figureRarity,
     retryCapture,
     clearPendingCapture,
     showRewardComplete,
@@ -436,7 +437,8 @@ export function CaptureFlow() {
           useNativeFallback={camera.useNativeFallback}
           showBlackPreviewFallback={camera.showBlackPreviewFallback}
           inCaptureRange={inCaptureRange}
-          distanceMeters={distanceMeters}
+          proximityPhase={proximityPhase}
+          figureRarity={figureRarity}
           onCapture={capture}
           onFileSelected={handleFileSelected}
           onUseNativeCamera={handleUseNativeCamera}
@@ -462,11 +464,6 @@ export function CaptureFlow() {
         <div className="safe-top pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
           <p className="rounded-full bg-black/75 px-4 py-2 text-xs text-white/85">
             {gpsStatusLabel}
-            {distanceMeters != null
-              ? ` · ~${Math.round(distanceMeters)}m del punto`
-              : mapPosition.accuracy
-                ? ` (~${Math.round(mapPosition.accuracy)}m precisión)`
-                : ''}
           </p>
         </div>
       )}

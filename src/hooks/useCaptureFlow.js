@@ -7,10 +7,16 @@ import {
 } from '../utils/nativePhotoPrepare'
 import { compressImageWithFallback } from '../utils/imageCompression'
 import { withTimeout } from '../utils/withTimeout'
-import { vibrateCapture, vibrateReady, vibrateUnlock } from '../utils/vibration'
+import { vibrateCapture, vibrateReady, vibrateUnlock, vibrateProximityPulse } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
-import { CAPTURE_MAX_DISTANCE_METERS } from '../config/ux'
 import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
+import {
+  buildProximitySnapshot,
+  getProximityRadii,
+  isWithinCaptureRange,
+} from '../utils/proximityExperience'
+import { useSmoothedProximityVisual } from './useSmoothedProximity'
+import { VIBRATION_PROXIMITY_PULSE_COOLDOWN_MS } from '../config/ux'
 import {
   buildCaptureRecord,
   processCaptureForUnlock,
@@ -193,19 +199,34 @@ export function useCaptureFlow({
     [figure, position],
   )
 
+  const proximitySnapshot = useMemo(
+    () => buildProximitySnapshot(figure, distanceMeters),
+    [distanceMeters, figure],
+  )
+
+  const captureRadiusMeters = proximitySnapshot?.captureMeters ?? getProximityRadii(figure).captureMeters
+  const detectionRadiusMeters =
+    proximitySnapshot?.detectionMeters ?? getProximityRadii(figure).detectionMeters
+
   const inCaptureRange =
     isRetake ||
-    (distanceMeters != null && distanceMeters <= CAPTURE_MAX_DISTANCE_METERS)
+    isWithinCaptureRange(distanceMeters, captureRadiusMeters)
+
+  const inDetectionRange = isRetake || Boolean(proximitySnapshot?.inDetectionRange)
+
+  const rawRingProgress = proximitySnapshot?.easedProgress ?? 0
+  const visualProgress = useSmoothedProximityVisual(rawRingProgress, {
+    enabled: Boolean(figure) && inDetectionRange && !isRetake,
+  })
+
+  const proximityPhase = proximitySnapshot?.phase ?? 'none'
+  const figureRarity = proximitySnapshot?.rarity ?? 'común'
 
   const isApproximateGps =
     position?.accuracy != null &&
     position.accuracy > GPS_APPROXIMATE_CAPTURE_WARNING_M
 
-  const gpsProgress = useMemo(() => {
-    if (!position || distanceMeters == null) return 0
-    if (inCaptureRange) return 1
-    return Math.max(0, 1 - distanceMeters / CAPTURE_MAX_DISTANCE_METERS)
-  }, [distanceMeters, inCaptureRange, position])
+  const gpsProgress = inDetectionRange ? visualProgress : 0
 
   const isReady =
     camera.isReady &&
@@ -213,6 +234,16 @@ export function useCaptureFlow({
     phase === CAPTURE_PHASES.CAMERA &&
     !isProcessing &&
     Boolean(figure)
+
+  const lastPulsePhaseRef = useRef(null)
+
+  useEffect(() => {
+    if (isRetake || !inDetectionRange || inCaptureRange) return
+    if (lastPulsePhaseRef.current === proximityPhase) return
+    if (vibrateProximityPulse(proximityPhase, VIBRATION_PROXIMITY_PULSE_COOLDOWN_MS)) {
+      lastPulsePhaseRef.current = proximityPhase
+    }
+  }, [inCaptureRange, inDetectionRange, isRetake, proximityPhase])
 
   const acknowledgeChallenge = useCallback(() => {
     setPhase(CAPTURE_PHASES.CAMERA)
@@ -343,12 +374,14 @@ export function useCaptureFlow({
       }
 
       const currentDistance = getDistanceToFigure(targetPosition, targetFigure)
-      if (currentDistance == null || currentDistance > CAPTURE_MAX_DISTANCE_METERS) {
+      const captureRadius = getProximityRadii(targetFigure).captureMeters
+      if (currentDistance == null || !isWithinCaptureRange(currentDistance, captureRadius)) {
         captureLog.warn('blocked — too far before camera', {
           figureId: targetFigure.id,
           distanceMeters: currentDistance != null ? Math.round(currentDistance) : null,
+          captureRadiusMeters: captureRadius,
         })
-        setCaptureError('Estás lejos del punto. Acercate para capturar.')
+        setCaptureError('Todavía no estás lo suficientemente cerca. Seguí la señal del aro.')
         return false
       }
 
@@ -995,6 +1028,12 @@ export function useCaptureFlow({
     phase,
     camera,
     gpsProgress,
+    visualProgress,
+    proximityPhase,
+    figureRarity,
+    inDetectionRange,
+    detectionRadiusMeters,
+    captureRadiusMeters,
     inCaptureRange,
     isApproximateGps,
     isReady,

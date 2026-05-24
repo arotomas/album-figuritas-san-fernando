@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FaXmark } from 'react-icons/fa6'
 import { ValidationRing } from './ValidationRing'
 import { CaptureButton } from './CaptureButton'
+import { getCameraProximityHint } from '../../utils/proximityExperience'
 
 export function CameraView({
   videoRef,
@@ -16,7 +17,8 @@ export function CameraView({
   useNativeFallback = false,
   showBlackPreviewFallback = false,
   inCaptureRange = false,
-  distanceMeters = null,
+  proximityPhase = 'none',
+  figureRarity = 'común',
   onCapture,
   onFileSelected,
   onUseNativeCamera,
@@ -26,6 +28,7 @@ export function CameraView({
   const inputRef = fileInputRef ?? localInputRef
   const showNativeUi = nativeOnly || useNativeFallback
   const showSecondaryNativeButton = !nativeOnly && !useNativeFallback
+  const hint = getCameraProximityHint(proximityPhase, { inCaptureRange })
 
   return (
     <div
@@ -103,21 +106,24 @@ export function CameraView({
       </div>
 
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
-        <ValidationRing progress={gpsProgress} isReady={isReady} />
+        <ValidationRing
+          progress={gpsProgress}
+          isReady={isReady}
+          proximityPhase={proximityPhase}
+          rarity={figureRarity}
+        />
 
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {!isReady && !isCapturing && (
             <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="mt-6 max-w-xs px-6 text-center text-sm text-white/70"
+              key={proximityPhase}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="mt-6 max-w-xs px-6 text-center text-sm leading-relaxed text-white/75"
             >
-              {inCaptureRange
-                ? 'Sacá una foto del lugar para desbloquear la figurita.'
-                : distanceMeters != null
-                  ? `Acercate al punto (~${Math.round(distanceMeters)}m).`
-                  : 'Esperando ubicación para habilitar la captura…'}
+              {hint}
             </motion.p>
           )}
         </AnimatePresence>

@@ -23,6 +23,7 @@ import {
   getMainProgressState,
   getRevealedNormalFigures,
 } from '../utils/figureGameRules'
+import { getMapProximityHint } from '../utils/proximityExperience'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -258,14 +259,17 @@ export function MyFiguresScreen() {
             <div className="mt-4 rounded-2xl border border-border/60 bg-warm-white/80 px-3 py-2.5">
               <p className={`${typeClasses.micro} text-muted`}>Próxima misión</p>
               <p className="mt-1 font-body text-sm font-bold text-ink">
-                {nearFigure?.is_bonus
-                  ? `Hay algo especial cerca: ${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
-                  : nearFigure
-                    ? `${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
-                    : nextMissionFigure
-                      ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
-                      : 'Explorá el mapa para encontrar secretos especiales.'}
+                {nearFigure
+                  ? getMapProximityHint(nearFigure.proximity?.phase ?? 'medium', {
+                      isBonus: nearFigure.is_bonus,
+                    }) ?? 'Hay algo cerca… seguí explorando.'
+                  : nextMissionFigure
+                    ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
+                    : 'Explorá el mapa para encontrar secretos especiales.'}
               </p>
+              {nearFigure && (
+                <p className="mt-0.5 font-body text-xs text-muted">{nearFigure.nombre}</p>
+              )}
             </div>
           </div>
         </header>

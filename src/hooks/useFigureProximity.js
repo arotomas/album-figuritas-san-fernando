@@ -1,21 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getDistanceMeters } from '../utils/geo'
 import {
-  PROXIMITY_ENTER_METERS,
-  PROXIMITY_EXIT_METERS,
-} from '../config/ux'
+  buildProximitySnapshot,
+  compareFigureProximityPriority,
+  getProximityRadii,
+  pickPriorityFigure,
+} from '../utils/proximityExperience'
 
 /**
- * Proximidad con histéresis: entra a 250m, sale a 280m — evita flicker en el borde.
+ * Proximidad con histéresis por figurita:
+ * - detección: avisa dentro del radio de detección (por rareza)
+ * - captura: solo dentro del radio de captura (otro hook/flujo)
  */
-export function useFigureProximity(
-  userPosition,
-  figures,
-  {
-    enterMeters = PROXIMITY_ENTER_METERS,
-    exitMeters = PROXIMITY_EXIT_METERS,
-  } = {},
-) {
+export function useFigureProximity(userPosition, figures) {
   const nearStateRef = useRef({})
   const [tick, setTick] = useState(0)
 
@@ -23,16 +20,20 @@ export function useFigureProximity(
     if (!userPosition || !figures.length) return []
 
     return figures
-      .map((figure) => ({
-        ...figure,
-        distanceMeters: getDistanceMeters(
+      .map((figure) => {
+        const distanceMeters = getDistanceMeters(
           userPosition.lat,
           userPosition.lng,
           figure.lat,
           figure.lng,
-        ),
-      }))
-      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+        )
+        return {
+          ...figure,
+          distanceMeters,
+          proximity: buildProximitySnapshot(figure, distanceMeters),
+        }
+      })
+      .sort(compareFigureProximityPriority)
   }, [userPosition, figures])
 
   useEffect(() => {
@@ -54,16 +55,14 @@ export function useFigureProximity(
         return
       }
 
-      const figureEnterMeters =
-        Number(figure.is_bonus ? figure.reveal_radius : figure.capture_radius) || enterMeters
-      const figureExitMeters = Math.max(figureEnterMeters + 30, exitMeters)
+      const { detectionMeters, exitMeters } = getProximityRadii(figure)
       const wasNear = Boolean(nextState[figure.id])
       const dist = figure.distanceMeters
 
-      if (!wasNear && dist <= figureEnterMeters) {
+      if (!wasNear && dist <= detectionMeters) {
         nextState[figure.id] = true
         changed = true
-      } else if (wasNear && dist > figureExitMeters) {
+      } else if (wasNear && dist > exitMeters) {
         delete nextState[figure.id]
         changed = true
       }
@@ -73,7 +72,7 @@ export function useFigureProximity(
       nearStateRef.current = nextState
       setTick((v) => v + 1)
     }
-  }, [figuresWithDistance, userPosition, enterMeters, exitMeters])
+  }, [figuresWithDistance, userPosition])
 
   return useMemo(() => {
     void tick
@@ -86,6 +85,7 @@ export function useFigureProximity(
         isNearFigure: false,
         nearFigure: null,
         nearFigures: [],
+        priorityNearFigure: null,
       }
     }
 
@@ -93,6 +93,7 @@ export function useFigureProximity(
       (figure) => nearStateRef.current[figure.id],
     )
 
+    const priorityNearFigure = pickPriorityFigure(nearFigures)
     const nearestFigure = figuresWithDistance[0] ?? null
 
     return {
@@ -100,8 +101,9 @@ export function useFigureProximity(
       nearestFigure,
       nearestDistance: nearestFigure?.distanceMeters ?? null,
       isNearFigure: nearFigures.length > 0,
-      nearFigure: nearFigures[0] ?? null,
+      nearFigure: priorityNearFigure,
       nearFigures,
+      priorityNearFigure,
     }
   }, [figures, figuresWithDistance, tick, userPosition])
 }

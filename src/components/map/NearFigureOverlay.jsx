@@ -1,9 +1,9 @@
 import { memo } from 'react'
 import { m } from 'framer-motion'
-import { formatDistance } from '../../utils/geo'
 import { PremiumButton } from '../ui/PremiumButton'
 import { GlowCard } from '../ui/GlowCard'
 import { typeClasses } from '../../theme/typography'
+import { getMapProximityHint } from '../../utils/proximityExperience'
 
 function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
   if (!nearFigure) return null
@@ -12,6 +12,8 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
     nearFigure.bonus_type === 'legendary' || nearFigure.rareza === 'legendaria'
       ? 'legendaria'
       : 'épica'
+  const phase = nearFigure.proximity?.phase ?? 'medium'
+  const hint = getMapProximityHint(phase, { isBonus })
 
   return (
     <GlowCard
@@ -35,12 +37,10 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
         )}
         <div className="border-b border-white/8 px-4 py-3.5">
           <p className={`${typeClasses.label} text-center ${isBonus ? 'text-amber-100' : 'text-progress'}`}>
-            {isBonus
-              ? `Hay algo especial cerca… una figurita ${bonusKind} está a ${formatDistance(nearFigure.distanceMeters)}.`
-              : 'Estás cerca. Sacá una foto del lugar para desbloquear la figurita.'}
+            {hint}
           </p>
           <p className="mt-1.5 text-center font-body text-xs text-white/50">
-            {nearFigure.nombre} · a {formatDistance(nearFigure.distanceMeters)}
+            {nearFigure.nombre}
           </p>
         </div>
 
