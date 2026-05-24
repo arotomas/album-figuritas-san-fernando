@@ -2,9 +2,10 @@ import { supabase } from '../../lib/supabase'
 import { getSessionUserId } from './auth'
 import { getBonusFigures, getMainProgressState } from '../../utils/figureGameRules'
 import { PROFILE_ROLES } from '../../utils/roles'
+import { isAbortError, withTimeout } from '../../utils/adminAsync'
 
 const PROFILE_COLUMNS =
-  'id, username, role, is_admin, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
+  'id, username, avatar_url, role, is_admin, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at, deleted_at, deleted_by, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
 
 const FIGURE_COLUMNS =
   'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
@@ -13,8 +14,25 @@ const CAPTURE_COLUMNS =
   'id, user_id, figure_id, lat, lng, created_at, photo_url, device, validation_status, reviewed_at, reviewed_by, review_note'
 
 const VALID_ROLES = PROFILE_ROLES
-
 const VALID_REVIEW_STATUSES = ['pending', 'approved', 'rejected']
+
+let figuresCache = null
+let figuresCacheAt = 0
+const FIGURES_CACHE_TTL_MS = 60_000
+const RPC_TIMEOUT_MS = 25_000
+
+function rpcOptions(signal) {
+  return signal ? { abortSignal: signal } : undefined
+}
+
+async function runRpc(promiseFactory, { signal, timeoutMs = RPC_TIMEOUT_MS } = {}) {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
+
+  const task = promiseFactory()
+  return withTimeout(task, timeoutMs, 'TIMEOUT')
+}
 
 function logAdminPlayers(message, detail) {
   console.info('[admin-players]', message, detail)
@@ -50,95 +68,65 @@ function normalizeFigure(row) {
   }
 }
 
-async function fetchProfiles() {
-  let { data, error } = await supabase.from('profiles').select(PROFILE_COLUMNS)
+function mapListPlayer(row) {
+  return {
+    ...row,
+    album_status: row.album_status ?? 'pending',
+    mainProgress: row.mainProgress ?? { obtained: 0, total: 0 },
+    bonusObtained: row.bonusObtained ?? 0,
+    totalCaptures: row.totalCaptures ?? 0,
+  }
+}
 
-  if (error && /album_status|album_review/i.test(error.message ?? '')) {
-    const fallback = await supabase.from('profiles').select('id, username, created_at')
-    data = fallback.data?.map((profile) => ({
-      ...profile,
-      role: 'user',
-      is_admin: false,
-      album_status: 'pending',
-      album_reviewed_at: null,
-      album_reviewed_by: null,
-      album_review_note: null,
-      nombre: null,
-      apellido: null,
-      dni: null,
-      email: null,
-      celular: null,
-      auth_provider: 'anonymous',
-      profile_completed: false,
-      last_login_at: null,
-      updated_at: null,
-      direccion_texto: null,
-      direccion_lat: null,
-      direccion_lng: null,
-      localidad: null,
-      provincia: null,
-      pais: null,
-      codigo_postal: null,
-    }))
-    error = fallback.error
-  } else if (
-    error &&
-    /nombre|apellido|dni|email|celular|auth_provider|profile_completed|last_login_at|updated_at|direccion_|localidad|provincia|pais|codigo_postal/i.test(
-      error.message ?? '',
-    )
-  ) {
+async function fetchProfileById(userId) {
+  let { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_COLUMNS)
+    .eq('id', userId)
+    .is('deleted_at', null)
+    .single()
+
+  if (error && /deleted_at|deleted_by/i.test(error.message ?? '')) {
     const fallback = await supabase
       .from('profiles')
-      .select('id, username, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note')
-    data = fallback.data?.map((profile) => ({
-      ...profile,
-      role: profile.role ?? 'user',
-      is_admin: profile.is_admin ?? false,
-      nombre: null,
-      apellido: null,
-      dni: null,
-      email: null,
-      celular: null,
-      auth_provider: 'anonymous',
-      profile_completed: false,
-      last_login_at: null,
-      updated_at: null,
-      direccion_texto: null,
-      direccion_lat: null,
-      direccion_lng: null,
-      localidad: null,
-      provincia: null,
-      pais: null,
-      codigo_postal: null,
-    }))
+      .select(PROFILE_COLUMNS.replace(', deleted_at, deleted_by', ''))
+      .eq('id', userId)
+      .single()
+    data = fallback.data
     error = fallback.error
   }
 
   if (error) throw error
-  return (data ?? []).map(mapRoleFallback)
+  if (!data) throw new Error('PLAYER_NOT_FOUND')
+  return mapRoleFallback(data)
 }
 
-async function fetchFigures() {
+async function fetchFigures(force = false) {
+  const now = Date.now()
+  if (!force && figuresCache && now - figuresCacheAt < FIGURES_CACHE_TTL_MS) {
+    return figuresCache
+  }
+
   const { data, error } = await supabase.from('figures').select(FIGURE_COLUMNS)
   if (error) throw error
-  return (data ?? []).map(normalizeFigure)
+  figuresCache = (data ?? []).map(normalizeFigure)
+  figuresCacheAt = now
+  return figuresCache
 }
 
-async function fetchUserFigures(userId = null) {
+async function fetchUserFigures(userId) {
   let query = supabase
     .from('user_figures')
     .select('id, user_id, figure_id, captured_at, photo_url, source, updated_at, last_photo_updated_at')
-
-  if (userId) query = query.eq('user_id', userId)
+    .eq('user_id', userId)
 
   let { data, error } = await query
 
   if (error && /updated_at|last_photo_updated_at/i.test(error.message ?? '')) {
-    let fallbackQuery = supabase
+    const fallback = await supabase
       .from('user_figures')
       .select('id, user_id, figure_id, captured_at, photo_url, source')
-    if (userId) fallbackQuery = fallbackQuery.eq('user_id', userId)
-    const fallback = await fallbackQuery
+      .eq('user_id', userId)
     data = fallback.data
     error = fallback.error
   }
@@ -147,9 +135,14 @@ async function fetchUserFigures(userId = null) {
   return data ?? []
 }
 
-async function fetchCaptures(userId = null) {
-  let query = supabase.from('captures').select(CAPTURE_COLUMNS)
-  if (userId) query = query.eq('user_id', userId)
+async function fetchCaptures(userId, { limit = null } = {}) {
+  let query = supabase
+    .from('captures')
+    .select(CAPTURE_COLUMNS)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (limit) query = query.limit(limit)
 
   let { data, error } = await query
 
@@ -157,7 +150,9 @@ async function fetchCaptures(userId = null) {
     let fallbackQuery = supabase
       .from('captures')
       .select('id, user_id, figure_id, lat, lng, created_at, photo_url, device')
-    if (userId) fallbackQuery = fallbackQuery.eq('user_id', userId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    if (limit) fallbackQuery = fallbackQuery.limit(limit)
     const fallback = await fallbackQuery
     data = fallback.data?.map((capture) => ({
       ...capture,
@@ -174,69 +169,35 @@ async function fetchCaptures(userId = null) {
 }
 
 function buildPlayerSummary(profile, figures, unlocks, captures) {
-  const userUnlocks = unlocks.filter((row) => row.user_id === profile.id)
-  const userCaptures = captures.filter((row) => row.user_id === profile.id)
-  const unlockedIds = new Set(userUnlocks.map((row) => String(row.figure_id)))
+  const unlockedIds = new Set(unlocks.map((row) => String(row.figure_id)))
   const playerFigures = figures.map((figure) => ({
     ...figure,
     obtenida: unlockedIds.has(String(figure.id)),
   }))
   const mainProgress = getMainProgressState(playerFigures)
   const bonusObtained = getBonusFigures(playerFigures).filter((figure) => figure.obtenida).length
-  const lastCapture = userCaptures
-    .slice()
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+  const lastCapture = captures[0] ?? null
 
   return {
     ...profile,
     album_status: profile.album_status ?? 'pending',
     mainProgress,
     bonusObtained,
-    totalCaptures: userCaptures.length,
-    lastActivity: lastCapture?.created_at ?? null,
+    totalCaptures: captures.length,
+    lastActivity: lastCapture?.created_at ?? profile.last_login_at ?? null,
     lastCapture,
   }
 }
 
-export async function getAdminPlayers() {
-  const [profiles, figures, unlocks, captures] = await Promise.all([
-    fetchProfiles(),
-    fetchFigures(),
-    fetchUserFigures(),
-    fetchCaptures(),
-  ])
-
-  const players = profiles
-    .map((profile) => buildPlayerSummary(profile, figures, unlocks, captures))
-    .sort((a, b) => new Date(b.lastActivity ?? b.created_at) - new Date(a.lastActivity ?? a.created_at))
-
-  logAdminPlayers('players loaded', { count: players.length })
-  return players
-}
-
-export async function getAdminPlayerDetail(userId) {
-  if (!userId) throw new Error('MISSING_USER_ID')
-
-  const [profiles, figures, unlocks, captures] = await Promise.all([
-    fetchProfiles(),
-    fetchFigures(),
-    fetchUserFigures(userId),
-    fetchCaptures(userId),
-  ])
-  const profile = profiles.find((row) => row.id === userId)
-  if (!profile) throw new Error('PLAYER_NOT_FOUND')
-
+function buildAlbumFigures(figures, unlocks, captures) {
   const unlockByFigureId = new Map(unlocks.map((row) => [String(row.figure_id), row]))
   const capturesByFigureId = new Map()
-  captures
-    .slice()
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .forEach((capture) => {
-      const key = String(capture.figure_id)
-      if (!capturesByFigureId.has(key)) capturesByFigureId.set(key, capture)
-    })
+  captures.forEach((capture) => {
+    const key = String(capture.figure_id)
+    if (!capturesByFigureId.has(key)) capturesByFigureId.set(key, capture)
+  })
 
-  const albumFigures = figures.map((figure) => {
+  return figures.map((figure) => {
     const unlock = unlockByFigureId.get(String(figure.id))
     const capture = capturesByFigureId.get(String(figure.id))
     return {
@@ -248,18 +209,165 @@ export async function getAdminPlayerDetail(userId) {
       capture,
     }
   })
-  const summary = buildPlayerSummary(profile, figures, unlocks, captures)
+}
 
-  const detail = {
-    profile,
-    summary,
-    albumFigures,
-    captures,
-    mainProgress: getMainProgressState(albumFigures),
-    bonusObtained: getBonusFigures(albumFigures).filter((figure) => figure.obtenida).length,
+export async function getAdminPlayersPage(
+  {
+    query = '',
+    username = '',
+    email = '',
+    dni = '',
+    localidad = '',
+    albumStatus = 'all',
+    role = 'all',
+    progress = 'all',
+    quickTab = 'all',
+    page = 1,
+    pageSize = 25,
+  } = {},
+  { signal } = {},
+) {
+  const safePage = Math.max(1, page)
+  const safePageSize = Math.max(1, Math.min(pageSize, 100))
+  const offset = (safePage - 1) * safePageSize
+
+  const { data, error } = await runRpc(
+    () =>
+      supabase.rpc(
+        'admin_list_players',
+        {
+          p_query: query.trim(),
+          p_username: username.trim(),
+          p_email: email.trim(),
+          p_dni: dni.trim(),
+          p_localidad: localidad.trim(),
+          p_album_status: albumStatus,
+          p_role: role,
+          p_progress: progress,
+          p_quick_tab: quickTab,
+          p_limit: safePageSize,
+          p_offset: offset,
+        },
+        rpcOptions(signal),
+      ),
+    { signal },
+  )
+
+  if (error) {
+    if (isAbortError(error)) throw error
+    throw error
   }
 
-  logAdminPlayers('player detail loaded', { userId, figures: albumFigures.length, captures: captures.length })
+  const payload = data ?? { players: [], total: 0 }
+  const players = (payload.players ?? []).map(mapListPlayer)
+
+  logAdminPlayers('players page loaded', {
+    page: safePage,
+    pageSize: safePageSize,
+    count: players.length,
+    total: payload.total,
+  })
+
+  return {
+    players,
+    total: Number(payload.total ?? 0),
+    page: safePage,
+    pageSize: safePageSize,
+  }
+}
+
+export async function getAdminPlayerMetrics({ signal } = {}) {
+  const { data, error } = await runRpc(
+    () => supabase.rpc('admin_player_metrics', {}, rpcOptions(signal)),
+    { signal },
+  )
+  if (error) {
+    if (isAbortError(error)) throw error
+    throw error
+  }
+
+  return {
+    total: Number(data?.total ?? 0),
+    active: Number(data?.active ?? 0),
+    blocked: Number(data?.blocked ?? 0),
+    admins: Number(data?.admins ?? 0),
+    withFigures: Number(data?.withFigures ?? 0),
+  }
+}
+
+export async function getAdminPlayerMapMarkers({ signal } = {}) {
+  const { data, error } = await runRpc(
+    () => supabase.rpc('admin_player_map_markers', {}, rpcOptions(signal)),
+    { signal },
+  )
+  if (error) {
+    if (isAbortError(error)) throw error
+    throw error
+  }
+  return data ?? []
+}
+
+export async function getAdminPlayerBasic(userId) {
+  if (!userId) throw new Error('MISSING_USER_ID')
+
+  const [profile, figures, unlocks, captures] = await Promise.all([
+    fetchProfileById(userId),
+    fetchFigures(),
+    fetchUserFigures(userId),
+    fetchCaptures(userId, { limit: 1 }),
+  ])
+
+  const summary = buildPlayerSummary(profile, figures, unlocks, captures)
+
+  return {
+    profile,
+    summary,
+    mainProgress: summary.mainProgress,
+    bonusObtained: summary.bonusObtained,
+  }
+}
+
+export async function getAdminPlayerCaptures(userId, limit = 8) {
+  if (!userId) throw new Error('MISSING_USER_ID')
+  return fetchCaptures(userId, { limit })
+}
+
+export async function getAdminPlayerAlbum(userId) {
+  if (!userId) throw new Error('MISSING_USER_ID')
+
+  const [figures, unlocks, captures] = await Promise.all([
+    fetchFigures(),
+    fetchUserFigures(userId),
+    fetchCaptures(userId),
+  ])
+
+  return buildAlbumFigures(figures, unlocks, captures)
+}
+
+export async function getAdminPlayerDetail(userId) {
+  if (!userId) throw new Error('MISSING_USER_ID')
+
+  const [basic, captures, albumFigures] = await Promise.all([
+    getAdminPlayerBasic(userId),
+    fetchCaptures(userId),
+    getAdminPlayerAlbum(userId),
+  ])
+
+  const detail = {
+    profile: basic.profile,
+    summary: basic.summary,
+    albumFigures,
+    captures,
+    mainProgress: basic.mainProgress,
+    bonusObtained: basic.bonusObtained,
+  }
+
+  logAdminPlayers('player detail loaded', {
+    userId,
+    figures: albumFigures.length,
+    captures: captures.length,
+  })
+
   return detail
 }
 
@@ -277,6 +385,7 @@ export async function updatePlayerAlbumStatus(userId, status, note = '') {
     .from('profiles')
     .update(payload)
     .eq('id', userId)
+    .is('deleted_at', null)
     .select(PROFILE_COLUMNS)
     .single()
 
@@ -350,5 +459,11 @@ export async function deletePlayer(userId) {
     throw error
   }
 
-  logAdminPlayers('user deleted', { userId })
+  logAdminPlayers('user soft-deleted', { userId })
+}
+
+/** @deprecated Use getAdminPlayersPage */
+export async function getAdminPlayers() {
+  const { players } = await getAdminPlayersPage({ page: 1, pageSize: 100 })
+  return players
 }

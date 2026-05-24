@@ -44,6 +44,12 @@ export { syncUnlockToSupabase, syncReplaceFigurePhoto, pullRemoteAlbum } from '.
 
 export {
   getAdminPlayers,
+  getAdminPlayersPage,
+  getAdminPlayerMetrics,
+  getAdminPlayerMapMarkers,
+  getAdminPlayerBasic,
+  getAdminPlayerCaptures,
+  getAdminPlayerAlbum,
   getAdminPlayerDetail,
   updatePlayerAlbumStatus,
   updateCaptureValidation,

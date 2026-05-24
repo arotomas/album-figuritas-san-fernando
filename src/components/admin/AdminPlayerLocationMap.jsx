@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet'
 import {
   DEFAULT_CENTER,
@@ -52,10 +53,21 @@ export function AdminPlayerLocationMap({
   )
 }
 
-export function AdminPlayersDistributionMap({ players, className = 'h-[420px]' }) {
-  const markers = (players ?? []).filter(
-    (player) => player.direccion_lat != null && player.direccion_lng != null,
+function DistributionMapInner({ players, className }) {
+  const markers = useMemo(
+    () =>
+      (players ?? []).filter(
+        (player) => player.direccion_lat != null && player.direccion_lng != null,
+      ),
+    [players],
   )
+
+  const center = useMemo(() => {
+    if (markers.length === 1) {
+      return [Number(markers[0].direccion_lat), Number(markers[0].direccion_lng)]
+    }
+    return DEFAULT_CENTER
+  }, [markers])
 
   if (!markers.length) {
     return (
@@ -66,11 +78,6 @@ export function AdminPlayersDistributionMap({ players, className = 'h-[420px]' }
       </div>
     )
   }
-
-  const center =
-    markers.length === 1
-      ? [Number(markers[0].direccion_lat), Number(markers[0].direccion_lng)]
-      : DEFAULT_CENTER
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-border bg-white ${className}`}>
@@ -91,7 +98,7 @@ export function AdminPlayersDistributionMap({ players, className = 'h-[420px]' }
             <Popup>
               <strong>{player.username ?? 'Jugador'}</strong>
               <br />
-              {player.direccion_texto ?? 'Sin dirección'}
+              {player.localidad ?? player.direccion_texto ?? 'Sin dirección'}
             </Popup>
           </CircleMarker>
         ))}
@@ -99,3 +106,5 @@ export function AdminPlayersDistributionMap({ players, className = 'h-[420px]' }
     </div>
   )
 }
+
+export const AdminPlayersDistributionMap = memo(DistributionMapInner)
