@@ -19,7 +19,7 @@ const PAGE_TITLES = {
 }
 
 function navLinkClass({ isActive }) {
-  return `block rounded-xl px-4 py-3 transition-colors ${
+  return `block rounded-xl px-3 py-2.5 transition-colors ${
     isActive ? 'bg-white/10 text-white' : 'text-slate-200 hover:bg-white/10'
   }`
 }
@@ -44,20 +44,26 @@ export function AdminLayout() {
       </div>
 
       <div className="hidden h-full overflow-hidden bg-slate-100 text-ink lg:flex">
-        <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-slate-950 px-6 py-7 text-white">
+        <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-950 px-4 py-6 text-white">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
               Supabase Admin
             </p>
-            <h1 className="mt-3 text-3xl font-black">Panel Admin</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Vista de escritorio para revisar capturas, jugadores, figuritas y mapa.
+            <h1 className="mt-2 text-2xl font-black leading-tight">Panel Admin</h1>
+            <p className="mt-2 text-xs leading-5 text-slate-300">
+              Capturas, jugadores, figuritas y mapa.
             </p>
           </div>
 
-          <nav className="mt-10 space-y-2 text-sm font-semibold">
+          <nav className="mt-8 space-y-1.5 text-sm font-semibold">
             {visibleNavItems.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                relative="path"
+                className={navLinkClass}
+              >
                 {item.label}
               </NavLink>
             ))}
@@ -65,15 +71,15 @@ export function AdminLayout() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="shrink-0 border-b border-slate-200 bg-white px-8 py-5">
+          <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
             <p className="text-xs font-bold uppercase tracking-wide text-muted">
               Dashboard operativo
             </p>
-            <h2 className="mt-1 text-3xl font-black">{pageTitle}</h2>
+            <h2 className="mt-1 text-2xl font-black">{pageTitle}</h2>
           </header>
 
-          <main className="min-h-0 flex-1 overflow-y-auto p-8">
-            <div className="mx-auto min-w-[1180px] max-w-[1560px] space-y-7">
+          <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">
+            <div className="mx-auto w-full min-w-0 max-w-[1560px] space-y-7">
               <Outlet />
             </div>
           </main>

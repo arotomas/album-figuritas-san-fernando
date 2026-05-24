@@ -19,6 +19,7 @@ function BottomNavInner() {
           <NavLink
             key={to}
             to={withQa(to)}
+            end
             className={({ isActive }) =>
               `flex min-h-[52px] flex-col items-center justify-center gap-1 px-2 py-1.5 transition-colors ${
                 isActive ? 'text-ink' : 'text-muted'

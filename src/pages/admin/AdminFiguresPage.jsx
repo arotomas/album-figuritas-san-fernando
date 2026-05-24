@@ -268,7 +268,7 @@ export function AdminFiguresPage() {
 
       <AdminErrorBanner message={error} />
 
-      <section className="rounded-3xl border border-border bg-white p-6 shadow-sm">
+      <section className="min-w-0 rounded-3xl border border-border bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-slate-50 p-4">
           <label className="text-xs font-bold uppercase tracking-wide text-muted">
             Tipo

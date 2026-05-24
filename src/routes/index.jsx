@@ -5,6 +5,7 @@ import { AuthLayout } from '../layouts/AuthLayout'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { ProtectedRoute, GuestRoute, ProfileSetupRoute } from './ProtectedRoute'
 import { RootRedirect } from './RootRedirect'
+import { NotFoundRedirect } from './NotFoundRedirect'
 import { AdminRoute, AdminRoleGate } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
 
@@ -244,6 +245,10 @@ export function AppRoutes() {
             }
           />
           <Route
+            path=":section/map"
+            element={<Navigate to="/admin/map" replace />}
+          />
+          <Route
             path="map"
             element={
               <AdminRoleGate minRole="admin">
@@ -255,7 +260,7 @@ export function AppRoutes() {
           />
         </Route>
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
     </div>
   )
