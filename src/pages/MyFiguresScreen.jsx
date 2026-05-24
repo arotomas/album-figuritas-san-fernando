@@ -189,9 +189,7 @@ export function MyFiguresScreen() {
 
       vibrateAlbumSwipe()
       setLastViewedFigure(figureId)
-      if (selected.obtenida) {
-        setSelectedFigureId(figureId)
-      }
+      setSelectedFigureId(figureId)
     },
     [sanitizedFigures, setLastViewedFigure],
   )
@@ -226,52 +224,52 @@ export function MyFiguresScreen() {
     <div className="my-figures-screen relative flex h-full min-h-0 flex-col overflow-hidden">
       <AlbumBackground rareza={featuredRarity ?? 'común'} />
 
-      <header className="my-figures-header relative z-10 shrink-0 px-5 pb-3 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className={albumClasses.headerEyebrow}>Tu colección</p>
-            <h1 className={`${typeClasses.display} mt-1 text-xl text-ink`}>
-              Álbum de figuritas
-            </h1>
-            <p className="mt-1 font-body text-sm text-muted">
-              San Fernando · Colección del jugador
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full border border-border/80 bg-white/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-muted backdrop-blur-sm">
-            {STATUS_LABELS[albumStatus] ?? albumStatus}
-          </span>
-        </div>
-
-        <div className="album-mission-card mt-4 rounded-[1.5rem] border border-white/70 bg-white/72 p-4 shadow-sm backdrop-blur-md">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className={`${typeClasses.micro} text-muted`}>Progreso principal</p>
-              <p className={`${typeClasses.display} mt-1 text-2xl text-ink`}>
-                {mainProgress.obtained} de {mainProgress.total} descubiertas
+      <div className="my-figures-scroll safe-bottom relative z-10 min-h-0 flex-1 scroll-y-app px-4 pb-5">
+        <header className="my-figures-header px-1 pb-3 pt-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className={albumClasses.headerEyebrow}>Tu colección</p>
+              <h1 className={`${typeClasses.display} mt-1 text-xl text-ink`}>
+                Álbum de figuritas
+              </h1>
+              <p className="mt-1 font-body text-sm text-muted">
+                San Fernando · Colección del jugador
               </p>
             </div>
-            <span className="rounded-full bg-progress px-3 py-1 text-xs font-black text-ink shadow-[0_0_18px_rgba(140,198,63,0.28)]">
-              {mainProgress.obtained}/{mainProgress.visibleTotal}
+            <span className="shrink-0 rounded-full border border-border/80 bg-white/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-muted backdrop-blur-sm">
+              {STATUS_LABELS[albumStatus] ?? albumStatus}
             </span>
           </div>
-          <AlbumProgress progress={mainProgress.obtained} total={mainProgress.visibleTotal} />
-          <ProgressDots progress={mainProgress.obtained} total={mainProgress.total} />
-          <div className="mt-4 rounded-2xl border border-border/60 bg-warm-white/80 px-3 py-2.5">
-            <p className={`${typeClasses.micro} text-muted`}>Próxima misión</p>
-            <p className="mt-1 font-body text-sm font-bold text-ink">
-              {nearFigure?.is_bonus
-                ? `Hay algo especial cerca: ${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
-                : nearFigure
-                  ? `${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
-                  : nextMissionFigure
-                    ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
-                    : 'Explorá el mapa para encontrar secretos especiales.'}
-            </p>
-          </div>
-        </div>
-      </header>
 
-      <div className="my-figures-scroll safe-bottom relative z-10 min-h-0 flex-1 scroll-y-app px-4 pb-5">
+          <div className="album-mission-card mt-4 rounded-[1.5rem] border border-white/70 bg-white/72 p-4 shadow-sm backdrop-blur-md">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className={`${typeClasses.micro} text-muted`}>Progreso principal</p>
+                <p className={`${typeClasses.display} mt-1 text-2xl text-ink`}>
+                  {mainProgress.obtained} de {mainProgress.total} descubiertas
+                </p>
+              </div>
+              <span className="rounded-full bg-progress px-3 py-1 text-xs font-black text-ink shadow-[0_0_18px_rgba(140,198,63,0.28)]">
+                {mainProgress.obtained}/{mainProgress.visibleTotal}
+              </span>
+            </div>
+            <AlbumProgress progress={mainProgress.obtained} total={mainProgress.visibleTotal} />
+            <ProgressDots progress={mainProgress.obtained} total={mainProgress.total} />
+            <div className="mt-4 rounded-2xl border border-border/60 bg-warm-white/80 px-3 py-2.5">
+              <p className={`${typeClasses.micro} text-muted`}>Próxima misión</p>
+              <p className="mt-1 font-body text-sm font-bold text-ink">
+                {nearFigure?.is_bonus
+                  ? `Hay algo especial cerca: ${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
+                  : nearFigure
+                    ? `${nearFigure.nombre} • ${Math.round(nearFigure.distanceMeters ?? 0)}m`
+                    : nextMissionFigure
+                      ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
+                      : 'Explorá el mapa para encontrar secretos especiales.'}
+              </p>
+            </div>
+          </div>
+        </header>
+
         <section className="album-page-shell mx-auto w-full max-w-[720px] rounded-[2rem] px-3 py-4 sm:px-5">
           <div className="mb-4 flex items-center justify-between px-1">
             <div>
@@ -337,7 +335,7 @@ export function MyFiguresScreen() {
 
       <FigureDetailSheet
         figure={selectedFigure}
-        open={Boolean(selectedFigure?.obtenida)}
+        open={Boolean(selectedFigure)}
         onClose={() => setSelectedFigureId(null)}
         onRetakePhoto={handleRetakePhoto}
       />
