@@ -81,7 +81,13 @@ function DistributionMapInner({ players, className }) {
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-border bg-white ${className}`}>
-      <MapContainer center={center} zoom={DEFAULT_ZOOM - 1} className="h-full w-full" scrollWheelZoom>
+      <MapContainer
+        center={center}
+        zoom={DEFAULT_ZOOM - 1}
+        className="h-full w-full"
+        style={{ height: '100%', width: '100%' }}
+        scrollWheelZoom
+      >
         <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} {...TILE_OPTIONS} />
         {markers.map((player) => (
           <CircleMarker

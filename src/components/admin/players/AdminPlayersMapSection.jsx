@@ -11,6 +11,8 @@ const LazyDistributionMap = lazy(() =>
   })),
 )
 
+const MAP_PANEL_HEIGHT = 'h-[420px] min-h-[420px]'
+
 export const AdminPlayersMapSection = memo(function AdminPlayersMapSection() {
   const mapRequest = useLatestRequest()
   const [expanded, setExpanded] = useState(false)
@@ -79,7 +81,10 @@ export const AdminPlayersMapSection = memo(function AdminPlayersMapSection() {
       {expanded && (
         <div id="admin-players-map-panel" className="border-t border-border px-5 pb-5">
           {loading && (
-            <div className="mt-4 h-[280px] animate-pulse rounded-2xl bg-slate-100" aria-hidden="true" />
+            <div
+              className={`mt-4 ${MAP_PANEL_HEIGHT} animate-pulse rounded-2xl bg-slate-100`}
+              aria-hidden="true"
+            />
           )}
           {error && !loading && (
             <div className="mt-4">
@@ -87,9 +92,15 @@ export const AdminPlayersMapSection = memo(function AdminPlayersMapSection() {
             </div>
           )}
           {!loading && !error && mapMounted && (
-            <Suspense fallback={<div className="mt-4 h-[280px] animate-pulse rounded-2xl bg-slate-100" />}>
-              <LazyDistributionMap players={markers} className="mt-4 h-[280px]" />
-            </Suspense>
+            <div className="mt-4">
+              <Suspense
+                fallback={
+                  <div className={`${MAP_PANEL_HEIGHT} animate-pulse rounded-2xl bg-slate-100`} />
+                }
+              >
+                <LazyDistributionMap players={markers} className={MAP_PANEL_HEIGHT} />
+              </Suspense>
+            </div>
           )}
         </div>
       )}
