@@ -170,7 +170,7 @@ export function AdminPlayersPage() {
       .finally(() => {
         if (listRequest.isLatest(id)) setLoading(false)
       })
-  }, [listQueryKey, debouncedFilters, debouncedQuickTab, pageSize, page, listRequest])
+  }, [listQueryKey, listRequest])
 
   useEffect(() => {
     void loadMetrics()

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 export function useLatestRequest() {
   const requestIdRef = useRef(0)
@@ -22,7 +22,10 @@ export function useLatestRequest() {
     abortRef.current = null
   }, [])
 
-  useEffect(() => cancelAll, [cancelAll])
+  useEffect(() => () => cancelAll(), [cancelAll])
 
-  return { begin, isLatest, cancelAll }
+  return useMemo(
+    () => ({ begin, isLatest, cancelAll }),
+    [begin, isLatest, cancelAll],
+  )
 }
