@@ -1,9 +1,10 @@
 import { supabase } from '../../lib/supabase'
 import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
+import { enrichFigureWithCollection } from '../../utils/collectionModel'
 
 const PUBLIC_FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
+  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, collection_id, category, page, event_id, event_starts_at, event_ends_at, created_at'
 
 function normalizeRemoteFigure(row) {
   const lat = Number(row.lat)
@@ -47,6 +48,12 @@ function normalizeRemoteFigure(row) {
     challenge_description: row.challenge_description ?? null,
     challenge_type: row.challenge_type ?? null,
     challenge_example_image_url: row.challenge_example_image_url ?? null,
+    collection_id: row.collection_id ?? null,
+    category: row.category ?? null,
+    page: row.page != null ? Number(row.page) : null,
+    event_id: row.event_id ?? null,
+    event_starts_at: row.event_starts_at ?? null,
+    event_ends_at: row.event_ends_at ?? null,
     active: row.active !== false,
     emoji: '📍',
     obtenida: false,
@@ -65,7 +72,7 @@ export async function fetchPublicFigures() {
 
   if (
     error &&
-    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size|challenge_title|challenge_description|challenge_type|challenge_example_image_url/i.test(error.message ?? '')
+    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size|challenge_title|challenge_description|challenge_type|challenge_example_image_url|collection_id|category|page|event_id|event_starts_at|event_ends_at/i.test(error.message ?? '')
   ) {
     const fallback = await supabase
       .from('figures')
@@ -88,6 +95,12 @@ export async function fetchPublicFigures() {
       challenge_description: null,
       challenge_type: null,
       challenge_example_image_url: null,
+      collection_id: null,
+      category: null,
+      page: null,
+      event_id: null,
+      event_starts_at: null,
+      event_ends_at: null,
     }))
     error = fallback.error
   }
@@ -104,14 +117,14 @@ export async function fetchPublicFigures() {
   const figures = (data ?? []).map(normalizeRemoteFigure).filter(Boolean)
   let normalOrder = 0
   const figuresWithRevealDefaults = figures.map((figure) => {
-    if (figure.is_bonus) return figure
+    if (figure.is_bonus) return enrichFigureWithCollection(figure)
     normalOrder += 1
     const unlockOrder = figure.unlock_order ?? normalOrder
-    return {
+    return enrichFigureWithCollection({
       ...figure,
       unlock_order: unlockOrder,
       reveal_after_count: figure.reveal_after_count || Math.max(0, unlockOrder - 5),
-    }
+    })
   })
 
   console.info('[figures-remote]', 'loaded', JSON.stringify({

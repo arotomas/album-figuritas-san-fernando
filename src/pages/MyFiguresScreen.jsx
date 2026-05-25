@@ -8,6 +8,7 @@ import { LockedFigureCard } from '../components/album/LockedFigureCard'
 import { NewBadge } from '../components/album/NewBadge'
 import { FigureDetailSheet } from '../components/album/FigureDetailSheet'
 import { FigureCollectionViewer } from '../components/album/FigureCollectionViewer'
+import { CollectionSectionHeader } from '../components/album/CollectionSectionHeader'
 import { RarityBadge } from '../components/ui/RarityBadge'
 import { useQaMode } from '../utils/qaMode'
 import { getRarity } from '../theme/rarity'
@@ -21,6 +22,10 @@ import {
   getMainProgressState,
   getRevealedNormalFigures,
 } from '../utils/figureGameRules'
+import {
+  enrichFigureWithCollection,
+  getMainAlbumCollectionGroups,
+} from '../utils/collectionModel'
 import { getMapProximityHint } from '../utils/proximityExperience'
 
 const STATUS_LABELS = {
@@ -174,6 +179,10 @@ export function MyFiguresScreen() {
   const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
   const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
   const mainFigures = useMemo(() => getRevealedNormalFigures(sanitizedFigures), [sanitizedFigures])
+  const mainCollectionGroups = useMemo(
+    () => getMainAlbumCollectionGroups(sanitizedFigures),
+    [sanitizedFigures],
+  )
   const bonusFigures = useMemo(() => getBonusFigures(sanitizedFigures), [sanitizedFigures])
   const visibleBonusFigures = useMemo(
     () =>
@@ -209,7 +218,7 @@ export function MyFiguresScreen() {
   const obtainedFigures = useMemo(() => {
     const main = mainFigures.filter((figure) => figure.obtenida)
     const bonus = visibleBonusFigures.filter((figure) => figure.obtenida)
-    return [...main, ...bonus]
+    return [...main, ...bonus].map(enrichFigureWithCollection)
   }, [mainFigures, visibleBonusFigures])
 
   const sheetFigure = useMemo(
@@ -303,14 +312,21 @@ export function MyFiguresScreen() {
             </span>
           </div>
 
-          <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {mainFigures.map((figure) => (
-              <AlbumSlotCard
-                key={figure.id}
-                figure={figure}
-                isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
-                onSelect={handleSelect}
-              />
+          <div className="space-y-5">
+            {mainCollectionGroups.map(({ collection, figures, progress }) => (
+              <section key={collection.id} className="album-collection-section">
+                <CollectionSectionHeader progress={progress} />
+                <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {figures.map((figure) => (
+                    <AlbumSlotCard
+                      key={figure.id}
+                      figure={figure}
+                      isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
+                      onSelect={handleSelect}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </section>
@@ -362,7 +378,8 @@ export function MyFiguresScreen() {
         onRetakePhoto={handleRetakePhoto}
         onDeletePhoto={handleDeletePhoto}
         getCollectionLabel={(figure) =>
-          figure?.is_bonus ? 'Colección bonus' : 'Colección principal'
+          figure?.collection?.label ??
+          (figure?.is_bonus ? 'Colección bonus' : 'Colección principal')
         }
       />
 

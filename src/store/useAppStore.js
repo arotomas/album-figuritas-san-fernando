@@ -24,6 +24,7 @@ import { myFiguresLog } from '../utils/myFiguresLog'
 import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
 import { getSupabaseProjectRef } from '../utils/authDebug'
 import { isProfileComplete } from '../utils/profileValidation'
+import { getMainProgressState } from '../utils/figureGameRules'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 

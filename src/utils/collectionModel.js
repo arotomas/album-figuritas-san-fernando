@@ -1,0 +1,130 @@
+import {
+  ALBUM_COLLECTIONS,
+  COLLECTION_LIST,
+  COLLECTION_STATUS,
+  COLLECTION_TRACK,
+  FIGURE_COLLECTION_OVERRIDES,
+  getCollectionById,
+} from '../config/albumCollections'
+import { getBonusFigures, getRevealedNormalFigures, isBonusFigure } from './figureGameRules'
+
+export function resolveFigureCollectionId(figure) {
+  if (!figure) return ALBUM_COLLECTIONS.otros.id
+
+  const explicit = figure.collection_id ?? figure.collectionId
+  if (explicit && ALBUM_COLLECTIONS[explicit]) return explicit
+
+  const slug = String(figure.slug ?? '').trim().toLowerCase()
+  if (slug && FIGURE_COLLECTION_OVERRIDES[slug]) {
+    return FIGURE_COLLECTION_OVERRIDES[slug]
+  }
+
+  if (isBonusFigure(figure)) return ALBUM_COLLECTIONS.secretos.id
+
+  return ALBUM_COLLECTIONS.otros.id
+}
+
+export function enrichFigureWithCollection(figure) {
+  if (!figure) return figure
+
+  const collectionId = resolveFigureCollectionId(figure)
+  const collection = getCollectionById(collectionId)
+
+  return {
+    ...figure,
+    collection_id: collectionId,
+    collection,
+    category: figure.category ?? null,
+    page: figure.page ?? collection.page ?? null,
+    event_id: figure.event_id ?? figure.eventId ?? null,
+  }
+}
+
+export function enrichFiguresWithCollections(figures) {
+  return (Array.isArray(figures) ? figures : []).map(enrichFigureWithCollection)
+}
+
+function getCollectionStatus(obtained, total) {
+  if (total <= 0) return COLLECTION_STATUS.INCOMPLETE
+  if (obtained >= total) return COLLECTION_STATUS.COMPLETED
+  if (obtained >= total - 1 || obtained / total >= 0.7) {
+    return COLLECTION_STATUS.ALMOST_COMPLETE
+  }
+  return COLLECTION_STATUS.INCOMPLETE
+}
+
+export function getCollectionProgressState(figures, collectionId) {
+  const collection = getCollectionById(collectionId)
+  const scoped = (Array.isArray(figures) ? figures : []).filter(
+    (figure) => resolveFigureCollectionId(figure) === collectionId,
+  )
+  const obtained = scoped.filter((figure) => figure.obtenida).length
+  const total = scoped.length
+  const ratio = total > 0 ? obtained / total : 0
+
+  return {
+    collection,
+    collectionId,
+    figures: scoped,
+    obtained,
+    total,
+    ratio,
+    percent: Math.round(ratio * 100),
+    status: getCollectionStatus(obtained, total),
+    completed: obtained >= total && total > 0,
+  }
+}
+
+export function groupFiguresByCollection(figures, { track = COLLECTION_TRACK.MAIN } = {}) {
+  const enriched = enrichFiguresWithCollections(figures)
+  const trackCollections = COLLECTION_LIST.filter((collection) => collection.track === track)
+
+  const groups = trackCollections
+    .map((collection) => {
+      const items = enriched.filter(
+        (figure) => resolveFigureCollectionId(figure) === collection.id,
+      )
+      if (items.length === 0) return null
+
+      return {
+        collection,
+        figures: items,
+        progress: getCollectionProgressState(enriched, collection.id),
+      }
+    })
+    .filter(Boolean)
+
+  return groups
+}
+
+export function getMainAlbumCollectionGroups(figures) {
+  const revealed = getRevealedNormalFigures(figures)
+  return groupFiguresByCollection(revealed, { track: COLLECTION_TRACK.MAIN })
+}
+
+export function getBonusCollectionGroups(figures) {
+  const bonus = getBonusFigures(figures)
+  return groupFiguresByCollection(bonus, { track: COLLECTION_TRACK.BONUS })
+}
+
+export function getAllCollectionProgress(figures, { track = COLLECTION_TRACK.MAIN } = {}) {
+  const trackCollections = COLLECTION_LIST.filter((collection) => collection.track === track)
+  return trackCollections
+    .map((collection) => getCollectionProgressState(figures, collection.id))
+    .filter((progress) => progress.total > 0)
+}
+
+/** Prep futura: eventos temporales activos (sin lógica de unlock aún). */
+export function isFigureInActiveEvent(figure, now = Date.now()) {
+  if (!figure?.event_id) return true
+  const starts = figure.event_starts_at ? Date.parse(figure.event_starts_at) : null
+  const ends = figure.event_ends_at ? Date.parse(figure.event_ends_at) : null
+  if (starts && now < starts) return false
+  if (ends && now > ends) return false
+  return true
+}
+
+export function isFigureCollectionHidden(figure) {
+  const collection = getCollectionById(resolveFigureCollectionId(figure))
+  return Boolean(collection.hiddenUntilDiscovered && figure.is_hidden && !figure.obtenida)
+}
