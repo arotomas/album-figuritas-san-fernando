@@ -105,13 +105,6 @@ const MAP_HINTS = {
   [PROXIMITY_PHASES.CAPTURE]: '¡Listo para capturar!',
 }
 
-const CAMERA_HINTS = {
-  [PROXIMITY_PHASES.FAR]: 'Seguí acercándote… la señal es tenue.',
-  [PROXIMITY_PHASES.MEDIUM]: 'Vas bien. La presencia se siente más fuerte.',
-  [PROXIMITY_PHASES.CLOSE]: 'Casi ahí. Mantenete un momento.',
-  [PROXIMITY_PHASES.CAPTURE]: 'Sacá una foto del lugar para desbloquear la figurita.',
-}
-
 const BONUS_MAP_HINTS = {
   [PROXIMITY_PHASES.FAR]: 'Algo especial pulsa en la distancia…',
   [PROXIMITY_PHASES.MEDIUM]: 'Un bonus oculto despierta cerca tuyo.',
@@ -123,16 +116,6 @@ export function getMapProximityHint(phase, { isBonus = false } = {}) {
   if (phase === PROXIMITY_PHASES.NONE) return null
   if (isBonus) return BONUS_MAP_HINTS[phase] ?? BONUS_MAP_HINTS[PROXIMITY_PHASES.FAR]
   return MAP_HINTS[phase] ?? MAP_HINTS[PROXIMITY_PHASES.FAR]
-}
-
-export function getCameraProximityHint(phase, { inCaptureRange = false } = {}) {
-  if (inCaptureRange || phase === PROXIMITY_PHASES.CAPTURE) {
-    return CAMERA_HINTS[PROXIMITY_PHASES.CAPTURE]
-  }
-  if (phase === PROXIMITY_PHASES.NONE) {
-    return 'Esperando señal del punto…'
-  }
-  return CAMERA_HINTS[phase] ?? CAMERA_HINTS[PROXIMITY_PHASES.FAR]
 }
 
 export function getRingVisualStyle(phase) {

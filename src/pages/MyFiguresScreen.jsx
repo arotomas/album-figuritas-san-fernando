@@ -7,6 +7,7 @@ import { AlbumScreenSkeleton } from '../components/album/AlbumFigureSkeleton'
 import { LockedFigureCard } from '../components/album/LockedFigureCard'
 import { NewBadge } from '../components/album/NewBadge'
 import { FigureDetailSheet } from '../components/album/FigureDetailSheet'
+import { FigureCollectionViewer } from '../components/album/FigureCollectionViewer'
 import { RarityBadge } from '../components/ui/RarityBadge'
 import { useQaMode } from '../utils/qaMode'
 import { getRarity } from '../theme/rarity'
@@ -167,7 +168,8 @@ export function MyFiguresScreen() {
   const deleteFigurePhotoSynced = useAppStore((state) => state.deleteFigurePhotoSynced)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const hasHydrated = useAppStore((state) => state._hasHydrated)
-  const [selectedFigureId, setSelectedFigureId] = useState(null)
+  const [viewerFigureId, setViewerFigureId] = useState(null)
+  const [sheetFigureId, setSheetFigureId] = useState(null)
 
   const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
   const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
@@ -204,12 +206,18 @@ export function MyFiguresScreen() {
     return 'Explorá el mapa para descubrir secretos especiales.'
   }, [nearFigure, nextMissionFigure])
 
-  const selectedFigure = useMemo(
+  const obtainedFigures = useMemo(() => {
+    const main = mainFigures.filter((figure) => figure.obtenida)
+    const bonus = visibleBonusFigures.filter((figure) => figure.obtenida)
+    return [...main, ...bonus]
+  }, [mainFigures, visibleBonusFigures])
+
+  const sheetFigure = useMemo(
     () =>
-      selectedFigureId
-        ? sanitizedFigures.find((figure) => String(figure.id) === String(selectedFigureId))
+      sheetFigureId
+        ? sanitizedFigures.find((figure) => String(figure.id) === String(sheetFigureId))
         : null,
-    [sanitizedFigures, selectedFigureId],
+    [sanitizedFigures, sheetFigureId],
   )
 
   const handleSelect = useCallback(
@@ -222,7 +230,15 @@ export function MyFiguresScreen() {
 
       vibrateAlbumSwipe()
       setLastViewedFigure(figureId)
-      setSelectedFigureId(figureId)
+
+      if (selected.obtenida) {
+        setViewerFigureId(figureId)
+        setSheetFigureId(null)
+        return
+      }
+
+      setSheetFigureId(figureId)
+      setViewerFigureId(null)
     },
     [sanitizedFigures, setLastViewedFigure],
   )
@@ -230,7 +246,8 @@ export function MyFiguresScreen() {
   const handleRetakePhoto = useCallback(
     (figure) => {
       if (!figure?.obtenida) return
-      setSelectedFigureId(null)
+      setViewerFigureId(null)
+      setSheetFigureId(null)
       startRetakeSession(figure)
       navigate(withQa('/capture'))
     },
@@ -241,7 +258,10 @@ export function MyFiguresScreen() {
     async (figure) => {
       if (!figure?.obtenida || !figure?.foto) return
       const ok = await deleteFigurePhotoSynced(figure.id)
-      if (ok) setSelectedFigureId(null)
+      if (ok) {
+        setViewerFigureId(null)
+        setSheetFigureId(null)
+      }
     },
     [deleteFigurePhotoSynced],
   )
@@ -334,10 +354,22 @@ export function MyFiguresScreen() {
         </section>
       </div>
 
+      <FigureCollectionViewer
+        figures={obtainedFigures}
+        activeFigureId={viewerFigureId}
+        open={Boolean(viewerFigureId)}
+        onClose={() => setViewerFigureId(null)}
+        onRetakePhoto={handleRetakePhoto}
+        onDeletePhoto={handleDeletePhoto}
+        getCollectionLabel={(figure) =>
+          figure?.is_bonus ? 'Colección bonus' : 'Colección principal'
+        }
+      />
+
       <FigureDetailSheet
-        figure={selectedFigure}
-        open={Boolean(selectedFigure)}
-        onClose={() => setSelectedFigureId(null)}
+        figure={sheetFigure}
+        open={Boolean(sheetFigure)}
+        onClose={() => setSheetFigureId(null)}
         onRetakePhoto={handleRetakePhoto}
         onDeletePhoto={handleDeletePhoto}
       />
