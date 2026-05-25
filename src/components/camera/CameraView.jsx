@@ -2,8 +2,8 @@ import { useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FaXmark } from 'react-icons/fa6'
 import { ValidationRing } from './ValidationRing'
+import { RingProgressFeedback } from './RingProgressFeedback'
 import { CaptureButton } from './CaptureButton'
-import { getCameraProximityHint } from '../../utils/proximityExperience'
 
 export function CameraView({
   videoRef,
@@ -26,7 +26,6 @@ export function CameraView({
   const localInputRef = useRef(null)
   const inputRef = fileInputRef ?? localInputRef
   const showEmbeddedPreview = !useNativeFallback
-  const hint = getCameraProximityHint(proximityPhase, { inCaptureRange })
 
   return (
     <div className="capture-screen relative flex h-full flex-col overflow-hidden bg-black">
@@ -94,20 +93,11 @@ export function CameraView({
           proximityPhase={proximityPhase}
         />
 
-        <AnimatePresence mode="wait">
-          {!isReady && !isCapturing && (
-            <motion.p
-              key={proximityPhase}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="mt-6 max-w-xs px-6 text-center text-sm leading-relaxed text-white/75"
-            >
-              {hint}
-            </motion.p>
-          )}
-        </AnimatePresence>
+        <RingProgressFeedback
+          progress={gpsProgress}
+          isReady={isReady}
+          isCapturing={isCapturing}
+        />
 
         {import.meta.env.DEV && gpsAccuracy != null && (
           <p className="mt-3 text-center text-[11px] text-progress/80">

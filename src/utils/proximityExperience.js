@@ -188,6 +188,45 @@ export function getRingVisualStyle(phase) {
 export const RING_PROGRESS_COLOR = '#8cc63f'
 export const RING_BASE_COLOR = 'rgba(255,255,255,0.18)'
 
+const RING_PROGRESS_FEEDBACK_TIERS = [
+  { min: 0.97, id: 'detected', message: 'Punto detectado' },
+  { min: 0.82, id: 'near', message: 'Estás extremadamente cerca' },
+  { min: 0.62, id: 'strong', message: 'La energía es muy fuerte en esta zona' },
+  { min: 0.37, id: 'approaching', message: 'Te estás acercando al punto correcto' },
+  { min: 0.18, id: 'intensifying', message: 'La señal comienza a intensificarse' },
+  { min: 0.08, id: 'weak', message: 'Se detecta una señal débil…' },
+]
+
+/** Frase inmersiva según el mismo progreso que alimenta el aro (0–1). */
+export function getRingProgressFeedback(progress) {
+  const fill = Math.min(1, Math.max(0, progress ?? 0))
+  if (fill < RING_PROGRESS_FEEDBACK_TIERS.at(-1).min) return null
+
+  return (
+    RING_PROGRESS_FEEDBACK_TIERS.find((tier) => fill >= tier.min) ?? null
+  )
+}
+
+/** Color y glow del texto: blanco lejos → verde institucional al completar. */
+export function getRingProgressFeedbackStyle(progress) {
+  const fill = Math.min(1, Math.max(0, progress ?? 0))
+  const isPeak = fill >= 0.97
+  const mix = isPeak ? 1 : fill ** 0.88
+
+  const r = Math.round(255 + (140 - 255) * mix)
+  const g = Math.round(255 + (198 - 255) * mix)
+  const b = Math.round(255 + (63 - 255) * mix)
+
+  return {
+    isPeak,
+    color: isPeak ? RING_PROGRESS_COLOR : `rgb(${r}, ${g}, ${b})`,
+    textShadow: isPeak
+      ? '0 0 16px rgba(140,198,63,0.7), 0 0 32px rgba(140,198,63,0.35)'
+      : `0 0 ${6 + mix * 14}px rgba(${r}, ${g}, ${b}, ${0.12 + mix * 0.28})`,
+    opacity: 0.52 + mix * 0.48,
+  }
+}
+
 /** Glow, marco y partículas según cuánto verde hay en el arco (no el color del trazo). */
 export function getRingProximityColors(progress, { isReady = false } = {}) {
   if (isReady) {

@@ -1,6 +1,6 @@
 import { FaXmark } from 'react-icons/fa6'
 import { ValidationRing } from './ValidationRing'
-import { getCameraProximityHint } from '../../utils/proximityExperience'
+import { RingProgressFeedback } from './RingProgressFeedback'
 
 export function NativeCapturePanel({
   figure,
@@ -18,8 +18,6 @@ export function NativeCapturePanel({
   onRetry,
   onClose,
 }) {
-  const hint = getCameraProximityHint(proximityPhase, { inCaptureRange })
-
   return (
     <div className="safe-top safe-bottom relative flex h-full flex-col overflow-hidden bg-black">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
@@ -50,9 +48,11 @@ export function NativeCapturePanel({
               proximityPhase={proximityPhase}
               rarity={figureRarity}
             />
-            <p className="mt-6 max-w-xs text-center text-sm leading-relaxed text-white/75">
-              {isOpening ? hint : hint}
-            </p>
+            <RingProgressFeedback
+              progress={gpsProgress}
+              isReady={isReady}
+              isCapturing={isProcessing}
+            />
           </>
         )}
 
