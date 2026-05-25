@@ -94,6 +94,7 @@ function resetStoreToDefaults() {
     lastObtenidaFigureId: null,
     lastViewedFigureId: null,
     lastSavedAt: null,
+    celebratedCollectionIds: [],
     isAuthenticated: false,
     user: null,
     nearFigure: null,
@@ -134,6 +135,9 @@ function buildPersistedSnapshot(state) {
     lastObtenidaFigureId: state.lastObtenidaFigureId,
     lastViewedFigureId: state.lastViewedFigureId,
     lastSavedAt: state.lastSavedAt,
+    celebratedCollectionIds: Array.isArray(state.celebratedCollectionIds)
+      ? state.celebratedCollectionIds
+      : [],
   }
 }
 
@@ -170,6 +174,7 @@ export const useAppStore = create(
       lastObtenidaFigureId: null,
       lastViewedFigureId: null,
       lastSavedAt: null,
+      celebratedCollectionIds: [],
       supabaseUserId: null,
       supabaseReady: false,
       isSupabaseAdmin: false,
@@ -769,6 +774,21 @@ export const useAppStore = create(
       /** @deprecated alias */
       clearDevTestFigure: () => get().clearQaTestFigure(),
 
+      acknowledgeCollectionCelebration: (collectionId) =>
+        set((state) => {
+          const id = String(collectionId)
+          const current = Array.isArray(state.celebratedCollectionIds)
+            ? state.celebratedCollectionIds
+            : []
+          if (current.includes(id)) {
+            return { lastSavedAt: Date.now() }
+          }
+          return {
+            celebratedCollectionIds: [...current, id],
+            lastSavedAt: Date.now(),
+          }
+        }),
+
       setLastViewedFigure: (figureId) =>
         set((state) => {
           const figures = state.figures
@@ -790,6 +810,7 @@ export const useAppStore = create(
           lastObtenidaFigureId: null,
           lastViewedFigureId: null,
           lastSavedAt: Date.now(),
+          celebratedCollectionIds: [],
           nearFigure: null,
           qaTestFigure: null,
         }),

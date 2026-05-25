@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
@@ -9,6 +9,9 @@ import { NewBadge } from '../components/album/NewBadge'
 import { FigureDetailSheet } from '../components/album/FigureDetailSheet'
 import { FigureCollectionViewer } from '../components/album/FigureCollectionViewer'
 import { CollectionSectionHeader } from '../components/album/CollectionSectionHeader'
+import { AlbumGlobalDashboard } from '../components/album/AlbumGlobalDashboard'
+import { CollectionCompleteAnimation } from '../components/album/CollectionCompleteAnimation'
+import { CollectionDetailViewer } from '../components/album/CollectionDetailViewer'
 import { RarityBadge } from '../components/ui/RarityBadge'
 import { useQaMode } from '../utils/qaMode'
 import { getRarity } from '../theme/rarity'
@@ -24,7 +27,9 @@ import {
 } from '../utils/figureGameRules'
 import {
   enrichFigureWithCollection,
+  getAlbumGlobalProgress,
   getMainAlbumCollectionGroups,
+  detectCollectionCompletionTransition,
 } from '../utils/collectionModel'
 import { getMapProximityHint } from '../utils/proximityExperience'
 
@@ -173,8 +178,15 @@ export function MyFiguresScreen() {
   const deleteFigurePhotoSynced = useAppStore((state) => state.deleteFigurePhotoSynced)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const hasHydrated = useAppStore((state) => state._hasHydrated)
+  const celebratedCollectionIds = useAppStore((state) => state.celebratedCollectionIds)
+  const acknowledgeCollectionCelebration = useAppStore(
+    (state) => state.acknowledgeCollectionCelebration,
+  )
   const [viewerFigureId, setViewerFigureId] = useState(null)
   const [sheetFigureId, setSheetFigureId] = useState(null)
+  const [openCollectionId, setOpenCollectionId] = useState(null)
+  const [celebratingProgress, setCelebratingProgress] = useState(null)
+  const celebrationCheckedForRef = useRef(null)
 
   const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
   const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
@@ -182,6 +194,14 @@ export function MyFiguresScreen() {
   const mainCollectionGroups = useMemo(
     () => getMainAlbumCollectionGroups(sanitizedFigures),
     [sanitizedFigures],
+  )
+  const globalProgress = useMemo(
+    () => getAlbumGlobalProgress(sanitizedFigures),
+    [sanitizedFigures],
+  )
+  const openCollectionGroup = useMemo(
+    () => mainCollectionGroups.find((group) => group.collection.id === openCollectionId) ?? null,
+    [mainCollectionGroups, openCollectionId],
   )
   const bonusFigures = useMemo(() => getBonusFigures(sanitizedFigures), [sanitizedFigures])
   const visibleBonusFigures = useMemo(
@@ -276,6 +296,39 @@ export function MyFiguresScreen() {
   )
 
   useEffect(() => {
+    if (!hasHydrated || !lastObtenidaFigureId) return
+
+    const checkKey = String(lastObtenidaFigureId)
+    if (celebrationCheckedForRef.current === checkKey) return
+    celebrationCheckedForRef.current = checkKey
+
+    const transition = detectCollectionCompletionTransition(
+      sanitizedFigures,
+      lastObtenidaFigureId,
+    )
+    if (!transition) return
+    if (celebratedCollectionIds?.includes(transition.collectionId)) return
+
+    setCelebratingProgress(transition)
+  }, [hasHydrated, lastObtenidaFigureId, sanitizedFigures, celebratedCollectionIds])
+
+  const handleCollectionCelebrationComplete = useCallback(() => {
+    if (celebratingProgress?.collectionId) {
+      acknowledgeCollectionCelebration(celebratingProgress.collectionId)
+    }
+    setCelebratingProgress(null)
+  }, [acknowledgeCollectionCelebration, celebratingProgress])
+
+  const handleOpenCollection = useCallback((collectionId) => {
+    vibrateAlbumSwipe()
+    setOpenCollectionId(collectionId)
+  }, [])
+
+  const handleCloseCollection = useCallback(() => {
+    setOpenCollectionId(null)
+  }, [])
+
+  useEffect(() => {
     const activeFigure = sanitizedFigures.find((figure) => figure.id === lastObtenidaFigureId)
     if (!activeFigure) return
     myFiguresLog.info('active photo source', {
@@ -302,6 +355,10 @@ export function MyFiguresScreen() {
       />
 
       <div className="my-figures-scroll safe-x relative z-10 min-h-0 flex-1 scroll-y-app px-4 pt-3">
+        <div className="album-page-shell mx-auto mb-3 w-full max-w-[720px] px-1 sm:px-2">
+          <AlbumGlobalDashboard globalProgress={globalProgress} />
+        </div>
+
         <section className="album-page-shell mx-auto w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
           <div className="mb-3 flex items-center justify-between px-1">
             <h2 className="font-display text-sm font-bold uppercase tracking-wide text-ink/80">
@@ -315,7 +372,10 @@ export function MyFiguresScreen() {
           <div className="space-y-5">
             {mainCollectionGroups.map(({ collection, figures, progress }) => (
               <section key={collection.id} className="album-collection-section">
-                <CollectionSectionHeader progress={progress} />
+                <CollectionSectionHeader
+                  progress={progress}
+                  onOpen={() => handleOpenCollection(collection.id)}
+                />
                 <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {figures.map((figure) => (
                     <AlbumSlotCard
@@ -369,6 +429,23 @@ export function MyFiguresScreen() {
           )}
         </section>
       </div>
+
+      <CollectionDetailViewer
+        group={openCollectionGroup}
+        open={Boolean(openCollectionGroup)}
+        onClose={handleCloseCollection}
+        onSelectFigure={(figureId) => {
+          handleCloseCollection()
+          handleSelect(figureId)
+        }}
+        lastObtenidaFigureId={lastObtenidaFigureId}
+      />
+
+      <CollectionCompleteAnimation
+        progress={celebratingProgress}
+        open={Boolean(celebratingProgress)}
+        onComplete={handleCollectionCelebrationComplete}
+      />
 
       <FigureCollectionViewer
         figures={obtainedFigures}

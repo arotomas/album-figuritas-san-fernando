@@ -6,7 +6,7 @@ import {
   FIGURE_COLLECTION_OVERRIDES,
   getCollectionById,
 } from '../config/albumCollections'
-import { getBonusFigures, getRevealedNormalFigures, isBonusFigure } from './figureGameRules'
+import { getBonusFigures, getMainProgressState, getRevealedNormalFigures, isBonusFigure } from './figureGameRules'
 
 export function resolveFigureCollectionId(figure) {
   if (!figure) return ALBUM_COLLECTIONS.otros.id
@@ -49,6 +49,9 @@ function getCollectionStatus(obtained, total) {
   if (obtained >= total) return COLLECTION_STATUS.COMPLETED
   if (obtained >= total - 1 || obtained / total >= 0.7) {
     return COLLECTION_STATUS.ALMOST_COMPLETE
+  }
+  if (obtained >= 2 || obtained / total >= 0.4) {
+    return COLLECTION_STATUS.ADVANCED
   }
   return COLLECTION_STATUS.INCOMPLETE
 }
@@ -127,4 +130,82 @@ export function isFigureInActiveEvent(figure, now = Date.now()) {
 export function isFigureCollectionHidden(figure) {
   const collection = getCollectionById(resolveFigureCollectionId(figure))
   return Boolean(collection.hiddenUntilDiscovered && figure.is_hidden && !figure.obtenida)
+}
+
+export function getAlbumGlobalProgress(figures) {
+  const mainProgress = getMainProgressState(figures)
+  const collectionProgress = getAllCollectionProgress(figures, { track: COLLECTION_TRACK.MAIN })
+  const completedCollections = collectionProgress.filter((progress) => progress.completed)
+  const activeCollections = collectionProgress.filter(
+    (progress) => !progress.completed && progress.total > 0,
+  )
+
+  const mostAdvanced =
+    [...activeCollections]
+      .filter((progress) => progress.obtained > 0)
+      .sort((a, b) => b.ratio - a.ratio || b.obtained - a.obtained)[0] ?? null
+
+  const nextToComplete =
+    [...activeCollections]
+      .sort((a, b) => {
+        const score = (progress) =>
+          progress.ratio +
+          (progress.status === COLLECTION_STATUS.ALMOST_COMPLETE ? 0.35 : 0) +
+          (progress.status === COLLECTION_STATUS.ADVANCED ? 0.1 : 0) -
+          progress.obtained / Math.max(progress.total, 1) * 0.05
+        return score(b) - score(a)
+      })[0] ?? null
+
+  const percentComplete =
+    mainProgress.total > 0
+      ? Math.round((mainProgress.obtained / mainProgress.total) * 100)
+      : 0
+
+  return {
+    percentComplete,
+    obtained: mainProgress.obtained,
+    total: mainProgress.total,
+    completedCollectionCount: completedCollections.length,
+    totalCollectionCount: collectionProgress.length,
+    mostAdvanced,
+    nextToComplete,
+    collectionProgress,
+  }
+}
+
+export function detectCollectionCompletionTransition(figures, figureId) {
+  if (!figureId) return null
+
+  const figure = (Array.isArray(figures) ? figures : []).find(
+    (item) => String(item.id) === String(figureId),
+  )
+  if (!figure?.obtenida) return null
+
+  const collectionId = resolveFigureCollectionId(figure)
+  const after = getCollectionProgressState(figures, collectionId)
+  if (!after.completed) return null
+
+  const beforeFigures = figures.map((item) =>
+    String(item.id) === String(figureId) ? { ...item, obtenida: false } : item,
+  )
+  const before = getCollectionProgressState(beforeFigures, collectionId)
+  if (before.completed) return null
+
+  return after
+}
+
+/** Prep futura — disponibilidad de colección (sin gameplay activo). */
+export function isCollectionAvailable(collection, { now = Date.now(), context = {} } = {}) {
+  if (!collection) return false
+  if (collection.visibility === 'hidden') return Boolean(context.discovered)
+  if (collection.availableFrom && now < Date.parse(collection.availableFrom)) return false
+  if (collection.availableUntil && now > Date.parse(collection.availableUntil)) return false
+  if (collection.unlockCondition && !context[collection.unlockCondition]) return false
+  return true
+}
+
+export function getVisibleCollectionGroups(figures, options = {}) {
+  return groupFiguresByCollection(figures, options).filter(({ collection }) =>
+    isCollectionAvailable(collection, options),
+  )
 }

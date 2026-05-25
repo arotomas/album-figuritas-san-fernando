@@ -8,8 +8,23 @@ export const COLLECTION_TRACK = {
 
 export const COLLECTION_STATUS = {
   INCOMPLETE: 'incomplete',
+  ADVANCED: 'advanced',
   ALMOST_COMPLETE: 'almost_complete',
   COMPLETED: 'completed',
+}
+
+/** Prep futura — sin gameplay activo todavía. */
+export const COLLECTION_VISIBILITY = {
+  PUBLIC: 'public',
+  HIDDEN: 'hidden',
+  CONDITIONAL: 'conditional',
+}
+
+export const COLLECTION_EDITION = {
+  STANDARD: 'standard',
+  LIMITED: 'limited',
+  SEASONAL: 'seasonal',
+  EVENT: 'event',
 }
 
 export const ALBUM_COLLECTIONS = {
@@ -21,6 +36,12 @@ export const ALBUM_COLLECTIONS = {
     page: 1,
     sortOrder: 1,
     track: COLLECTION_TRACK.MAIN,
+    visibility: COLLECTION_VISIBILITY.PUBLIC,
+    edition: COLLECTION_EDITION.STANDARD,
+    eventId: null,
+    availableFrom: null,
+    availableUntil: null,
+    unlockCondition: null,
   },
   murales: {
     id: 'murales',
@@ -76,6 +97,8 @@ export const ALBUM_COLLECTIONS = {
     sortOrder: 90,
     track: COLLECTION_TRACK.BONUS,
     hiddenUntilDiscovered: true,
+    visibility: COLLECTION_VISIBILITY.HIDDEN,
+    edition: COLLECTION_EDITION.STANDARD,
   },
   otros: {
     id: 'otros',
@@ -97,8 +120,19 @@ export const MAIN_COLLECTIONS = COLLECTION_LIST.filter(
 )
 
 export function getCollectionById(collectionId) {
-  if (!collectionId) return ALBUM_COLLECTIONS.otros
-  return ALBUM_COLLECTIONS[collectionId] ?? ALBUM_COLLECTIONS.otros
+  const base = !collectionId
+    ? ALBUM_COLLECTIONS.otros
+    : ALBUM_COLLECTIONS[collectionId] ?? ALBUM_COLLECTIONS.otros
+
+  return {
+    visibility: COLLECTION_VISIBILITY.PUBLIC,
+    edition: COLLECTION_EDITION.STANDARD,
+    eventId: null,
+    availableFrom: null,
+    availableUntil: null,
+    unlockCondition: null,
+    ...base,
+  }
 }
 
 /** Fallback client-side cuando la DB aún no tiene collection_id. */

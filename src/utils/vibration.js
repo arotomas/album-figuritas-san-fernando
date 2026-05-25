@@ -10,6 +10,7 @@ const NEAR_CAPTURE_PATTERN = [120, 60, 120, 60, 200]
 const READY_PATTERN = [40, 30, 40]
 const CAPTURE_PATTERN = [30, 20, 60]
 const UNLOCK_PATTERN = [80, 40, 120, 40, 200]
+const COLLECTION_COMPLETE_PATTERN = [50, 30, 80, 30, 120]
 const ALBUM_SWIPE_PATTERN = [18, 8, 14]
 
 const lastVibrationAt = {
@@ -17,6 +18,7 @@ const lastVibrationAt = {
   ready: 0,
   album: 0,
   pulse: 0,
+  collection: 0,
 }
 
 const figureAlertCooldowns = new Map()
@@ -99,6 +101,10 @@ export function vibrateUnlock() {
 
 export function vibrateAlbumSwipe() {
   return vibrateWithCooldown('album', ALBUM_SWIPE_PATTERN, 400)
+}
+
+export function vibrateCollectionComplete() {
+  return vibrateWithCooldown('collection', COLLECTION_COMPLETE_PATTERN, 1200)
 }
 
 export function stopVibration() {

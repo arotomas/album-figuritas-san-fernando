@@ -33,6 +33,9 @@ export function sanitizePersistedState(raw) {
     lastViewedFigureId:
       source.lastViewedFigureId != null ? source.lastViewedFigureId : null,
     lastSavedAt: typeof source.lastSavedAt === 'number' ? source.lastSavedAt : null,
+    celebratedCollectionIds: Array.isArray(source.celebratedCollectionIds)
+      ? source.celebratedCollectionIds.filter((id) => typeof id === 'string')
+      : [],
   }
 }
 
