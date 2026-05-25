@@ -67,6 +67,10 @@ export function ValidationRing({
     () => getRingVisualStyle(isReady ? PROXIMITY_PHASES.CAPTURE : proximityPhase, rarity),
     [isReady, proximityPhase, rarity],
   )
+  const containerOpacity = Math.max(
+    visualStyle.opacity,
+    progress > 0.02 ? 0.45 : visualStyle.opacity,
+  )
   const rarityTheme = getRarity(rarity)
   const ringColor = isReady ? '#8cc63f' : rarityTheme.colors.primary
 
@@ -74,7 +78,7 @@ export function ValidationRing({
     <motion.div
       className="pointer-events-none relative flex items-center justify-center"
       animate={{
-        opacity: visualStyle.opacity,
+        opacity: containerOpacity,
         scale: visualStyle.scale,
       }}
       transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}

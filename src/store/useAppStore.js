@@ -17,7 +17,7 @@ import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
 import { offsetCoordinates } from '../utils/geoOffset'
 import { getDistanceMeters } from '../utils/geo'
-import { syncUnlockToSupabase, syncReplaceFigurePhoto } from '../services/supabase/sync'
+import { syncUnlockToSupabase, syncReplaceFigurePhoto, syncDeleteFigurePhoto } from '../services/supabase/sync'
 import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
 import { canUseTestFigure } from '../utils/qaMode'
 import { myFiguresLog } from '../utils/myFiguresLog'
@@ -634,6 +634,40 @@ export const useAppStore = create(
           publicUrl: result.remotePhotoUrl,
         })
 
+        return true
+      },
+
+      deleteFigurePhotoSynced: async (figureId) => {
+        const state = get()
+        const existing = state.figures.find((f) => sameFigureId(f.id, figureId))
+        if (!existing?.obtenida || !existing?.foto) {
+          persistLog.persist('photo delete blocked — no photo to delete', figureId)
+          return false
+        }
+
+        const result = await syncDeleteFigurePhoto({ figureId })
+        if (!result.ok) {
+          get().setSupabaseSyncWarning(
+            result.reason ?? 'No se pudo eliminar la foto en Supabase.',
+          )
+          return false
+        }
+
+        set((current) => ({
+          figures: current.figures.map((figure) =>
+            sameFigureId(figure.id, figureId)
+              ? {
+                  ...figure,
+                  foto: null,
+                  fotoSizeBytes: null,
+                  fotoUpdatedAt: null,
+                }
+              : figure,
+          ),
+          lastSupabaseSyncWarning: null,
+        }))
+
+        console.info('[photo-delete]', 'local store cleared photo', { figureId })
         return true
       },
 

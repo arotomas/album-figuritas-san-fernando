@@ -1,4 +1,6 @@
 import { FaXmark } from 'react-icons/fa6'
+import { ValidationRing } from './ValidationRing'
+import { getCameraProximityHint } from '../../utils/proximityExperience'
 
 export function NativeCapturePanel({
   figure,
@@ -7,70 +9,86 @@ export function NativeCapturePanel({
   processingMessage,
   isOpening,
   captureError,
+  gpsProgress = 0,
+  isReady = false,
+  inCaptureRange = false,
+  proximityPhase = 'none',
+  figureRarity = 'común',
   onFileSelected,
   onRetry,
   onClose,
 }) {
+  const hint = getCameraProximityHint(proximityPhase, { inCaptureRange })
+
   return (
-    <div className="safe-top safe-bottom screen-full flex flex-col bg-warm-white px-6 py-5">
-      <div className="flex items-center justify-between">
+    <div className="safe-top safe-bottom relative flex h-full flex-col overflow-hidden bg-black">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
+
+      <div className="relative z-10 flex items-center justify-between px-5 py-4">
         <button
           type="button"
           onClick={onClose}
           aria-label="Volver al mapa"
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white text-ink shadow-sm"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
         >
           <FaXmark size={18} />
         </button>
-        <p className="max-w-[60%] truncate text-sm font-semibold text-ink">
-          {figure?.nombre ?? 'Captura'}
-        </p>
+
+        <div className="rounded-full bg-black/40 px-4 py-1.5 backdrop-blur-sm">
+          <p className="text-xs font-medium text-white/90">{figure?.nombre ?? 'Captura'}</p>
+        </div>
+
         <div className="w-10" />
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
-        {isProcessing ? (
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6">
+        {!isProcessing && !captureError && (
+          <>
+            <ValidationRing
+              progress={gpsProgress}
+              isReady={isReady}
+              proximityPhase={proximityPhase}
+              rarity={figureRarity}
+            />
+            <p className="mt-6 max-w-xs text-center text-sm leading-relaxed text-white/75">
+              {isOpening ? hint : hint}
+            </p>
+          </>
+        )}
+
+        {isProcessing && (
           <>
             <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-progress/40 border-t-progress" />
-            <p className="mt-4 text-sm font-medium text-ink">
+            <p className="mt-4 text-sm font-medium text-white/85">
               {processingMessage ?? 'Procesando foto…'}
             </p>
           </>
-        ) : captureError ? (
+        )}
+
+        {captureError && (
           <>
-            <p className="max-w-xs text-sm text-red-700">{captureError}</p>
+            <p className="max-w-xs text-sm text-red-200">{captureError}</p>
             <button
               type="button"
               onClick={onRetry}
-              className="mt-4 min-h-[44px] rounded-full bg-ink px-5 py-2 text-xs font-bold uppercase text-white"
+              className="mt-4 min-h-[44px] rounded-full bg-white/10 px-5 py-2 text-xs font-bold uppercase text-white"
             >
               Reintentar
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 min-h-[44px] text-xs font-semibold text-muted underline"
+              className="mt-3 min-h-[44px] text-xs font-semibold text-white/75 underline"
             >
               Volver al mapa
             </button>
           </>
-        ) : (
-          <>
-            <div className="map-skeleton-pulse h-12 w-12 rounded-full border-2 border-progress/40 border-t-progress" />
-            <p className="mt-4 text-sm font-medium text-ink">Abriendo cámara…</p>
-          </>
         )}
       </div>
 
-      <div className="pb-2">
-        {!isProcessing && !captureError && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[44px] w-full text-sm font-semibold text-muted underline"
-          >
-            Volver al mapa
-          </button>
+      <div className="safe-bottom relative z-10 px-6 pb-8">
+        {!isProcessing && !captureError && isOpening && (
+          <p className="text-center text-xs text-white/55">Abriendo cámara…</p>
         )}
       </div>
 

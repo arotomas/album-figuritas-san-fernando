@@ -149,27 +149,27 @@ export function getRingVisualStyle(phase, rarityKey) {
     case PROXIMITY_PHASES.FAR:
       return {
         ...base,
-        opacity: rarity.tier >= 3 ? 0.12 : 0.22,
-        scale: rarity.tier >= 3 ? 0.78 : 0.84,
-        glowOpacity: 0.06,
-        particleIntensity: rarity.tier >= 2 ? 0.15 : 0.08,
+        opacity: rarity.tier >= 3 ? 0.32 : 0.42,
+        scale: rarity.tier >= 3 ? 0.82 : 0.86,
+        glowOpacity: 0.12,
+        particleIntensity: rarity.tier >= 2 ? 0.2 : 0.12,
       }
     case PROXIMITY_PHASES.MEDIUM:
       return {
         ...base,
-        opacity: 0.48,
-        scale: 0.9,
-        glowOpacity: 0.18,
-        particleIntensity: 0.35,
+        opacity: 0.62,
+        scale: 0.92,
+        glowOpacity: 0.22,
+        particleIntensity: 0.4,
         strokeWidth: 4.5,
       }
     case PROXIMITY_PHASES.CLOSE:
       return {
         ...base,
-        opacity: 0.78,
-        scale: 0.96,
-        glowOpacity: 0.32,
-        particleIntensity: 0.65,
+        opacity: 0.86,
+        scale: 0.97,
+        glowOpacity: 0.36,
+        particleIntensity: 0.7,
         strokeWidth: 5,
       }
     case PROXIMITY_PHASES.CAPTURE:

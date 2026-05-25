@@ -3,7 +3,7 @@ import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
 import { getSessionUserId, isSupabaseConfigured } from './auth'
-import { fetchUserFigures, replaceUserFigurePhoto, upsertUserFigure } from './figures'
+import { fetchUserFigures, deleteUserFigurePhoto, replaceUserFigurePhoto, upsertUserFigure } from './figures'
 import { insertCapture } from './captures'
 import { uploadCapturePhoto } from './storage'
 
@@ -308,6 +308,35 @@ export async function syncReplaceFigurePhoto({
       figureId,
     })
     return { ok: false, reason: error?.message ?? 'replace_failed' }
+  }
+}
+
+/**
+ * Elimina la foto de una figurita obtenida sin revertir el progreso del álbum.
+ */
+export async function syncDeleteFigurePhoto({ figureId, qaTargetFigureId = null }) {
+  if (!isSupabaseConfigured()) {
+    supabaseLog.sync.warn('photo delete skipped — supabase not configured')
+    return { ok: false, reason: 'not_configured' }
+  }
+
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) {
+      supabaseLog.sync.warn('photo delete skipped — no auth session')
+      return { ok: false, reason: 'no_session' }
+    }
+
+    const realFigureId = resolveRealFigureId(figureId, qaTargetFigureId)
+    await deleteUserFigurePhoto({ userId, figureId: realFigureId })
+    supabaseLog.sync.info('photo delete success', { figureId: realFigureId })
+    return { ok: true }
+  } catch (error) {
+    supabaseLog.sync.warn('photo delete failed', {
+      message: error?.message ?? String(error),
+      figureId,
+    })
+    return { ok: false, reason: error?.message ?? 'delete_failed' }
   }
 }
 

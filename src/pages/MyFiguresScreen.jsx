@@ -148,6 +148,7 @@ export function MyFiguresScreen() {
   const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
   const setLastViewedFigure = useAppStore((state) => state.setLastViewedFigure)
   const startRetakeSession = useAppStore((state) => state.startRetakeSession)
+  const deleteFigurePhotoSynced = useAppStore((state) => state.deleteFigurePhotoSynced)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const hasHydrated = useAppStore((state) => state._hasHydrated)
   const [selectedFigureId, setSelectedFigureId] = useState(null)
@@ -203,6 +204,15 @@ export function MyFiguresScreen() {
       navigate(withQa('/capture'))
     },
     [navigate, startRetakeSession, withQa],
+  )
+
+  const handleDeletePhoto = useCallback(
+    async (figure) => {
+      if (!figure?.obtenida || !figure?.foto) return
+      const ok = await deleteFigurePhotoSynced(figure.id)
+      if (ok) setSelectedFigureId(null)
+    },
+    [deleteFigurePhotoSynced],
   )
 
   useEffect(() => {
@@ -342,6 +352,7 @@ export function MyFiguresScreen() {
         open={Boolean(selectedFigure)}
         onClose={() => setSelectedFigureId(null)}
         onRetakePhoto={handleRetakePhoto}
+        onDeletePhoto={handleDeletePhoto}
       />
     </div>
   )

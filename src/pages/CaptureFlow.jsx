@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CameraView } from '../components/camera'
@@ -85,6 +85,23 @@ export function CaptureFlow() {
     [replaceFigurePhotoSynced],
   )
 
+  const captureFigure = nearFigure ?? captureSession?.figure ?? null
+
+  const sessionPosition = useMemo(() => {
+    const snapshot = captureSession?.locationSnapshot
+    if (!snapshot || snapshot.lat == null || snapshot.lng == null) return null
+    return {
+      lat: snapshot.lat,
+      lng: snapshot.lng,
+      accuracy: snapshot.accuracy ?? null,
+    }
+  }, [captureSession?.locationSnapshot])
+
+  const capturePosition =
+    proximityPosition ?? mapPosition ?? sessionPosition ?? captureSession?.position ?? null
+
+  const hasTrustedSessionGeo = Boolean(captureSession?.locationSnapshot?.lat != null)
+
   const {
     phase,
     camera,
@@ -110,8 +127,8 @@ export function CaptureFlow() {
     showRewardComplete,
     complete,
   } = useCaptureFlow({
-    figure: nearFigure,
-    position: proximityPosition ?? mapPosition,
+    figure: captureFigure,
+    position: capturePosition,
     captureSession,
     captureMode,
     onObtainFigure: handleObtain,
@@ -152,6 +169,16 @@ export function CaptureFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobileNative])
 
+  useEffect(() => {
+    captureSyncLog.info('capture flow mount', {
+      figureId: captureFigure?.id ?? null,
+      sessionFigureId: captureSession?.figure?.id ?? null,
+      hasTrustedSessionGeo,
+      hasLivePosition: Boolean(capturePosition),
+      isMobileNative,
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useLayoutEffect(() => {
     if (!isMobileNative) return
     if (phase === CAPTURE_PHASES.CHALLENGE) return
@@ -160,8 +187,11 @@ export function CaptureFlow() {
     if (isPostCapturePhase || isProcessing) return
     if (phase === CAPTURE_PHASES.CAPTURING || phase === CAPTURE_PHASES.COMPRESSING) return
 
-    nativePickerOpenedRef.current = true
-    openNativeCapture()
+    const opened = openNativeCapture()
+    if (opened) {
+      nativePickerOpenedRef.current = true
+      captureSyncLog.info('native picker opened on mount', { figureId: displayFigure.id })
+    }
   }, [
     displayFigure,
     isMobileNative,
@@ -304,7 +334,8 @@ export function CaptureFlow() {
   const geoSignalIssue =
     geoErrorType === 'timeout' || geoErrorType === 'unavailable'
   const needsGeoUi =
-    geoPermissionDenied || (geoSignalIssue && !mapPosition && !geoLoading)
+    !hasTrustedSessionGeo &&
+    (geoPermissionDenied || (geoSignalIssue && !mapPosition && !geoLoading))
 
   if (phase === CAPTURE_PHASES.CHALLENGE && displayFigure) {
     return (
@@ -379,6 +410,11 @@ export function CaptureFlow() {
         processingMessage={processingMessage}
         isOpening={!isCapturing && !showCaptureError}
         captureError={showCaptureError ? captureError : null}
+        gpsProgress={gpsProgress}
+        isReady={isReady}
+        inCaptureRange={inCaptureRange}
+        proximityPhase={proximityPhase}
+        figureRarity={figureRarity}
         onFileSelected={handleFileSelected}
         onRetry={handleRetryNative}
         onClose={handleClose}

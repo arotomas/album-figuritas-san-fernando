@@ -145,6 +145,56 @@ export async function fetchUserFigures(userId) {
   return data ?? []
 }
 
+export async function deleteUserFigurePhoto({ userId, figureId }) {
+  if (!userId || figureId == null) {
+    throw new Error('MISSING_USER_OR_FIGURE')
+  }
+
+  const remoteFigureId = toRemoteFigureId(figureId)
+  const now = new Date().toISOString()
+  const payload = {
+    photo_url: null,
+    updated_at: now,
+    last_photo_updated_at: now,
+  }
+
+  const { data, error } = await supabase
+    .from('user_figures')
+    .update(payload)
+    .eq('user_id', userId)
+    .eq('figure_id', remoteFigureId)
+    .select('id, figure_id, captured_at, photo_url, source, updated_at, last_photo_updated_at')
+    .maybeSingle()
+
+  if (error) {
+    const missingColumn = /updated_at|last_photo_updated_at/i.test(error.message ?? '')
+    if (missingColumn) {
+      const fallback = await supabase
+        .from('user_figures')
+        .update({ photo_url: null })
+        .eq('user_id', userId)
+        .eq('figure_id', remoteFigureId)
+        .select('id, figure_id, captured_at, photo_url, source')
+        .maybeSingle()
+      if (fallback.error) throw fallback.error
+      if (!fallback.data) throw new Error('USER_FIGURE_NOT_FOUND')
+      supabaseLog.figures.info('user figure photo deleted (fallback)', {
+        figureId: remoteFigureId,
+      })
+      return fallback.data
+    }
+    throw error
+  }
+
+  if (!data) {
+    throw new Error('USER_FIGURE_NOT_FOUND')
+  }
+
+  supabaseLog.figures.info('user figure photo deleted', { figureId: remoteFigureId })
+  captureSyncLog.info('user_figures photo deleted', { figureId: remoteFigureId })
+  return data
+}
+
 export async function replaceUserFigurePhoto({
   userId,
   figureId,
