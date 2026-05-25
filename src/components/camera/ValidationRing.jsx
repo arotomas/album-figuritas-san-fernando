@@ -3,6 +3,8 @@ import { motion, useSpring, useTransform } from 'framer-motion'
 import {
   getRingProximityColors,
   getRingVisualStyle,
+  RING_BASE_COLOR,
+  RING_PROGRESS_COLOR,
 } from '../../utils/proximityExperience'
 import { PROXIMITY_PHASES } from '../../config/proximity'
 
@@ -64,6 +66,18 @@ export function ValidationRing({
     return CIRCUMFERENCE * (1 - clamped)
   })
 
+  const progressOpacity = useTransform(springProgress, (value) => {
+    const clamped = Math.min(1, Math.max(0, value))
+    if (clamped <= 0) return 0
+    return 0.55 + clamped * 0.45
+  })
+
+  const haloOpacity = useTransform(springProgress, (value) => {
+    const clamped = Math.min(1, Math.max(0, value))
+    if (clamped <= 0) return 0
+    return 0.12 + clamped * 0.22
+  })
+
   const phase = isReady ? PROXIMITY_PHASES.CAPTURE : proximityPhase
   const visualStyle = useMemo(() => getRingVisualStyle(phase), [phase])
   const ringColors = useMemo(
@@ -73,7 +87,7 @@ export function ValidationRing({
 
   const containerOpacity = Math.max(
     visualStyle.opacity,
-    progress > 0.02 ? 0.4 : visualStyle.opacity,
+    progress > 0.02 ? 0.42 : visualStyle.opacity,
   )
 
   return (
@@ -87,11 +101,11 @@ export function ValidationRing({
     >
       <motion.div
         animate={{
-          opacity: isReady ? [0.35, 0.75, 0.35] : visualStyle.glowOpacity,
-          scale: isReady ? [1, 1.12, 1] : 1,
+          opacity: isReady ? [0.35, 0.75, 0.35] : ringColors.glowIntensity * 0.85 + 0.08,
+          scale: isReady ? [1, 1.12, 1] : 0.92 + ringColors.glowIntensity * 0.08,
         }}
         transition={{
-          duration: isReady ? 1.6 : 0.8,
+          duration: isReady ? 1.6 : 0.55,
           repeat: isReady ? Infinity : 0,
           ease: 'easeInOut',
         }}
@@ -104,25 +118,58 @@ export function ValidationRing({
         color={ringColors.particle}
       />
 
-      <svg width={SIZE} height={SIZE} className="-rotate-90">
+      <svg width={SIZE} height={SIZE} className="-rotate-90" aria-hidden="true">
+        <defs>
+          <filter id="ring-progress-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Capa 1 — base fija: aro blanco tenue siempre completo */}
         <circle
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
-          stroke="rgba(255,255,255,0.12)"
+          stroke={RING_BASE_COLOR}
           strokeWidth={visualStyle.strokeWidth}
         />
+
+        {/* Capa 2a — halo suave del arco verde (scanner/radar) */}
         <motion.circle
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
-          stroke={ringColors.stroke}
+          stroke={RING_PROGRESS_COLOR}
+          strokeWidth={visualStyle.strokeWidth + 3}
+          strokeLinecap="round"
+          strokeDasharray={CIRCUMFERENCE}
+          style={{
+            strokeDashoffset: dashOffset,
+            opacity: haloOpacity,
+          }}
+        />
+
+        {/* Capa 2b — progreso radial verde institucional */}
+        <motion.circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          fill="none"
+          stroke={RING_PROGRESS_COLOR}
           strokeWidth={visualStyle.strokeWidth}
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
-          style={{ strokeDashoffset: dashOffset }}
+          filter="url(#ring-progress-glow)"
+          style={{
+            strokeDashoffset: dashOffset,
+            opacity: progressOpacity,
+          }}
         />
       </svg>
 

@@ -185,38 +185,35 @@ export function getRingVisualStyle(phase) {
   }
 }
 
-const INSTITUTIONAL_GREEN = { r: 140, g: 198, b: 63 }
-const PROXIMITY_WHITE = { r: 255, g: 255, b: 255 }
+export const RING_PROGRESS_COLOR = '#8cc63f'
+export const RING_BASE_COLOR = 'rgba(255,255,255,0.18)'
 
-function mixChannel(from, to, amount) {
-  return Math.round(from + (to - from) * amount)
-}
-
-/** Color del aro: blanco lejos → verde institucional cerca/captura. */
+/** Glow, marco y partículas según cuánto verde hay en el arco (no el color del trazo). */
 export function getRingProximityColors(progress, { isReady = false } = {}) {
   if (isReady) {
     return {
-      stroke: '#8cc63f',
-      glow: 'rgba(140,198,63,0.5)',
-      particle: '#8cc63f',
+      glow: 'rgba(140,198,63,0.52)',
+      glowIntensity: 1,
+      particle: RING_PROGRESS_COLOR,
       frameGlow: '0 0 28px rgba(140,198,63,0.5)',
       frameBorder: 'rgba(140,198,63,0.85)',
     }
   }
 
-  const eased = Math.min(1, Math.max(0, progress))
-  const mix = eased ** 1.35
-  const r = mixChannel(PROXIMITY_WHITE.r, INSTITUTIONAL_GREEN.r, mix)
-  const g = mixChannel(PROXIMITY_WHITE.g, INSTITUTIONAL_GREEN.g, mix)
-  const b = mixChannel(PROXIMITY_WHITE.b, INSTITUTIONAL_GREEN.b, mix)
-  const stroke = `rgb(${r}, ${g}, ${b})`
-  const glowAlpha = 0.08 + mix * 0.32
+  const fill = Math.min(1, Math.max(0, progress))
+  const glowIntensity = fill ** 1.15
 
   return {
-    stroke,
-    glow: `rgba(${r}, ${g}, ${b}, ${glowAlpha})`,
-    particle: mix >= 0.55 ? '#8cc63f' : `rgba(255,255,255,${0.45 + mix * 0.35})`,
-    frameGlow: `0 0 ${12 + mix * 18}px rgba(${r}, ${g}, ${b}, ${0.12 + mix * 0.28})`,
-    frameBorder: `rgba(${r}, ${g}, ${b}, ${0.28 + mix * 0.45})`,
+    glow: `rgba(140,198,63,${0.04 + glowIntensity * 0.36})`,
+    glowIntensity,
+    particle:
+      fill >= 0.35
+        ? RING_PROGRESS_COLOR
+        : `rgba(255,255,255,${0.32 + fill * 0.42})`,
+    frameGlow: `0 0 ${6 + fill * 24}px rgba(140,198,63,${0.06 + fill * 0.34})`,
+    frameBorder:
+      fill >= 0.8
+        ? `rgba(140,198,63,${0.5 + fill * 0.35})`
+        : `rgba(255,255,255,${0.2 + fill * 0.3})`,
   }
 }
