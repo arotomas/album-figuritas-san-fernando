@@ -11,6 +11,7 @@ import {
 const QUICK_LINKS = [
   { to: '/admin/players', label: 'Jugadores', description: 'Revisar álbumes e inscriptos' },
   { to: '/admin/figures', label: 'Figuritas', description: 'CRUD de puntos del catálogo' },
+  { to: '/admin/collections', label: 'Colecciones', description: 'Universo del álbum y agrupación' },
   { to: '/admin/captures', label: 'Capturas', description: 'Validar fotos y ubicaciones' },
   { to: '/admin/map', label: 'Mapa', description: 'Vista geográfica del sistema' },
 ]

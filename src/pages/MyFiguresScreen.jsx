@@ -31,6 +31,7 @@ import {
   getMainAlbumCollectionGroups,
   detectCollectionCompletionTransition,
 } from '../utils/collectionModel'
+import { useAlbumCollectionsBootstrap } from '../hooks/useAlbumCollectionsBootstrap'
 import { getMapProximityHint } from '../utils/proximityExperience'
 
 const STATUS_LABELS = {
@@ -168,6 +169,7 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
 }
 
 export function MyFiguresScreen() {
+  useAlbumCollectionsBootstrap(true)
   const navigate = useNavigate()
   const { withQa } = useQaMode()
   const rawFigures = useAppStore((state) => state.figures)

@@ -1,27 +1,32 @@
 import {
-  ALBUM_COLLECTIONS,
-  COLLECTION_LIST,
   COLLECTION_STATUS,
   COLLECTION_TRACK,
   FIGURE_COLLECTION_OVERRIDES,
-  getCollectionById,
 } from '../config/albumCollections'
+import {
+  getCollectionById,
+  getCollectionList,
+  isKnownCollectionId,
+} from './collectionRegistry'
 import { getBonusFigures, getMainProgressState, getRevealedNormalFigures, isBonusFigure } from './figureGameRules'
 
 export function resolveFigureCollectionId(figure) {
-  if (!figure) return ALBUM_COLLECTIONS.otros.id
+  if (!figure) return 'otros'
 
   const explicit = figure.collection_id ?? figure.collectionId
-  if (explicit && ALBUM_COLLECTIONS[explicit]) return explicit
+  if (explicit && isKnownCollectionId(explicit)) return explicit
 
-  const slug = String(figure.slug ?? '').trim().toLowerCase()
-  if (slug && FIGURE_COLLECTION_OVERRIDES[slug]) {
-    return FIGURE_COLLECTION_OVERRIDES[slug]
+  // Legacy slug overrides — solo si la figurita no tiene collection_id en DB
+  if (!explicit) {
+    const slug = String(figure.slug ?? figure.id ?? '').trim().toLowerCase()
+    if (slug && FIGURE_COLLECTION_OVERRIDES[slug]) {
+      return FIGURE_COLLECTION_OVERRIDES[slug]
+    }
   }
 
-  if (isBonusFigure(figure)) return ALBUM_COLLECTIONS.secretos.id
+  if (isBonusFigure(figure)) return 'secretos'
 
-  return ALBUM_COLLECTIONS.otros.id
+  return 'otros'
 }
 
 export function enrichFigureWithCollection(figure) {
@@ -80,7 +85,7 @@ export function getCollectionProgressState(figures, collectionId) {
 
 export function groupFiguresByCollection(figures, { track = COLLECTION_TRACK.MAIN } = {}) {
   const enriched = enrichFiguresWithCollections(figures)
-  const trackCollections = COLLECTION_LIST.filter((collection) => collection.track === track)
+  const trackCollections = getCollectionList({ track })
 
   const groups = trackCollections
     .map((collection) => {
@@ -111,7 +116,7 @@ export function getBonusCollectionGroups(figures) {
 }
 
 export function getAllCollectionProgress(figures, { track = COLLECTION_TRACK.MAIN } = {}) {
-  const trackCollections = COLLECTION_LIST.filter((collection) => collection.track === track)
+  const trackCollections = getCollectionList({ track })
   return trackCollections
     .map((collection) => getCollectionProgressState(figures, collection.id))
     .filter((progress) => progress.total > 0)

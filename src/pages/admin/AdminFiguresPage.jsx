@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminFigureLocationPicker } from '../../components/admin/AdminFigureLocationPicker'
+import { useAlbumCollectionsBootstrap } from '../../hooks/useAlbumCollectionsBootstrap'
 import {
   buildFigureId,
   createFigureAdmin,
@@ -15,10 +16,10 @@ import {
 } from '../../services/supabase/storage'
 import {
   AdminErrorBanner,
-  COLLECTION_OPTIONS,
   DEFAULT_FIGURE_FORM,
   GameTypeBadges,
   getCollectionLabel,
+  getCollectionOptions,
   getGamePlacement,
   RARITY_OPTIONS,
   toFigureForm,
@@ -27,6 +28,8 @@ import {
 import { CHALLENGE_TYPES, getFigureChallenge } from '../../utils/figureChallenges'
 
 export function AdminFiguresPage() {
+  const collectionsMeta = useAlbumCollectionsBootstrap(true)
+  const collectionOptions = useMemo(() => getCollectionOptions(), [collectionsMeta.source])
   const [figures, setFigures] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -311,7 +314,7 @@ export function AdminFiguresPage() {
             >
               <option value="all">Todas</option>
               <option value="none">Sin asignar</option>
-              {COLLECTION_OPTIONS.map((collection) => (
+              {collectionOptions.map((collection) => (
                 <option key={collection.id} value={collection.id}>
                   {collection.icon} {collection.label}
                 </option>
@@ -549,7 +552,7 @@ export function AdminFiguresPage() {
                         className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
                       >
                         <option value="">Auto (según reglas)</option>
-                        {COLLECTION_OPTIONS.map((collection) => (
+                        {collectionOptions.map((collection) => (
                           <option key={collection.id} value={collection.id}>
                             {collection.icon} {collection.label}
                           </option>

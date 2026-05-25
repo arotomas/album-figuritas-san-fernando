@@ -132,6 +132,6 @@ Supabase (figures, user_figures, captures, profiles)
 | Etapa | DB | Cliente |
 |-------|-----|---------|
 | Fase 1 figures | `collection_id`, event cols en `figures` | Admin CRUD + dropdown colecciones |
-| Fase 2 collections | Tabla `album_collections` | Fetch + reemplazar `ALBUM_COLLECTIONS` |
+| Fase 2 collections | Tabla `album_collections` + fetch remoto | `collectionRegistry.js` fallback a `albumCollections.js` |
 | Fase 3 events | `album_events` + FK | `isCollectionAvailable` lee DB |
 | Gameplay timed | — | Activar flags ya preparados en config |

@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/admin', end: true, label: 'Dashboard', minRole: 'admin' },
   { to: '/admin/players', label: 'Jugadores', minRole: 'moderator' },
   { to: '/admin/figures', label: 'Figuritas', minRole: 'admin' },
+  { to: '/admin/collections', label: 'Colecciones', minRole: 'admin' },
   { to: '/admin/captures', label: 'Capturas', minRole: 'moderator' },
   { to: '/admin/map', label: 'Mapa', minRole: 'admin' },
 ]
@@ -14,6 +15,7 @@ const PAGE_TITLES = {
   '/admin': 'Dashboard',
   '/admin/players': 'Jugadores',
   '/admin/figures': 'Figuritas',
+  '/admin/collections': 'Colecciones',
   '/admin/captures': 'Capturas',
   '/admin/map': 'Mapa admin',
 }

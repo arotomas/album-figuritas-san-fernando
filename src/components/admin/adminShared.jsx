@@ -1,16 +1,20 @@
 import { isBonusFigure, isMainAlbumFigure } from '../../utils/figureGameRules'
-import { ALBUM_COLLECTIONS, COLLECTION_LIST } from '../../config/albumCollections'
+import {
+  getCollectionById,
+  getCollectionList,
+  isKnownCollectionId,
+} from '../../utils/collectionRegistry'
 
 export const RARITY_OPTIONS = ['común', 'rara', 'épica', 'legendaria']
 
-export const COLLECTION_OPTIONS = COLLECTION_LIST.map((collection) => ({
-  id: collection.id,
-  label: collection.label,
-  icon: collection.icon,
-  track: collection.track,
-}))
-
-export const COLLECTION_ID_SET = new Set(Object.keys(ALBUM_COLLECTIONS))
+export function getCollectionOptions() {
+  return getCollectionList().map((collection) => ({
+    id: collection.id,
+    label: collection.label,
+    icon: collection.icon,
+    track: collection.track,
+  }))
+}
 
 export const ALBUM_REVIEW_LABELS = {
   pending: 'Pendiente',
@@ -63,7 +67,7 @@ function toDatetimeLocalValue(value) {
 
 export function getCollectionLabel(collectionId) {
   if (!collectionId) return 'Auto (reglas cliente)'
-  return ALBUM_COLLECTIONS[collectionId]?.label ?? collectionId
+  return getCollectionById(collectionId)?.label ?? collectionId
 }
 
 export function normalizeText(value) {
@@ -193,7 +197,7 @@ export function validateFigureForm(form) {
   if (form.is_bonus && form.bonus_type && !['epic', 'legendary'].includes(form.bonus_type)) {
     return 'El tipo bonus no es válido.'
   }
-  if (form.collection_id && !COLLECTION_ID_SET.has(form.collection_id)) {
+  if (form.collection_id && !isKnownCollectionId(form.collection_id)) {
     return 'La colección seleccionada no es válida.'
   }
   if (form.page !== '' && form.page != null) {
