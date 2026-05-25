@@ -4,23 +4,35 @@ import {
   BLACK_PREVIEW_TIMEOUT_MS,
   getRearCameraStream,
   isBlackVideoPreview,
-  isCameraSupported,
   isPermissionDeniedError,
   logCameraPermission,
   queryCameraPermission,
 } from '../utils/camera'
+import {
+  EMBEDDED_CAMERA_INIT_TIMEOUT_MS,
+  getCameraCapabilities,
+  getNativeFallbackMessage,
+  mapCameraErrorToFallbackReason,
+  shouldOfferNativeFallback,
+  shouldTryEmbeddedCameraFirst,
+} from '../utils/cameraCapabilities'
 import { cameraLog } from '../utils/cameraLog'
-import { isNativeCameraOnly } from '../utils/device'
 import { getQaState } from '../utils/diagnostics'
 import { useAppLifecycle } from './useAppLifecycle'
 import { cleanupMediaStream } from '../utils/cleanup'
+import { withTimeout } from '../utils/withTimeout'
+
+function hasLiveVideoStream(stream) {
+  if (!stream?.active) return false
+  return stream.getVideoTracks().some((track) => track.readyState === 'live')
+}
 
 /**
- * Mobile: siempre cámara nativa (input file).
- * Desktop: getUserMedia con fallback nativo.
+ * Cámara embebida (getUserMedia) como flujo principal.
+ * Fallback automático a input nativo solo si falla la embebida.
  */
 export function useCamera() {
-  const nativeOnly = useMemo(() => isNativeCameraOnly(), [])
+  const capabilities = useMemo(() => getCameraCapabilities(), [])
 
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -28,14 +40,16 @@ export function useCamera() {
   const blackPreviewTimerRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  const [permission, setPermission] = useState(nativeOnly ? 'native' : 'unknown')
-  const [status, setStatus] = useState(nativeOnly ? 'native' : 'idle')
+  const [permission, setPermission] = useState('unknown')
+  const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
-  const [useNativeFallback, setUseNativeFallback] = useState(nativeOnly)
+  const [useNativeFallback, setUseNativeFallback] = useState(false)
+  const [fallbackReason, setFallbackReason] = useState(null)
   const [showBlackPreviewFallback, setShowBlackPreviewFallback] = useState(false)
-  const statusRef = useRef(nativeOnly ? 'native' : 'idle')
-  const permissionRef = useRef(nativeOnly ? 'native' : 'unknown')
-  const useNativeFallbackRef = useRef(nativeOnly)
+
+  const statusRef = useRef('idle')
+  const permissionRef = useRef('unknown')
+  const useNativeFallbackRef = useRef(false)
 
   useEffect(() => {
     statusRef.current = status
@@ -56,44 +70,49 @@ export function useCamera() {
     }
   }, [])
 
+  const enableNativeFallback = useCallback(
+    ({ keepBlackFlag = false, reason = 'stream_failed' } = {}) => {
+      if (!shouldOfferNativeFallback()) {
+        setError('CAMERA_UNAVAILABLE')
+        setStatus('denied')
+        return false
+      }
+
+      clearBlackPreviewTimer()
+      setUseNativeFallback(true)
+      setFallbackReason(reason)
+      if (!keepBlackFlag) {
+        setShowBlackPreviewFallback(false)
+      }
+      setStatus('native')
+      setError(null)
+      cleanupMediaStream(streamRef, videoRef)
+      startingRef.current = false
+      cameraLog.warn('embedded camera fallback', { reason })
+      return true
+    },
+    [clearBlackPreviewTimer],
+  )
+
   const stop = useCallback(() => {
     clearBlackPreviewTimer()
     cleanupMediaStream(streamRef, videoRef)
     setShowBlackPreviewFallback(false)
-    if (nativeOnly) {
-      setUseNativeFallback(true)
-      setStatus('native')
-      startingRef.current = false
-      return
-    }
     setStatus((current) => {
+      if (useNativeFallbackRef.current) return 'native'
       if (current === 'denied') return 'denied'
       if (current === 'awaiting-permission') return 'awaiting-permission'
       return 'idle'
     })
     startingRef.current = false
-  }, [clearBlackPreviewTimer, nativeOnly])
-
-  const enableNativeFallback = useCallback(({ keepBlackFlag = false } = {}) => {
-    clearBlackPreviewTimer()
-    setUseNativeFallback(true)
-    if (!keepBlackFlag) {
-      setShowBlackPreviewFallback(false)
-    }
-    setStatus('native')
-    setError(null)
-    cleanupMediaStream(streamRef, videoRef)
-    startingRef.current = false
   }, [clearBlackPreviewTimer])
 
   const scheduleBlackPreviewCheck = useCallback(() => {
-    if (nativeOnly) return
-
     clearBlackPreviewTimer()
 
     blackPreviewTimerRef.current = setTimeout(() => {
       const video = videoRef.current
-      if (statusRef.current !== 'active') return
+      if (statusRef.current !== 'active' || useNativeFallbackRef.current) return
 
       if (isBlackVideoPreview(video)) {
         cameraLog.blackPreviewFallback({
@@ -102,15 +121,15 @@ export function useCamera() {
           readyState: video?.readyState ?? null,
         })
         setShowBlackPreviewFallback(true)
-        enableNativeFallback({ keepBlackFlag: true })
+        enableNativeFallback({ keepBlackFlag: true, reason: 'black_preview' })
       }
     }, BLACK_PREVIEW_TIMEOUT_MS)
-  }, [clearBlackPreviewTimer, enableNativeFallback, nativeOnly])
+  }, [clearBlackPreviewTimer, enableNativeFallback])
 
   const videoCallbackRef = useCallback(
     (node) => {
       videoRef.current = node
-      if (nativeOnly || !node || !streamRef.current) return
+      if (!node || !streamRef.current || useNativeFallbackRef.current) return
 
       attachStreamToVideo(node, streamRef.current)
         .then(() => {
@@ -120,35 +139,60 @@ export function useCamera() {
         })
         .catch(() => {})
     },
-    [nativeOnly, scheduleBlackPreviewCheck],
+    [scheduleBlackPreviewCheck],
   )
 
+  const resumeLiveStream = useCallback(async () => {
+    if (!hasLiveVideoStream(streamRef.current)) return false
+
+    setUseNativeFallback(false)
+    setFallbackReason(null)
+    setShowBlackPreviewFallback(false)
+    setPermission('granted')
+    setStatus('active')
+    setError(null)
+
+    if (videoRef.current) {
+      await attachStreamToVideo(videoRef.current, streamRef.current)
+    }
+
+    scheduleBlackPreviewCheck()
+    return true
+  }, [scheduleBlackPreviewCheck])
+
   const startStream = useCallback(async () => {
-    if (nativeOnly || startingRef.current) return
+    if (startingRef.current || useNativeFallbackRef.current) return
+
+    if (await resumeLiveStream()) {
+      return
+    }
+
     startingRef.current = true
 
     if (getQaState().forcePermissionDenied) {
-      setPermission('denied')
-      setStatus('denied')
-      setError('PERMISSION_DENIED')
-      setUseNativeFallback(false)
+      enableNativeFallback({ reason: 'permission_denied' })
       startingRef.current = false
       return
     }
 
-    if (!isCameraSupported()) {
-      enableNativeFallback()
+    if (!shouldTryEmbeddedCameraFirst()) {
+      enableNativeFallback({ reason: 'unsupported' })
       startingRef.current = false
       return
     }
 
     setUseNativeFallback(false)
+    setFallbackReason(null)
     setShowBlackPreviewFallback(false)
     setStatus('loading')
     setError(null)
 
     try {
-      const stream = await getRearCameraStream()
+      const stream = await withTimeout(
+        getRearCameraStream(),
+        EMBEDDED_CAMERA_INIT_TIMEOUT_MS,
+        'EMBEDDED_CAMERA_INIT',
+      )
       streamRef.current = stream
 
       if (videoRef.current) {
@@ -158,36 +202,40 @@ export function useCamera() {
       setPermission('granted')
       setStatus('active')
       scheduleBlackPreviewCheck()
+      cameraLog.granted({ mode: 'embedded', ...capabilities })
     } catch (err) {
-      if (isPermissionDeniedError(err)) {
-        logCameraPermission('denied')
-        setPermission('denied')
-        setStatus('denied')
-        setError('PERMISSION_DENIED')
-        setUseNativeFallback(false)
-      } else {
-        cameraLog.warn('getUserMedia failed', { message: err?.message })
-        enableNativeFallback()
+      const reason = mapCameraErrorToFallbackReason(err)
+      cameraLog.warn('embedded stream failed', {
+        message: err?.message,
+        reason,
+        isPermissionDenied: isPermissionDeniedError(err),
+      })
+
+      if (!enableNativeFallback({ reason })) {
+        if (isPermissionDeniedError(err)) {
+          setPermission('denied')
+          setStatus('denied')
+          setError('PERMISSION_DENIED')
+        } else {
+          setError(err?.message ?? 'CAMERA_INIT_FAILED')
+          setStatus('denied')
+        }
       }
     } finally {
       startingRef.current = false
     }
-  }, [enableNativeFallback, nativeOnly, scheduleBlackPreviewCheck])
+  }, [capabilities, enableNativeFallback, resumeLiveStream, scheduleBlackPreviewCheck])
 
   const initPermission = useCallback(async () => {
-    if (nativeOnly) {
-      enableNativeFallback()
-      return
-    }
+    cameraLog.getUserMediaStart({ phase: 'init', ...capabilities })
 
     if (getQaState().forcePermissionDenied) {
-      setPermission('denied')
-      setStatus('denied')
+      enableNativeFallback({ reason: 'permission_denied' })
       return
     }
 
-    if (!isCameraSupported()) {
-      enableNativeFallback()
+    if (!shouldTryEmbeddedCameraFirst()) {
+      enableNativeFallback({ reason: 'unsupported' })
       return
     }
 
@@ -201,24 +249,24 @@ export function useCamera() {
     }
 
     if (state === 'denied') {
-      setStatus('denied')
+      enableNativeFallback({ reason: 'permission_denied' })
       return
     }
 
     setStatus('awaiting-permission')
-  }, [enableNativeFallback, nativeOnly, startStream])
+  }, [capabilities, enableNativeFallback, startStream])
 
   const requestCamera = useCallback(async () => {
-    if (nativeOnly) {
+    if (useNativeFallbackRef.current) {
       cameraLog.nativeInputOpen()
       fileInputRef.current?.click()
       return
     }
     await startStream()
-  }, [nativeOnly, startStream])
+  }, [startStream])
 
   const useNativeCamera = useCallback(() => {
-    enableNativeFallback()
+    enableNativeFallback({ reason: 'manual' })
     cameraLog.nativeInputOpen()
     fileInputRef.current?.click()
   }, [enableNativeFallback])
@@ -234,18 +282,17 @@ export function useCamera() {
     onHidden: () => {
       wasActiveRef.current =
         statusRef.current === 'active' || statusRef.current === 'loading'
-      if (!nativeOnly) {
+      if (!useNativeFallbackRef.current) {
         stop()
       }
     },
     onVisible: () => {
       if (
-        !nativeOnly &&
         wasActiveRef.current &&
         !useNativeFallbackRef.current &&
         permissionRef.current === 'granted'
       ) {
-        startStream()
+        void startStream()
       }
     },
   })
@@ -253,30 +300,33 @@ export function useCamera() {
   useEffect(() => {
     return () => {
       clearBlackPreviewTimer()
-      if (!nativeOnly) {
-        cleanupMediaStream(streamRef, videoRef)
-      }
+      cleanupMediaStream(streamRef, videoRef)
       startingRef.current = false
     }
-  }, [clearBlackPreviewTimer, nativeOnly])
+  }, [clearBlackPreviewTimer])
 
-  const needsPrompt =
-    !nativeOnly && status === 'awaiting-permission' && !useNativeFallback
-  const isDenied = !nativeOnly && status === 'denied' && !useNativeFallback
+  const needsPrompt = status === 'awaiting-permission' && !useNativeFallback
+  const isDenied = status === 'denied' && !useNativeFallback
+  const fallbackMessage = fallbackReason
+    ? getNativeFallbackMessage(fallbackReason)
+    : null
 
   return {
     videoRef: videoCallbackRef,
     fileInputRef,
     getVideoElement: () => videoRef.current,
-    nativeOnly,
+    capabilities,
     permission,
     status,
     error,
     useNativeFallback,
+    fallbackReason,
+    fallbackMessage,
     showBlackPreviewFallback,
     needsPrompt,
     isDenied,
     isReady: status === 'active' || status === 'native',
+    isEmbeddedActive: status === 'active' && !useNativeFallback,
     isLoading: status === 'loading',
     initPermission,
     requestCamera,

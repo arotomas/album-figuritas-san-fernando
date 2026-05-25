@@ -13,9 +13,8 @@ export function CameraView({
   gpsAccuracy,
   isReady,
   isCapturing,
-  nativeOnly = false,
   useNativeFallback = false,
-  showBlackPreviewFallback = false,
+  fallbackMessage = null,
   inCaptureRange = false,
   proximityPhase = 'none',
   figureRarity = 'común',
@@ -26,17 +25,12 @@ export function CameraView({
 }) {
   const localInputRef = useRef(null)
   const inputRef = fileInputRef ?? localInputRef
-  const showNativeUi = nativeOnly || useNativeFallback
-  const showSecondaryNativeButton = !nativeOnly && !useNativeFallback
+  const showEmbeddedPreview = !useNativeFallback
   const hint = getCameraProximityHint(proximityPhase, { inCaptureRange })
 
   return (
-    <div
-      className={`capture-screen relative flex h-full flex-col overflow-hidden ${
-        showNativeUi ? 'bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950' : 'bg-black'
-      }`}
-    >
-      {!showNativeUi && (
+    <div className="capture-screen relative flex h-full flex-col overflow-hidden bg-black">
+      {showEmbeddedPreview ? (
         <video
           ref={videoRef}
           autoPlay
@@ -44,26 +38,8 @@ export function CameraView({
           muted
           className="absolute inset-0 h-full w-full object-cover"
         />
-      )}
-
-      {showNativeUi && nativeOnly && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
-          <p className="text-lg font-semibold text-white">Sacá la foto</p>
-          <p className="mt-2 max-w-xs text-sm text-white/70">
-            Tocá capturar para abrir la cámara del celular y desbloquear la figurita.
-          </p>
-        </div>
-      )}
-
-      {showNativeUi && !nativeOnly && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
-          <p className="text-lg font-semibold text-white">Cámara del celular</p>
-          <p className="mt-2 text-sm text-white/60">
-            {showBlackPreviewFallback
-              ? 'La vista previa web no funcionó. Usá la cámara nativa para sacar la foto.'
-              : 'Tocá capturar para abrir la cámara nativa.'}
-          </p>
-        </div>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black" />
       )}
 
       <input
@@ -84,9 +60,7 @@ export function CameraView({
         }}
       />
 
-      {!showNativeUi && (
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
-      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
 
       <div className="safe-top relative z-10 flex items-center justify-between px-5 py-4">
         <button
@@ -104,6 +78,14 @@ export function CameraView({
 
         <div className="w-10" />
       </div>
+
+      {useNativeFallback && fallbackMessage && (
+        <div className="safe-top pointer-events-none absolute inset-x-0 top-[4.5rem] z-20 flex justify-center px-4">
+          <p className="rounded-full bg-black/55 px-4 py-2 text-center text-[11px] leading-relaxed text-white/75 backdrop-blur-sm">
+            {fallbackMessage}
+          </p>
+        </div>
+      )}
 
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
         <ValidationRing
@@ -141,7 +123,7 @@ export function CameraView({
           isReady={isReady}
           onCapture={onCapture}
         />
-        {showSecondaryNativeButton && (
+        {!useNativeFallback && (
           <button
             type="button"
             onClick={onUseNativeCamera}

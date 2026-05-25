@@ -22,7 +22,7 @@ export function isMobileDevice() {
   )
 }
 
-/** Cámara nativa obligatoria en mobile; evaluar en runtime. */
+/** @deprecated Usar cameraCapabilities — embedded first en todos los dispositivos. */
 export function isNativeCameraOnly() {
-  return isMobileDevice()
+  return false
 }

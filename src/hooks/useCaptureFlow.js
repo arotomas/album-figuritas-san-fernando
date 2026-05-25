@@ -474,7 +474,7 @@ export function useCaptureFlow({
   )
 
   useEffect(() => {
-    if (isReady && !hasVibratedReadyRef.current && !camera.nativeOnly) {
+    if (isReady && !hasVibratedReadyRef.current && camera.isEmbeddedActive) {
       if (vibrateReady()) {
         hasVibratedReadyRef.current = true
         captureLog.info('ready to capture', { figureId: resolvedFigure?.id })
@@ -484,7 +484,7 @@ export function useCaptureFlow({
     if (!isReady) {
       hasVibratedReadyRef.current = false
     }
-  }, [camera.nativeOnly, isReady, resolvedFigure?.id])
+  }, [camera.isEmbeddedActive, isReady, resolvedFigure?.id])
 
   const runObtainAndReward = useCallback(
     async (photoPayload, figureSnapshot) => {
@@ -900,7 +900,7 @@ export function useCaptureFlow({
 
     if (!resolvedFigure) return
 
-    if (camera.nativeOnly || camera.useNativeFallback) {
+    if (camera.useNativeFallback) {
       openNativeCapture()
       return
     }
@@ -1054,11 +1054,10 @@ export function useCaptureFlow({
     setCaptureError(null)
     setPhase(CAPTURE_PHASES.CAMERA)
     captureLog.info('capture retry', {
-      nativeOnly: camera.nativeOnly,
       useNativeFallback: camera.useNativeFallback,
       figureId: resolvedFigure?.id ?? null,
     })
-    if (camera.nativeOnly || camera.useNativeFallback) {
+    if (camera.useNativeFallback) {
       openNativeCapture()
       return
     }
