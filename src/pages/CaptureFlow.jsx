@@ -94,8 +94,7 @@ export function CaptureFlow() {
     }
   }, [captureSession?.locationSnapshot])
 
-  const capturePosition =
-    proximityPosition ?? mapPosition ?? sessionPosition ?? captureSession?.position ?? null
+  const liveGpsPosition = proximityPosition ?? mapPosition ?? null
 
   const hasTrustedSessionGeo = Boolean(captureSession?.locationSnapshot?.lat != null)
 
@@ -123,7 +122,8 @@ export function CaptureFlow() {
     complete,
   } = useCaptureFlow({
     figure: captureFigure,
-    position: capturePosition,
+    position: liveGpsPosition,
+    bootstrapPosition: sessionPosition,
     captureSession,
     captureMode,
     onObtainFigure: handleObtain,
@@ -163,7 +163,7 @@ export function CaptureFlow() {
       figureId: captureFigure?.id ?? null,
       sessionFigureId: captureSession?.figure?.id ?? null,
       hasTrustedSessionGeo,
-      hasLivePosition: Boolean(capturePosition),
+      hasLivePosition: Boolean(liveGpsPosition),
       embeddedFirst: true,
       useNativeFallback: camera.useNativeFallback,
     })

@@ -14,6 +14,7 @@ import {
   buildProximitySnapshot,
   getProximityRadii,
   isWithinCaptureRange,
+  isWithinDetectionRange,
 } from '../utils/proximityExperience'
 import { useSmoothedProximityVisual } from './useSmoothedProximity'
 import { VIBRATION_PROXIMITY_PULSE_COOLDOWN_MS } from '../config/ux'
@@ -148,7 +149,8 @@ function toProcessingError(error) {
  */
 export function useCaptureFlow({
   figure,
-  position,
+  position: livePosition,
+  bootstrapPosition = null,
   captureSession,
   onObtainFigure,
   onReplacePhoto,
@@ -194,26 +196,32 @@ export function useCaptureFlow({
 
   const resolvedFigure = figure ?? captureSession?.figure ?? null
   const sessionSnapshot = captureSession?.locationSnapshot ?? null
-  const sessionDistance = sessionSnapshot?.distanceToFigure ?? null
 
-  const effectivePosition = useMemo(() => {
-    if (position) return position
-    return snapshotToPosition(sessionSnapshot)
-  }, [position, sessionSnapshot])
+  const hasLiveGps = livePosition?.lat != null && livePosition?.lng != null
+
+  const liveDistanceMeters = useMemo(() => {
+    if (!hasLiveGps || !resolvedFigure) return null
+    return getDistanceToFigure(livePosition, resolvedFigure)
+  }, [hasLiveGps, livePosition, resolvedFigure])
+
+  const bootstrapDistanceMeters = useMemo(() => {
+    if (sessionSnapshot?.distanceToFigure != null) {
+      return sessionSnapshot.distanceToFigure
+    }
+    if (bootstrapPosition && resolvedFigure) {
+      return getDistanceToFigure(bootstrapPosition, resolvedFigure)
+    }
+    return null
+  }, [bootstrapPosition, resolvedFigure, sessionSnapshot?.distanceToFigure])
+
+  /** El aro y la fase usan GPS en vivo; el snapshot solo arranca sin señal. */
+  const ringDistanceMeters = liveDistanceMeters ?? bootstrapDistanceMeters
 
   const activeFigure = pendingFigureRef.current ?? pendingFigure ?? resolvedFigure
 
-  const distanceMeters = useMemo(() => {
-    if (effectivePosition && resolvedFigure) {
-      return getDistanceToFigure(effectivePosition, resolvedFigure)
-    }
-    if (sessionDistance != null) return sessionDistance
-    return null
-  }, [effectivePosition, resolvedFigure, sessionDistance])
-
   const proximitySnapshot = useMemo(
-    () => buildProximitySnapshot(resolvedFigure, distanceMeters),
-    [distanceMeters, resolvedFigure],
+    () => buildProximitySnapshot(resolvedFigure, ringDistanceMeters),
+    [ringDistanceMeters, resolvedFigure],
   )
 
   const captureRadiusMeters =
@@ -221,36 +229,41 @@ export function useCaptureFlow({
   const detectionRadiusMeters =
     proximitySnapshot?.detectionMeters ?? getProximityRadii(resolvedFigure).detectionMeters
 
-  const sessionInCaptureRange = useMemo(() => {
-    if (isRetake || !resolvedFigure || sessionDistance == null) return false
-    return isWithinCaptureRange(sessionDistance, getProximityRadii(resolvedFigure).captureMeters)
-  }, [isRetake, resolvedFigure, sessionDistance])
+  const inCaptureRange = useMemo(() => {
+    if (isRetake) return true
+    if (liveDistanceMeters != null) {
+      return isWithinCaptureRange(liveDistanceMeters, captureRadiusMeters)
+    }
+    if (bootstrapDistanceMeters != null) {
+      return isWithinCaptureRange(bootstrapDistanceMeters, captureRadiusMeters)
+    }
+    return false
+  }, [bootstrapDistanceMeters, captureRadiusMeters, isRetake, liveDistanceMeters])
 
-  const inCaptureRange =
-    isRetake ||
-    Boolean(proximitySnapshot?.inCaptureRange) ||
-    sessionInCaptureRange
+  const inDetectionRange = useMemo(() => {
+    if (isRetake) return true
+    if (liveDistanceMeters != null) {
+      return isWithinDetectionRange(liveDistanceMeters, detectionRadiusMeters)
+    }
+    if (bootstrapDistanceMeters != null) {
+      return isWithinDetectionRange(bootstrapDistanceMeters, detectionRadiusMeters)
+    }
+    return false
+  }, [bootstrapDistanceMeters, detectionRadiusMeters, isRetake, liveDistanceMeters])
 
-  const inDetectionRange =
-    isRetake ||
-    Boolean(proximitySnapshot?.inDetectionRange) ||
-    sessionInCaptureRange
-
-  const rawRingProgress =
-    proximitySnapshot?.easedProgress ?? (sessionInCaptureRange ? 1 : 0)
+  const rawRingProgress = proximitySnapshot?.easedProgress ?? 0
   const visualProgress = useSmoothedProximityVisual(rawRingProgress, {
-    enabled: Boolean(resolvedFigure) && inDetectionRange && !isRetake,
+    enabled: Boolean(resolvedFigure) && inDetectionRange && !isRetake && ringDistanceMeters != null,
   })
 
-  const proximityPhase =
-    sessionInCaptureRange && proximitySnapshot?.phase === 'none'
-      ? 'capture'
-      : (proximitySnapshot?.phase ?? 'none')
+  const proximityPhase = proximitySnapshot?.phase ?? 'none'
   const figureRarity = proximitySnapshot?.rarity ?? 'común'
 
+  const effectivePosition = hasLiveGps ? livePosition : snapshotToPosition(sessionSnapshot)
+
   const isApproximateGps =
-    effectivePosition?.accuracy != null &&
-    effectivePosition.accuracy > GPS_APPROXIMATE_CAPTURE_WARNING_M
+    livePosition?.accuracy != null &&
+    livePosition.accuracy > GPS_APPROXIMATE_CAPTURE_WARNING_M
 
   const gpsProgress = inDetectionRange ? visualProgress : 0
 
@@ -590,8 +603,8 @@ export function useCaptureFlow({
       return qaSnapshot
     }
 
-    if (isRetake && position) {
-      return buildLocationSnapshot(figureSnapshot, position)
+    if (isRetake && livePosition) {
+      return buildLocationSnapshot(figureSnapshot, livePosition)
     }
 
     if (isRetake && figureSnapshot?.lat != null && figureSnapshot?.lng != null) {
@@ -614,8 +627,8 @@ export function useCaptureFlow({
       })
     }
 
-    return buildLocationSnapshot(figureSnapshot, position)
-  }, [captureSession?.locationSnapshot, isRetake, position])
+    return buildLocationSnapshot(figureSnapshot, effectivePosition)
+  }, [captureSession?.locationSnapshot, effectivePosition, isRetake, livePosition])
 
   const finalizeUnlock = useCallback(
     async (compressed, figureSnapshot, locationSnapshot, capturePosition) => {
@@ -1110,8 +1123,9 @@ export function useCaptureFlow({
     isProcessing,
     processingMessage,
     pendingFigure: pendingFigureRef.current ?? pendingFigure,
-    gpsAccuracy: effectivePosition?.accuracy ?? null,
-    distanceMeters,
+    gpsAccuracy: livePosition?.accuracy ?? effectivePosition?.accuracy ?? null,
+    distanceMeters: ringDistanceMeters,
+    hasLiveGps,
     compressedPhoto,
     captureError,
     rewardFigure,

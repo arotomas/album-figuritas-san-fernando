@@ -1,7 +1,9 @@
 import { useEffect, useMemo } from 'react'
 import { motion, useSpring, useTransform } from 'framer-motion'
-import { getRingVisualStyle } from '../../utils/proximityExperience'
-import { getRarity } from '../../theme/rarity'
+import {
+  getRingProximityColors,
+  getRingVisualStyle,
+} from '../../utils/proximityExperience'
 import { PROXIMITY_PHASES } from '../../config/proximity'
 
 const SIZE = 220
@@ -46,7 +48,6 @@ export function ValidationRing({
   progress = 0,
   isReady = false,
   proximityPhase = PROXIMITY_PHASES.NONE,
-  rarity = 'común',
 }) {
   const springProgress = useSpring(progress, {
     stiffness: 42,
@@ -63,16 +64,17 @@ export function ValidationRing({
     return CIRCUMFERENCE * (1 - clamped)
   })
 
-  const visualStyle = useMemo(
-    () => getRingVisualStyle(isReady ? PROXIMITY_PHASES.CAPTURE : proximityPhase, rarity),
-    [isReady, proximityPhase, rarity],
+  const phase = isReady ? PROXIMITY_PHASES.CAPTURE : proximityPhase
+  const visualStyle = useMemo(() => getRingVisualStyle(phase), [phase])
+  const ringColors = useMemo(
+    () => getRingProximityColors(progress, { isReady }),
+    [isReady, progress],
   )
+
   const containerOpacity = Math.max(
     visualStyle.opacity,
-    progress > 0.02 ? 0.45 : visualStyle.opacity,
+    progress > 0.02 ? 0.4 : visualStyle.opacity,
   )
-  const rarityTheme = getRarity(rarity)
-  const ringColor = isReady ? '#8cc63f' : rarityTheme.colors.primary
 
   return (
     <motion.div
@@ -94,12 +96,13 @@ export function ValidationRing({
           ease: 'easeInOut',
         }}
         className="absolute h-56 w-56 rounded-full blur-md"
-        style={{
-          backgroundColor: isReady ? 'rgba(140,198,63,0.35)' : rarityTheme.colors.glow,
-        }}
+        style={{ backgroundColor: ringColors.glow }}
       />
 
-      <RingParticles intensity={visualStyle.particleIntensity} color={rarityTheme.colors.particle} />
+      <RingParticles
+        intensity={visualStyle.particleIntensity}
+        color={ringColors.particle}
+      />
 
       <svg width={SIZE} height={SIZE} className="-rotate-90">
         <circle
@@ -115,7 +118,7 @@ export function ValidationRing({
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
-          stroke={ringColor}
+          stroke={ringColors.stroke}
           strokeWidth={visualStyle.strokeWidth}
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
@@ -126,14 +129,11 @@ export function ValidationRing({
       <div className="absolute inset-0 flex items-center justify-center">
         <motion.div
           animate={{
-            boxShadow: isReady
-              ? '0 0 28px rgba(140,198,63,0.45)'
-              : `0 0 18px ${rarityTheme.colors.glow}`,
+            boxShadow: ringColors.frameGlow,
           }}
           transition={{ duration: 0.55, ease: 'easeOut' }}
-          className={`relative h-44 w-44 rounded-3xl border-2 transition-colors duration-700 ${
-            isReady ? 'border-progress/80' : 'border-white/25'
-          }`}
+          className="relative h-44 w-44 rounded-3xl border-2 transition-colors duration-700"
+          style={{ borderColor: ringColors.frameBorder }}
         >
           <span className="absolute -left-px -top-px h-6 w-6 border-l-2 border-t-2 border-white/50" />
           <span className="absolute -right-px -top-px h-6 w-6 border-r-2 border-t-2 border-white/50" />

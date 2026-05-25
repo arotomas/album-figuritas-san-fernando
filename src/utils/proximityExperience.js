@@ -135,8 +135,7 @@ export function getCameraProximityHint(phase, { inCaptureRange = false } = {}) {
   return CAMERA_HINTS[phase] ?? CAMERA_HINTS[PROXIMITY_PHASES.FAR]
 }
 
-export function getRingVisualStyle(phase, rarityKey) {
-  const rarity = getRarity(rarityKey)
+export function getRingVisualStyle(phase) {
   const base = {
     opacity: 0.2,
     scale: 0.82,
@@ -149,10 +148,10 @@ export function getRingVisualStyle(phase, rarityKey) {
     case PROXIMITY_PHASES.FAR:
       return {
         ...base,
-        opacity: rarity.tier >= 3 ? 0.32 : 0.42,
-        scale: rarity.tier >= 3 ? 0.82 : 0.86,
-        glowOpacity: 0.12,
-        particleIntensity: rarity.tier >= 2 ? 0.2 : 0.12,
+        opacity: 0.38,
+        scale: 0.84,
+        glowOpacity: 0.1,
+        particleIntensity: 0.1,
       }
     case PROXIMITY_PHASES.MEDIUM:
       return {
@@ -183,5 +182,41 @@ export function getRingVisualStyle(phase, rarityKey) {
       }
     default:
       return base
+  }
+}
+
+const INSTITUTIONAL_GREEN = { r: 140, g: 198, b: 63 }
+const PROXIMITY_WHITE = { r: 255, g: 255, b: 255 }
+
+function mixChannel(from, to, amount) {
+  return Math.round(from + (to - from) * amount)
+}
+
+/** Color del aro: blanco lejos → verde institucional cerca/captura. */
+export function getRingProximityColors(progress, { isReady = false } = {}) {
+  if (isReady) {
+    return {
+      stroke: '#8cc63f',
+      glow: 'rgba(140,198,63,0.5)',
+      particle: '#8cc63f',
+      frameGlow: '0 0 28px rgba(140,198,63,0.5)',
+      frameBorder: 'rgba(140,198,63,0.85)',
+    }
+  }
+
+  const eased = Math.min(1, Math.max(0, progress))
+  const mix = eased ** 1.35
+  const r = mixChannel(PROXIMITY_WHITE.r, INSTITUTIONAL_GREEN.r, mix)
+  const g = mixChannel(PROXIMITY_WHITE.g, INSTITUTIONAL_GREEN.g, mix)
+  const b = mixChannel(PROXIMITY_WHITE.b, INSTITUTIONAL_GREEN.b, mix)
+  const stroke = `rgb(${r}, ${g}, ${b})`
+  const glowAlpha = 0.08 + mix * 0.32
+
+  return {
+    stroke,
+    glow: `rgba(${r}, ${g}, ${b}, ${glowAlpha})`,
+    particle: mix >= 0.55 ? '#8cc63f' : `rgba(255,255,255,${0.45 + mix * 0.35})`,
+    frameGlow: `0 0 ${12 + mix * 18}px rgba(${r}, ${g}, ${b}, ${0.12 + mix * 0.28})`,
+    frameBorder: `rgba(${r}, ${g}, ${b}, ${0.28 + mix * 0.45})`,
   }
 }

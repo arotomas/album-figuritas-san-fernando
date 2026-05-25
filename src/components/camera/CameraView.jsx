@@ -92,7 +92,6 @@ export function CameraView({
           progress={gpsProgress}
           isReady={isReady}
           proximityPhase={proximityPhase}
-          rarity={figureRarity}
         />
 
         <AnimatePresence mode="wait">
