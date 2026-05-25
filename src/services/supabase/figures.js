@@ -2,9 +2,15 @@ import { supabase } from '../../lib/supabase'
 import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 import { enrichFigureWithCollection } from '../../utils/collectionModel'
+import {
+  FIGURE_CORE_COLUMNS,
+  FIGURE_GAMEPLAY_DEFAULTS,
+  FIGURE_PUBLIC_SELECT,
+  FIGURE_SCHEMA_FALLBACK_PATTERN,
+  FIGURE_UNIVERSE_DEFAULTS,
+} from '../../config/figureSchema'
 
-const PUBLIC_FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, collection_id, category, page, event_id, event_starts_at, event_ends_at, created_at'
+const PUBLIC_FIGURE_COLUMNS = FIGURE_PUBLIC_SELECT
 
 function normalizeRemoteFigure(row) {
   const lat = Number(row.lat)
@@ -70,37 +76,17 @@ export async function fetchPublicFigures() {
     .eq('active', true)
     .order('created_at', { ascending: true })
 
-  if (
-    error &&
-    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size|challenge_title|challenge_description|challenge_type|challenge_example_image_url|collection_id|category|page|event_id|event_starts_at|event_ends_at/i.test(error.message ?? '')
-  ) {
+  if (error && FIGURE_SCHEMA_FALLBACK_PATTERN.test(error.message ?? '')) {
     const fallback = await supabase
       .from('figures')
-      .select('id, title, description, rarity, lat, lng, image_url, active, created_at')
+      .select(FIGURE_CORE_COLUMNS)
       .eq('active', true)
       .order('created_at', { ascending: true })
 
     data = fallback.data?.map((row) => ({
       ...row,
-      capture_radius: 250,
-      is_bonus: false,
-      is_hidden: false,
-      unlock_order: null,
-      reveal_after_count: 0,
-      bonus_type: null,
-      reveal_radius: 200,
-      marker_icon_url: null,
-      marker_icon_size: 48,
-      challenge_title: null,
-      challenge_description: null,
-      challenge_type: null,
-      challenge_example_image_url: null,
-      collection_id: null,
-      category: null,
-      page: null,
-      event_id: null,
-      event_starts_at: null,
-      event_ends_at: null,
+      ...FIGURE_GAMEPLAY_DEFAULTS,
+      ...FIGURE_UNIVERSE_DEFAULTS,
     }))
     error = fallback.error
   }

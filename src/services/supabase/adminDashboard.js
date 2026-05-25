@@ -1,8 +1,13 @@
 import { supabase } from '../../lib/supabase'
 import { adminLog } from '../../utils/adminLog'
+import {
+  FIGURE_ADMIN_SELECT,
+  FIGURE_CORE_COLUMNS,
+  FIGURE_SCHEMA_FALLBACK_PATTERN,
+  FIGURE_UNIVERSE_DEFAULTS,
+} from '../../config/figureSchema'
 
-const FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
+const FIGURE_COLUMNS = FIGURE_ADMIN_SELECT
 
 function isPermissionError(error) {
   return (
@@ -102,13 +107,10 @@ export async function getFiguresAdmin() {
     .select(FIGURE_COLUMNS)
     .order('created_at', { ascending: true })
 
-  if (
-    error &&
-    /capture_radius|is_bonus|is_hidden|unlock_order|reveal_after_count|bonus_type|reveal_radius|marker_icon_url|marker_icon_size|challenge_title|challenge_description|challenge_type|challenge_example_image_url/i.test(error.message ?? '')
-  ) {
+  if (error && FIGURE_SCHEMA_FALLBACK_PATTERN.test(error.message ?? '')) {
     const fallback = await supabase
       .from('figures')
-      .select('id, title, description, rarity, lat, lng, image_url, active, created_at')
+      .select(FIGURE_CORE_COLUMNS)
       .order('created_at', { ascending: true })
 
     data = fallback.data?.map((figure) => ({
@@ -126,6 +128,7 @@ export async function getFiguresAdmin() {
       challenge_description: null,
       challenge_type: null,
       challenge_example_image_url: null,
+      ...FIGURE_UNIVERSE_DEFAULTS,
     }))
     error = fallback.error
   }
@@ -139,6 +142,12 @@ function logFigureCrud(level, message, detail) {
   const tag = '[admin-figures]'
   if (level === 'error') console.error(tag, message, detail)
   else console.info(tag, message, detail)
+}
+
+function toIsoOrNull(value) {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null
 }
 
 function normalizeFigurePayload(figure) {
@@ -162,6 +171,12 @@ function normalizeFigurePayload(figure) {
     challenge_description: figure.challenge_description?.trim() || null,
     challenge_type: figure.challenge_type?.trim() || null,
     challenge_example_image_url: figure.challenge_example_image_url?.trim() || null,
+    collection_id: figure.collection_id?.trim() || null,
+    category: figure.category?.trim() || null,
+    page: figure.page === '' || figure.page == null ? null : Number(figure.page),
+    event_id: figure.event_id?.trim() || null,
+    event_starts_at: toIsoOrNull(figure.event_starts_at),
+    event_ends_at: toIsoOrNull(figure.event_ends_at),
     active: Boolean(figure.active),
   }
 }

@@ -3,12 +3,12 @@ import { getSessionUserId } from './auth'
 import { getBonusFigures, getMainProgressState } from '../../utils/figureGameRules'
 import { PROFILE_ROLES } from '../../utils/roles'
 import { isAbortError, withTimeout } from '../../utils/adminAsync'
+import { FIGURE_PUBLIC_SELECT } from '../../config/figureSchema'
 
 const PROFILE_COLUMNS =
   'id, username, avatar_url, role, is_admin, created_at, album_status, album_reviewed_at, album_reviewed_by, album_review_note, nombre, apellido, dni, email, celular, auth_provider, profile_completed, last_login_at, updated_at, deleted_at, deleted_by, direccion_texto, direccion_lat, direccion_lng, localidad, provincia, pais, codigo_postal'
 
-const FIGURE_COLUMNS =
-  'id, title, description, rarity, lat, lng, image_url, active, capture_radius, is_bonus, is_hidden, unlock_order, reveal_after_count, bonus_type, reveal_radius, marker_icon_url, marker_icon_size, challenge_title, challenge_description, challenge_type, challenge_example_image_url, created_at'
+const FIGURE_COLUMNS = FIGURE_PUBLIC_SELECT
 
 const CAPTURE_COLUMNS =
   'id, user_id, figure_id, lat, lng, created_at, photo_url, device, validation_status, reviewed_at, reviewed_by, review_note'

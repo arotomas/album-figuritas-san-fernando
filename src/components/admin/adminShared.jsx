@@ -1,6 +1,16 @@
 import { isBonusFigure, isMainAlbumFigure } from '../../utils/figureGameRules'
+import { ALBUM_COLLECTIONS, COLLECTION_LIST } from '../../config/albumCollections'
 
 export const RARITY_OPTIONS = ['común', 'rara', 'épica', 'legendaria']
+
+export const COLLECTION_OPTIONS = COLLECTION_LIST.map((collection) => ({
+  id: collection.id,
+  label: collection.label,
+  icon: collection.icon,
+  track: collection.track,
+}))
+
+export const COLLECTION_ID_SET = new Set(Object.keys(ALBUM_COLLECTIONS))
 
 export const ALBUM_REVIEW_LABELS = {
   pending: 'Pendiente',
@@ -29,12 +39,31 @@ export const DEFAULT_FIGURE_FORM = {
   challenge_description: '',
   challenge_type: '',
   challenge_example_image_url: '',
+  collection_id: '',
+  category: '',
+  page: '',
+  event_id: '',
+  event_starts_at: '',
+  event_ends_at: '',
   active: true,
 }
 
 export function formatDate(value) {
   if (!value) return '-'
   return new Date(value).toLocaleString('es-AR')
+}
+
+function toDatetimeLocalValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (part) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function getCollectionLabel(collectionId) {
+  if (!collectionId) return 'Auto (reglas cliente)'
+  return ALBUM_COLLECTIONS[collectionId]?.label ?? collectionId
 }
 
 export function normalizeText(value) {
@@ -135,6 +164,12 @@ export function toFigureForm(figure) {
     challenge_description: figure.challenge_description ?? '',
     challenge_type: figure.challenge_type ?? '',
     challenge_example_image_url: figure.challenge_example_image_url ?? '',
+    collection_id: figure.collection_id ?? '',
+    category: figure.category ?? '',
+    page: figure.page ?? '',
+    event_id: figure.event_id ?? '',
+    event_starts_at: toDatetimeLocalValue(figure.event_starts_at),
+    event_ends_at: toDatetimeLocalValue(figure.event_ends_at),
     active: Boolean(figure.active),
   }
 }
@@ -157,6 +192,20 @@ export function validateFigureForm(form) {
   if (!Number.isFinite(markerIconSize) || markerIconSize <= 0) return 'El tamaño del ícono no es válido.'
   if (form.is_bonus && form.bonus_type && !['epic', 'legendary'].includes(form.bonus_type)) {
     return 'El tipo bonus no es válido.'
+  }
+  if (form.collection_id && !COLLECTION_ID_SET.has(form.collection_id)) {
+    return 'La colección seleccionada no es válida.'
+  }
+  if (form.page !== '' && form.page != null) {
+    const page = Number(form.page)
+    if (!Number.isFinite(page) || page < 1) return 'La página del álbum no es válida.'
+  }
+  if (form.event_starts_at && form.event_ends_at) {
+    const starts = Date.parse(form.event_starts_at)
+    const ends = Date.parse(form.event_ends_at)
+    if (Number.isFinite(starts) && Number.isFinite(ends) && ends < starts) {
+      return 'La fecha de fin del evento no puede ser anterior al inicio.'
+    }
   }
 
   return null

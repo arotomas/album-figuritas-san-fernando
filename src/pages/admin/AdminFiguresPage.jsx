@@ -15,8 +15,10 @@ import {
 } from '../../services/supabase/storage'
 import {
   AdminErrorBanner,
+  COLLECTION_OPTIONS,
   DEFAULT_FIGURE_FORM,
   GameTypeBadges,
+  getCollectionLabel,
   getGamePlacement,
   RARITY_OPTIONS,
   toFigureForm,
@@ -41,6 +43,7 @@ export function AdminFiguresPage() {
   const [figureFilters, setFigureFilters] = useState({
     type: 'all',
     status: 'all',
+    collection: 'all',
   })
 
   const loadFigures = useCallback(async ({ silent = false } = {}) => {
@@ -73,8 +76,12 @@ export function AdminFiguresPage() {
           figureFilters.status === 'all' ||
           (figureFilters.status === 'active' && figure.active) ||
           (figureFilters.status === 'inactive' && !figure.active)
+        const matchesCollection =
+          figureFilters.collection === 'all' ||
+          (figureFilters.collection === 'none' && !figure.collection_id) ||
+          figure.collection_id === figureFilters.collection
 
-        return matchesType && matchesStatus
+        return matchesType && matchesStatus && matchesCollection
       }),
     [figureFilters, figures],
   )
@@ -295,6 +302,22 @@ export function AdminFiguresPage() {
               <option value="inactive">Inactivas</option>
             </select>
           </label>
+          <label className="text-xs font-bold uppercase tracking-wide text-muted">
+            Colección
+            <select
+              value={figureFilters.collection}
+              onChange={(event) => updateFigureFilter('collection', event.target.value)}
+              className="mt-1 block w-52 rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+            >
+              <option value="all">Todas</option>
+              <option value="none">Sin asignar</option>
+              {COLLECTION_OPTIONS.map((collection) => (
+                <option key={collection.id} value={collection.id}>
+                  {collection.icon} {collection.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="pb-2 text-sm font-semibold text-muted">
             {filteredFigures.length} de {figures.length} figuritas visibles
           </p>
@@ -507,6 +530,95 @@ export function AdminFiguresPage() {
                       <option value="true">Sí</option>
                     </select>
                   </label>
+                </div>
+
+                <div className="rounded-2xl border border-sky-200/60 bg-sky-50/80 p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-muted">
+                    Universo del álbum
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    Define cómo se agrupa en colecciones. Vacío = reglas automáticas del cliente.
+                  </p>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <label className="col-span-2 block text-xs font-bold uppercase tracking-wide text-muted">
+                      Colección
+                      <select
+                        value={figureForm.collection_id}
+                        onChange={(event) => updateFigureForm('collection_id', event.target.value)}
+                        className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      >
+                        <option value="">Auto (según reglas)</option>
+                        {COLLECTION_OPTIONS.map((collection) => (
+                          <option key={collection.id} value={collection.id}>
+                            {collection.icon} {collection.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Categoría
+                      <input
+                        value={figureForm.category}
+                        onChange={(event) => updateFigureForm('category', event.target.value)}
+                        placeholder="murales-historicos"
+                        className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      />
+                    </label>
+
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Página álbum
+                      <input
+                        type="number"
+                        min="1"
+                        value={figureForm.page}
+                        onChange={(event) => updateFigureForm('page', event.target.value)}
+                        className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-border/70 bg-white/70 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-muted">
+                      Evento (prep futura — sin gameplay activo)
+                    </p>
+                    <div className="mt-2 grid grid-cols-1 gap-3">
+                      <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                        Event ID
+                        <input
+                          value={figureForm.event_id}
+                          onChange={(event) => updateFigureForm('event_id', event.target.value)}
+                          placeholder="verano-2026"
+                          className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                        />
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Inicio
+                          <input
+                            type="datetime-local"
+                            value={figureForm.event_starts_at}
+                            onChange={(event) =>
+                              updateFigureForm('event_starts_at', event.target.value)
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                        <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                          Fin
+                          <input
+                            type="datetime-local"
+                            value={figureForm.event_ends_at}
+                            onChange={(event) =>
+                              updateFigureForm('event_ends_at', event.target.value)
+                            }
+                            className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div
@@ -742,12 +854,13 @@ export function AdminFiguresPage() {
         )}
 
         <div className="mt-5 overflow-x-auto rounded-2xl border border-border">
-          <table className="min-w-[1680px] text-left text-sm">
+          <table className="min-w-[1880px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Imagen</th>
                 <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Rarity</th>
+                <th className="px-4 py-3">Colección</th>
                 <th className="px-4 py-3">Tipo en juego</th>
                 <th className="px-4 py-3">Bonus</th>
                 <th className="px-4 py-3">Oculta</th>
@@ -782,6 +895,14 @@ export function AdminFiguresPage() {
                   </td>
                   <td className="px-4 py-4 font-semibold">{figure.title}</td>
                   <td className="px-4 py-4">{figure.rarity}</td>
+                  <td className="px-4 py-4">
+                    <span className="font-semibold text-ink">
+                      {getCollectionLabel(figure.collection_id)}
+                    </span>
+                    {figure.category && (
+                      <p className="mt-0.5 text-xs text-muted">{figure.category}</p>
+                    )}
+                  </td>
                   <td className="px-4 py-4">
                     <GameTypeBadges figure={figure} />
                   </td>
