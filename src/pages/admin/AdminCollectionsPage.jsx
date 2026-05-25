@@ -18,7 +18,10 @@ import {
   COLLECTION_TRACK_OPTIONS,
   COLLECTION_VISIBILITY_OPTIONS,
   DEFAULT_COLLECTION_FORM,
+  getCollectionAdminPreview,
+  getCollectionVisibilityBadgeClass,
   toCollectionForm,
+  UNLOCK_CONDITION_OPTIONS,
   validateCollectionForm,
 } from '../../components/admin/adminCollectionsShared'
 
@@ -347,6 +350,20 @@ export function AdminCollectionsPage() {
                 className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
               />
             </label>
+            <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+              Condición de unlock
+              <select
+                value={form.unlock_condition || 'always'}
+                onChange={(event) => updateForm('unlock_condition', event.target.value)}
+                className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
+              >
+                {UNLOCK_CONDITION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="flex items-center gap-2 text-sm font-semibold text-ink">
               <input
                 type="checkbox"
@@ -382,6 +399,7 @@ export function AdminCollectionsPage() {
               <th className="px-4 py-3">Colección</th>
               <th className="px-4 py-3">Track</th>
               <th className="px-4 py-3">Visibilidad</th>
+              <th className="px-4 py-3">Estado player</th>
               <th className="px-4 py-3">Orden</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Evento</th>
@@ -389,7 +407,9 @@ export function AdminCollectionsPage() {
             </tr>
           </thead>
           <tbody>
-            {sortedCollections.map((collection) => (
+            {sortedCollections.map((collection) => {
+              const preview = getCollectionAdminPreview(collection)
+              return (
               <tr key={collection.id} className="border-t border-border/70">
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-2">
@@ -401,7 +421,21 @@ export function AdminCollectionsPage() {
                   </div>
                 </td>
                 <td className="px-4 py-4 capitalize">{collection.track}</td>
-                <td className="px-4 py-4 capitalize">{collection.visibility}</td>
+                <td className="px-4 py-4">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${getCollectionVisibilityBadgeClass(collection)}`}
+                  >
+                    {collection.visibility}
+                    {collection.hiddenUntilDiscovered ? ' · reveal' : ''}
+                  </span>
+                </td>
+                <td className="px-4 py-4">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${preview.badgeClass}`}
+                  >
+                    {preview.label}
+                  </span>
+                </td>
                 <td className="px-4 py-4 tabular-nums">{collection.sortOrder}</td>
                 <td className="px-4 py-4">
                   <span
@@ -454,7 +488,7 @@ export function AdminCollectionsPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

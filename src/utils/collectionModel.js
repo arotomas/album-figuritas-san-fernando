@@ -8,6 +8,11 @@ import {
   getCollectionList,
   isKnownCollectionId,
 } from './collectionRegistry'
+import {
+  buildAvailabilityContext,
+  isCollectionVisible,
+  requiresCollectionDiscovery,
+} from './collectionAvailability'
 import { getBonusFigures, getMainProgressState, getRevealedNormalFigures, isBonusFigure } from './figureGameRules'
 
 export function resolveFigureCollectionId(figure) {
@@ -16,7 +21,6 @@ export function resolveFigureCollectionId(figure) {
   const explicit = figure.collection_id ?? figure.collectionId
   if (explicit && isKnownCollectionId(explicit)) return explicit
 
-  // Legacy slug overrides — solo si la figurita no tiene collection_id en DB
   if (!explicit) {
     const slug = String(figure.slug ?? figure.id ?? '').trim().toLowerCase()
     if (slug && FIGURE_COLLECTION_OVERRIDES[slug]) {
@@ -27,6 +31,22 @@ export function resolveFigureCollectionId(figure) {
   if (isBonusFigure(figure)) return 'secretos'
 
   return 'otros'
+}
+
+export function inferDiscoveredCollectionIds(figures, existingIds = []) {
+  const discovered = new Set((Array.isArray(existingIds) ? existingIds : []).map(String))
+  const list = Array.isArray(figures) ? figures : []
+
+  for (const figure of list) {
+    if (!figure?.obtenida) continue
+    const collectionId = String(resolveFigureCollectionId(figure))
+    const collection = getCollectionById(collectionId)
+    if (requiresCollectionDiscovery(collection)) {
+      discovered.add(collectionId)
+    }
+  }
+
+  return [...discovered]
 }
 
 export function enrichFigureWithCollection(figure) {
@@ -83,11 +103,16 @@ export function getCollectionProgressState(figures, collectionId) {
   }
 }
 
+function resolveAvailabilityContext(availabilityOptions = {}) {
+  if (availabilityOptions.context) return availabilityOptions.context
+  return buildAvailabilityContext(availabilityOptions)
+}
+
 export function groupFiguresByCollection(figures, { track = COLLECTION_TRACK.MAIN } = {}) {
   const enriched = enrichFiguresWithCollections(figures)
   const trackCollections = getCollectionList({ track })
 
-  const groups = trackCollections
+  return trackCollections
     .map((collection) => {
       const items = enriched.filter(
         (figure) => resolveFigureCollectionId(figure) === collection.id,
@@ -101,28 +126,55 @@ export function groupFiguresByCollection(figures, { track = COLLECTION_TRACK.MAI
       }
     })
     .filter(Boolean)
-
-  return groups
 }
 
-export function getMainAlbumCollectionGroups(figures) {
+export function getVisibleCollectionGroups(figures, availabilityOptions = {}) {
+  const context = resolveAvailabilityContext(availabilityOptions)
+  const { track = COLLECTION_TRACK.MAIN } = availabilityOptions
+
+  return groupFiguresByCollection(figures, { track }).filter(({ collection }) =>
+    isCollectionVisible(collection, context),
+  )
+}
+
+export function getMainAlbumCollectionGroups(figures, availabilityOptions = {}) {
   const revealed = getRevealedNormalFigures(figures)
-  return groupFiguresByCollection(revealed, { track: COLLECTION_TRACK.MAIN })
+  return getVisibleCollectionGroups(revealed, {
+    ...availabilityOptions,
+    track: COLLECTION_TRACK.MAIN,
+  })
 }
 
-export function getBonusCollectionGroups(figures) {
+export function getBonusCollectionGroups(figures, availabilityOptions = {}) {
   const bonus = getBonusFigures(figures)
-  return groupFiguresByCollection(bonus, { track: COLLECTION_TRACK.BONUS })
+  return getVisibleCollectionGroups(bonus, {
+    ...availabilityOptions,
+    track: COLLECTION_TRACK.BONUS,
+  })
 }
 
-export function getAllCollectionProgress(figures, { track = COLLECTION_TRACK.MAIN } = {}) {
+export function getEventCollectionGroups(figures, availabilityOptions = {}) {
+  return getVisibleCollectionGroups(figures, {
+    ...availabilityOptions,
+    track: COLLECTION_TRACK.EVENT,
+  })
+}
+
+export function getAllCollectionProgress(
+  figures,
+  { track = COLLECTION_TRACK.MAIN, ...availabilityOptions } = {},
+) {
+  const context = resolveAvailabilityContext(availabilityOptions)
   const trackCollections = getCollectionList({ track })
+
   return trackCollections
     .map((collection) => getCollectionProgressState(figures, collection.id))
-    .filter((progress) => progress.total > 0)
+    .filter(
+      (progress) =>
+        progress.total > 0 && isCollectionVisible(progress.collection, context),
+    )
 }
 
-/** Prep futura: eventos temporales activos (sin lógica de unlock aún). */
 export function isFigureInActiveEvent(figure, now = Date.now()) {
   if (!figure?.event_id) return true
   const starts = figure.event_starts_at ? Date.parse(figure.event_starts_at) : null
@@ -132,14 +184,19 @@ export function isFigureInActiveEvent(figure, now = Date.now()) {
   return true
 }
 
-export function isFigureCollectionHidden(figure) {
+/** @deprecated Usar resolveCollectionAvailability + isCollectionVisible. */
+export function isFigureCollectionHidden(figure, availabilityOptions = {}) {
   const collection = getCollectionById(resolveFigureCollectionId(figure))
-  return Boolean(collection.hiddenUntilDiscovered && figure.is_hidden && !figure.obtenida)
+  const context = resolveAvailabilityContext(availabilityOptions)
+  return !isCollectionVisible(collection, context)
 }
 
-export function getAlbumGlobalProgress(figures) {
+export function getAlbumGlobalProgress(figures, availabilityOptions = {}) {
   const mainProgress = getMainProgressState(figures)
-  const collectionProgress = getAllCollectionProgress(figures, { track: COLLECTION_TRACK.MAIN })
+  const collectionProgress = getAllCollectionProgress(figures, {
+    ...availabilityOptions,
+    track: COLLECTION_TRACK.MAIN,
+  })
   const completedCollections = collectionProgress.filter((progress) => progress.completed)
   const activeCollections = collectionProgress.filter(
     (progress) => !progress.completed && progress.total > 0,
@@ -199,18 +256,27 @@ export function detectCollectionCompletionTransition(figures, figureId) {
   return after
 }
 
-/** Prep futura — disponibilidad de colección (sin gameplay activo). */
-export function isCollectionAvailable(collection, { now = Date.now(), context = {} } = {}) {
-  if (!collection) return false
-  if (collection.visibility === 'hidden') return Boolean(context.discovered)
-  if (collection.availableFrom && now < Date.parse(collection.availableFrom)) return false
-  if (collection.availableUntil && now > Date.parse(collection.availableUntil)) return false
-  if (collection.unlockCondition && !context[collection.unlockCondition]) return false
-  return true
+export function detectCollectionDiscoveryTransition(figures, figureId, discoveredCollectionIds = []) {
+  if (!figureId) return null
+
+  const figure = (Array.isArray(figures) ? figures : []).find(
+    (item) => String(item.id) === String(figureId),
+  )
+  if (!figure?.obtenida) return null
+
+  const collectionId = String(resolveFigureCollectionId(figure))
+  const collection = getCollectionById(collectionId)
+  if (!requiresCollectionDiscovery(collection)) return null
+  if (!(discoveredCollectionIds ?? []).map(String).includes(collectionId)) return null
+
+  const progress = getCollectionProgressState(figures, collectionId)
+  if (progress.obtained !== 1) return null
+
+  return { collection, collectionId, progress }
 }
 
-export function getVisibleCollectionGroups(figures, options = {}) {
-  return groupFiguresByCollection(figures, options).filter(({ collection }) =>
-    isCollectionAvailable(collection, options),
-  )
+/** @deprecated Usar resolveCollectionAvailability / isCollectionVisible. */
+export function isCollectionAvailable(collection, options = {}) {
+  const context = resolveAvailabilityContext(options)
+  return isCollectionVisible(collection, context)
 }

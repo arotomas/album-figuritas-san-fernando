@@ -11,6 +11,7 @@ import { FigureCollectionViewer } from '../components/album/FigureCollectionView
 import { CollectionSectionHeader } from '../components/album/CollectionSectionHeader'
 import { AlbumGlobalDashboard } from '../components/album/AlbumGlobalDashboard'
 import { CollectionCompleteAnimation } from '../components/album/CollectionCompleteAnimation'
+import { CollectionDiscoverAnimation } from '../components/album/CollectionDiscoverAnimation'
 import { CollectionDetailViewer } from '../components/album/CollectionDetailViewer'
 import { RarityBadge } from '../components/ui/RarityBadge'
 import { useQaMode } from '../utils/qaMode'
@@ -21,17 +22,20 @@ import {
   sanitizeAlbumFigures,
 } from '../utils/myFiguresLog'
 import {
-  getBonusFigures,
   getMainProgressState,
   getRevealedNormalFigures,
 } from '../utils/figureGameRules'
 import {
   enrichFigureWithCollection,
   getAlbumGlobalProgress,
+  getBonusCollectionGroups,
+  getEventCollectionGroups,
   getMainAlbumCollectionGroups,
   detectCollectionCompletionTransition,
+  detectCollectionDiscoveryTransition,
 } from '../utils/collectionModel'
 import { useAlbumCollectionsBootstrap } from '../hooks/useAlbumCollectionsBootstrap'
+import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailability'
 import { getMapProximityHint } from '../utils/proximityExperience'
 
 const STATUS_LABELS = {
@@ -181,42 +185,60 @@ export function MyFiguresScreen() {
   const nearFigure = useAppStore((state) => state.nearFigure)
   const hasHydrated = useAppStore((state) => state._hasHydrated)
   const celebratedCollectionIds = useAppStore((state) => state.celebratedCollectionIds)
+  const discoveredCollectionIds = useAppStore((state) => state.discoveredCollectionIds)
+  const acknowledgedDiscoveryCollectionIds = useAppStore(
+    (state) => state.acknowledgedDiscoveryCollectionIds,
+  )
   const acknowledgeCollectionCelebration = useAppStore(
     (state) => state.acknowledgeCollectionCelebration,
   )
+  const acknowledgeCollectionDiscovery = useAppStore(
+    (state) => state.acknowledgeCollectionDiscovery,
+  )
+  const availabilityOptions = useCollectionAvailabilityOptions()
   const [viewerFigureId, setViewerFigureId] = useState(null)
   const [sheetFigureId, setSheetFigureId] = useState(null)
   const [openCollectionId, setOpenCollectionId] = useState(null)
   const [celebratingProgress, setCelebratingProgress] = useState(null)
+  const [discoveringCollection, setDiscoveringCollection] = useState(null)
   const celebrationCheckedForRef = useRef(null)
+  const discoveryCheckedForRef = useRef(null)
 
   const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
   const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
   const mainFigures = useMemo(() => getRevealedNormalFigures(sanitizedFigures), [sanitizedFigures])
   const mainCollectionGroups = useMemo(
-    () => getMainAlbumCollectionGroups(sanitizedFigures),
-    [sanitizedFigures],
+    () => getMainAlbumCollectionGroups(sanitizedFigures, availabilityOptions),
+    [sanitizedFigures, availabilityOptions],
+  )
+  const bonusCollectionGroups = useMemo(
+    () => getBonusCollectionGroups(sanitizedFigures, availabilityOptions),
+    [sanitizedFigures, availabilityOptions],
+  )
+  const eventCollectionGroups = useMemo(
+    () => getEventCollectionGroups(sanitizedFigures, availabilityOptions),
+    [sanitizedFigures, availabilityOptions],
   )
   const globalProgress = useMemo(
-    () => getAlbumGlobalProgress(sanitizedFigures),
-    [sanitizedFigures],
+    () => getAlbumGlobalProgress(sanitizedFigures, availabilityOptions),
+    [sanitizedFigures, availabilityOptions],
   )
-  const openCollectionGroup = useMemo(
-    () => mainCollectionGroups.find((group) => group.collection.id === openCollectionId) ?? null,
-    [mainCollectionGroups, openCollectionId],
+  const openCollectionGroup = useMemo(() => {
+    const groups = [...mainCollectionGroups, ...bonusCollectionGroups, ...eventCollectionGroups]
+    return groups.find((group) => group.collection.id === openCollectionId) ?? null
+  }, [mainCollectionGroups, bonusCollectionGroups, eventCollectionGroups, openCollectionId])
+  const bonusFiguresTotal = useMemo(
+    () => bonusCollectionGroups.reduce((sum, group) => sum + group.figures.length, 0),
+    [bonusCollectionGroups],
   )
-  const bonusFigures = useMemo(() => getBonusFigures(sanitizedFigures), [sanitizedFigures])
-  const visibleBonusFigures = useMemo(
+  const obtainedBonusCount = useMemo(
     () =>
-      bonusFigures.filter(
-        (figure) =>
-          figure.obtenida ||
-          !figure.is_hidden ||
-          (nearFigure?.is_bonus && String(nearFigure.id) === String(figure.id)),
+      bonusCollectionGroups.reduce(
+        (sum, group) => sum + group.figures.filter((figure) => figure.obtenida).length,
+        0,
       ),
-    [bonusFigures, nearFigure],
+    [bonusCollectionGroups],
   )
-  const obtainedBonusCount = visibleBonusFigures.filter((figure) => figure.obtenida).length
   const nextMissionFigure = mainFigures.find((figure) => !figure.obtenida) ?? null
   const lastObtainedFigure = sanitizedFigures.find(
     (figure) => figure.id === lastObtenidaFigureId,
@@ -239,9 +261,14 @@ export function MyFiguresScreen() {
 
   const obtainedFigures = useMemo(() => {
     const main = mainFigures.filter((figure) => figure.obtenida)
-    const bonus = visibleBonusFigures.filter((figure) => figure.obtenida)
-    return [...main, ...bonus].map(enrichFigureWithCollection)
-  }, [mainFigures, visibleBonusFigures])
+    const bonus = bonusCollectionGroups.flatMap((group) =>
+      group.figures.filter((figure) => figure.obtenida),
+    )
+    const eventFigures = eventCollectionGroups.flatMap((group) =>
+      group.figures.filter((figure) => figure.obtenida),
+    )
+    return [...main, ...bonus, ...eventFigures].map(enrichFigureWithCollection)
+  }, [mainFigures, bonusCollectionGroups, eventCollectionGroups])
 
   const sheetFigure = useMemo(
     () =>
@@ -314,12 +341,43 @@ export function MyFiguresScreen() {
     setCelebratingProgress(transition)
   }, [hasHydrated, lastObtenidaFigureId, sanitizedFigures, celebratedCollectionIds])
 
+  useEffect(() => {
+    if (!hasHydrated || !lastObtenidaFigureId) return
+
+    const checkKey = String(lastObtenidaFigureId)
+    if (discoveryCheckedForRef.current === checkKey) return
+    discoveryCheckedForRef.current = checkKey
+
+    const transition = detectCollectionDiscoveryTransition(
+      sanitizedFigures,
+      lastObtenidaFigureId,
+      discoveredCollectionIds,
+    )
+    if (!transition) return
+    if (acknowledgedDiscoveryCollectionIds?.includes(transition.collectionId)) return
+
+    setDiscoveringCollection(transition.collection)
+  }, [
+    hasHydrated,
+    lastObtenidaFigureId,
+    sanitizedFigures,
+    discoveredCollectionIds,
+    acknowledgedDiscoveryCollectionIds,
+  ])
+
   const handleCollectionCelebrationComplete = useCallback(() => {
     if (celebratingProgress?.collectionId) {
       acknowledgeCollectionCelebration(celebratingProgress.collectionId)
     }
     setCelebratingProgress(null)
   }, [acknowledgeCollectionCelebration, celebratingProgress])
+
+  const handleCollectionDiscoveryComplete = useCallback(() => {
+    if (discoveringCollection?.id) {
+      acknowledgeCollectionDiscovery(discoveringCollection.id)
+    }
+    setDiscoveringCollection(null)
+  }, [acknowledgeCollectionDiscovery, discoveringCollection])
 
   const handleOpenCollection = useCallback((collectionId) => {
     vibrateAlbumSwipe()
@@ -373,7 +431,13 @@ export function MyFiguresScreen() {
 
           <div className="space-y-5">
             {mainCollectionGroups.map(({ collection, figures, progress }) => (
-              <section key={collection.id} className="album-collection-section">
+              <m.section
+                key={collection.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="album-collection-section"
+              >
                 <CollectionSectionHeader
                   progress={progress}
                   onOpen={() => handleOpenCollection(collection.id)}
@@ -388,32 +452,85 @@ export function MyFiguresScreen() {
                     />
                   ))}
                 </div>
-              </section>
+              </m.section>
             ))}
           </div>
         </section>
+
+        {eventCollectionGroups.length > 0 && (
+          <section className="album-page-shell mx-auto mt-3 w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wide text-sky-100/90">
+                Eventos
+              </h2>
+            </div>
+            <div className="space-y-5">
+              {eventCollectionGroups.map(({ collection, figures, progress }) => (
+                <m.section
+                  key={collection.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className="album-collection-section"
+                >
+                  <CollectionSectionHeader
+                    progress={progress}
+                    onOpen={() => handleOpenCollection(collection.id)}
+                  />
+                  <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {figures.map((figure) => (
+                      <AlbumSlotCard
+                        key={figure.id}
+                        figure={figure}
+                        isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
+                        onSelect={handleSelect}
+                      />
+                    ))}
+                  </div>
+                </m.section>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="album-page-shell album-secret-page mx-auto mt-3 w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
           <div className="mb-3 flex items-center justify-between px-1">
             <h2 className="font-display text-sm font-bold uppercase tracking-wide text-amber-50/90">
               Bonus
             </h2>
-            {visibleBonusFigures.length > 0 && (
+            {bonusFiguresTotal > 0 && (
               <span className="rounded-full bg-amber-300/15 px-2.5 py-0.5 text-[10px] font-black tabular-nums text-amber-100">
-                {obtainedBonusCount}/{visibleBonusFigures.length}
+                {obtainedBonusCount}/{bonusFiguresTotal}
               </span>
             )}
           </div>
 
-          {visibleBonusFigures.length > 0 ? (
-            <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {visibleBonusFigures.map((figure) => (
-                <AlbumSlotCard
-                  key={figure.id}
-                  figure={figure}
-                  isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
-                  onSelect={handleSelect}
-                />
+          {bonusCollectionGroups.length > 0 ? (
+            <div className="space-y-5">
+              {bonusCollectionGroups.map(({ collection, figures, progress }) => (
+                <m.section
+                  key={collection.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="album-collection-section"
+                >
+                  <CollectionSectionHeader
+                    progress={progress}
+                    variant="bonus"
+                    onOpen={() => handleOpenCollection(collection.id)}
+                  />
+                  <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {figures.map((figure) => (
+                      <AlbumSlotCard
+                        key={figure.id}
+                        figure={figure}
+                        isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
+                        onSelect={handleSelect}
+                      />
+                    ))}
+                  </div>
+                </m.section>
               ))}
             </div>
           ) : (
@@ -447,6 +564,12 @@ export function MyFiguresScreen() {
         progress={celebratingProgress}
         open={Boolean(celebratingProgress)}
         onComplete={handleCollectionCelebrationComplete}
+      />
+
+      <CollectionDiscoverAnimation
+        collection={discoveringCollection}
+        open={Boolean(discoveringCollection)}
+        onComplete={handleCollectionDiscoveryComplete}
       />
 
       <FigureCollectionViewer

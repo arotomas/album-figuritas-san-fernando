@@ -3,6 +3,19 @@ import {
   COLLECTION_VISIBILITY,
   COLLECTION_EDITION,
 } from '../../config/albumCollections'
+import {
+  buildAvailabilityContext,
+  getCollectionAvailabilityBadgeClass,
+  getCollectionAvailabilityLabel,
+  resolveCollectionAvailability,
+  UNLOCK_CONDITION,
+} from '../../utils/collectionAvailability'
+
+export const UNLOCK_CONDITION_OPTIONS = [
+  { value: UNLOCK_CONDITION.ALWAYS, label: 'Siempre' },
+  { value: UNLOCK_CONDITION.NIGHT_ONLY, label: 'Solo de noche' },
+  { value: UNLOCK_CONDITION.WEEKEND_ONLY, label: 'Solo fin de semana' },
+]
 
 export const COLLECTION_TRACK_OPTIONS = [
   { value: COLLECTION_TRACK.MAIN, label: 'Principal' },
@@ -12,8 +25,8 @@ export const COLLECTION_TRACK_OPTIONS = [
 
 export const COLLECTION_VISIBILITY_OPTIONS = [
   { value: COLLECTION_VISIBILITY.PUBLIC, label: 'Pública' },
-  { value: COLLECTION_VISIBILITY.HIDDEN, label: 'Oculta' },
-  { value: COLLECTION_VISIBILITY.CONDITIONAL, label: 'Condicional' },
+  { value: COLLECTION_VISIBILITY.HIDDEN, label: 'Oculta (estricta)' },
+  { value: COLLECTION_VISIBILITY.CONDITIONAL, label: 'Descubierta al revelar' },
 ]
 
 export const COLLECTION_EDITION_OPTIONS = [
@@ -104,4 +117,32 @@ export function buildCollectionId(label) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 42) || 'coleccion'
+}
+
+export function getCollectionAdminPreview(collection, { assumeDiscovered = false } = {}) {
+  const context = buildAvailabilityContext({
+    discoveredCollectionIds: assumeDiscovered ? [collection.id] : [],
+    debugReveal: false,
+  })
+  const availability = resolveCollectionAvailability(collection, context)
+  return {
+    availability,
+    label: getCollectionAvailabilityLabel(availability),
+    badgeClass: getCollectionAvailabilityBadgeClass(availability),
+  }
+}
+
+export function getCollectionVisibilityBadgeClass(collection) {
+  if (collection.visibility === COLLECTION_VISIBILITY.HIDDEN) {
+    return collection.hiddenUntilDiscovered
+      ? 'bg-amber-100 text-amber-800'
+      : 'bg-slate-200 text-slate-700'
+  }
+  if (collection.visibility === COLLECTION_VISIBILITY.CONDITIONAL) {
+    return 'bg-violet-100 text-violet-800'
+  }
+  if (collection.track === COLLECTION_TRACK.EVENT || collection.edition === COLLECTION_EDITION.EVENT) {
+    return 'bg-sky-100 text-sky-800'
+  }
+  return 'bg-slate-100 text-slate-600'
 }

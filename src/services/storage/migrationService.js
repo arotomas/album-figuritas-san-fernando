@@ -1,6 +1,7 @@
 import { STORAGE_VERSION } from '../../config/persistence'
 import { mockFigures } from '../../data/mockFigures'
 import { computeAlbumStatus } from '../../store/albumUtils'
+import { inferDiscoveredCollectionIds } from '../../utils/collectionModel'
 import { persistLog } from '../../utils/persistLog'
 
 /**
@@ -35,6 +36,12 @@ export function sanitizePersistedState(raw) {
     lastSavedAt: typeof source.lastSavedAt === 'number' ? source.lastSavedAt : null,
     celebratedCollectionIds: Array.isArray(source.celebratedCollectionIds)
       ? source.celebratedCollectionIds.filter((id) => typeof id === 'string')
+      : [],
+    discoveredCollectionIds: Array.isArray(source.discoveredCollectionIds)
+      ? source.discoveredCollectionIds.filter((id) => typeof id === 'string')
+      : [],
+    acknowledgedDiscoveryCollectionIds: Array.isArray(source.acknowledgedDiscoveryCollectionIds)
+      ? source.acknowledgedDiscoveryCollectionIds.filter((id) => typeof id === 'string')
       : [],
   }
 }
@@ -132,6 +139,15 @@ export function migratePersistedState(raw) {
     )
 
     const obtenidas = figures.filter((f) => f.obtenida && !f.is_bonus).length
+    const discoveredCollectionIds = inferDiscoveredCollectionIds(
+      figures,
+      state.discoveredCollectionIds ?? [],
+    )
+    const acknowledgedDiscoveryCollectionIds =
+      Array.isArray(state.acknowledgedDiscoveryCollectionIds) &&
+      state.acknowledgedDiscoveryCollectionIds.length > 0
+        ? state.acknowledgedDiscoveryCollectionIds
+        : discoveredCollectionIds
 
     return {
       version: STORAGE_VERSION,
@@ -143,6 +159,9 @@ export function migratePersistedState(raw) {
         lastObtenidaFigureId: state.lastObtenidaFigureId ?? null,
         lastViewedFigureId: state.lastViewedFigureId ?? null,
         lastSavedAt: state.lastSavedAt ?? null,
+        celebratedCollectionIds: state.celebratedCollectionIds ?? [],
+        discoveredCollectionIds,
+        acknowledgedDiscoveryCollectionIds,
         progressSnapshot: obtenidas,
         totalFigures: figures.filter((f) => !f.is_bonus).length,
       },

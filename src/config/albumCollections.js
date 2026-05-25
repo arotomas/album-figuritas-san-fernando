@@ -97,7 +97,7 @@ export const ALBUM_COLLECTIONS = {
     sortOrder: 90,
     track: COLLECTION_TRACK.BONUS,
     hiddenUntilDiscovered: true,
-    visibility: COLLECTION_VISIBILITY.HIDDEN,
+    visibility: COLLECTION_VISIBILITY.CONDITIONAL,
     edition: COLLECTION_EDITION.STANDARD,
   },
   otros: {

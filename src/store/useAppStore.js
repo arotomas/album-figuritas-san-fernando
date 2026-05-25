@@ -25,6 +25,12 @@ import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
 import { getSupabaseProjectRef } from '../utils/authDebug'
 import { isProfileComplete } from '../utils/profileValidation'
 import { getMainProgressState } from '../utils/figureGameRules'
+import {
+  inferDiscoveredCollectionIds,
+  resolveFigureCollectionId,
+} from '../utils/collectionModel'
+import { getCollectionById } from '../utils/collectionRegistry'
+import { requiresCollectionDiscovery } from '../utils/collectionAvailability'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
@@ -95,6 +101,8 @@ function resetStoreToDefaults() {
     lastViewedFigureId: null,
     lastSavedAt: null,
     celebratedCollectionIds: [],
+    discoveredCollectionIds: [],
+    acknowledgedDiscoveryCollectionIds: [],
     isAuthenticated: false,
     user: null,
     nearFigure: null,
@@ -138,11 +146,40 @@ function buildPersistedSnapshot(state) {
     celebratedCollectionIds: Array.isArray(state.celebratedCollectionIds)
       ? state.celebratedCollectionIds
       : [],
+    discoveredCollectionIds: Array.isArray(state.discoveredCollectionIds)
+      ? state.discoveredCollectionIds
+      : [],
+    acknowledgedDiscoveryCollectionIds: Array.isArray(state.acknowledgedDiscoveryCollectionIds)
+      ? state.acknowledgedDiscoveryCollectionIds
+      : [],
   }
 }
 
 function sameFigureId(a, b) {
   return String(a) === String(b)
+}
+
+function discoverCollectionsPatch(state, figureId, patch) {
+  const figure = (Array.isArray(state.figures) ? state.figures : []).find((item) =>
+    sameFigureId(item.id, figureId),
+  )
+  if (!figure) return {}
+
+  const updated = { ...figure, ...patch }
+  if (!updated.obtenida) return {}
+
+  const collectionId = String(resolveFigureCollectionId(updated))
+  const collection = getCollectionById(collectionId)
+  if (!requiresCollectionDiscovery(collection)) return {}
+
+  const current = Array.isArray(state.discoveredCollectionIds)
+    ? state.discoveredCollectionIds.map(String)
+    : []
+  if (current.includes(collectionId)) return {}
+
+  return {
+    discoveredCollectionIds: [...current, collectionId],
+  }
 }
 
 function applyFigureUpdate(state, figureId, patch) {
@@ -156,6 +193,7 @@ function applyFigureUpdate(state, figureId, patch) {
     lastViewedFigureId: figureId,
     lastSavedAt: Date.now(),
     albumStatus: computeAlbumStatus(figures, figureId),
+    ...discoverCollectionsPatch(state, figureId, patch),
   }
 }
 
@@ -175,6 +213,8 @@ export const useAppStore = create(
       lastViewedFigureId: null,
       lastSavedAt: null,
       celebratedCollectionIds: [],
+    discoveredCollectionIds: [],
+    acknowledgedDiscoveryCollectionIds: [],
       supabaseUserId: null,
       supabaseReady: false,
       isSupabaseAdmin: false,
@@ -352,6 +392,10 @@ export const useAppStore = create(
             lastViewedFigureId,
             albumStatus: computeAlbumStatus(figures, lastViewedFigureId),
             lastSavedAt: Date.now(),
+            discoveredCollectionIds: inferDiscoveredCollectionIds(
+              figures,
+              state.discoveredCollectionIds,
+            ),
           }
         }),
 
@@ -789,6 +833,21 @@ export const useAppStore = create(
           }
         }),
 
+      acknowledgeCollectionDiscovery: (collectionId) =>
+        set((state) => {
+          const id = String(collectionId)
+          const current = Array.isArray(state.acknowledgedDiscoveryCollectionIds)
+            ? state.acknowledgedDiscoveryCollectionIds
+            : []
+          if (current.includes(id)) {
+            return { lastSavedAt: Date.now() }
+          }
+          return {
+            acknowledgedDiscoveryCollectionIds: [...current, id],
+            lastSavedAt: Date.now(),
+          }
+        }),
+
       setLastViewedFigure: (figureId) =>
         set((state) => {
           const figures = state.figures
@@ -811,6 +870,8 @@ export const useAppStore = create(
           lastViewedFigureId: null,
           lastSavedAt: Date.now(),
           celebratedCollectionIds: [],
+          discoveredCollectionIds: [],
+          acknowledgedDiscoveryCollectionIds: [],
           nearFigure: null,
           qaTestFigure: null,
         }),
@@ -829,6 +890,7 @@ export const useAppStore = create(
             albumStatus: mainProgress.completed ? ALBUM_STATUS.COMPLETADO : computeAlbumStatus(figures),
             lastObtenidaFigureId: figures[figures.length - 1]?.id ?? null,
             lastSavedAt: Date.now(),
+            discoveredCollectionIds: inferDiscoveredCollectionIds(figures, state.discoveredCollectionIds),
           }
         }),
 
@@ -895,11 +957,16 @@ export const useAppStore = create(
 
           const figures = mergeFiguresWithTemplate(sanitized.figures)
           const persistedFields = pickPersistedFields(sanitized)
+          const discoveredCollectionIds = inferDiscoveredCollectionIds(
+            figures,
+            persistedFields.discoveredCollectionIds ?? [],
+          )
 
           return {
             ...currentState,
             ...persistedFields,
             figures,
+            discoveredCollectionIds,
             albumStatus:
               persistedFields.albumStatus ??
               computeAlbumStatus(figures, persistedFields.lastViewedFigureId),
