@@ -1,6 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
-import { PageSkeleton } from '../components/performance/AppSkeleton'
 
 /** Ruta raíz: redirige según sesión Supabase real y perfil completo. */
 export function RootRedirect() {
@@ -10,7 +9,7 @@ export function RootRedirect() {
   const location = useLocation()
 
   if (!authBootstrapped) {
-    return <PageSkeleton />
+    return null
   }
 
   if (!supabaseReady) {

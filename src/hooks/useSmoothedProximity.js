@@ -5,8 +5,8 @@ import {
 } from '../config/proximity'
 
 /**
- * Suaviza el progreso visual del aro (lerp continuo por frame).
- * El loop permanece activo mientras `enabled` para seguir el GPS en vivo.
+ * Suaviza el progreso visual del aro (lerp por frame).
+ * El loop se detiene al converger y se reactiva cuando cambia el target.
  */
 export function useSmoothedProximityVisual(targetProgress, { enabled = true } = {}) {
   const [visualProgress, setVisualProgress] = useState(0)
@@ -22,13 +22,10 @@ export function useSmoothedProximityVisual(targetProgress, { enabled = true } = 
     if (!enabled) {
       currentRef.current = 0
       setVisualProgress(0)
-    }
-  }, [enabled, targetProgress])
-
-  useEffect(() => {
-    if (!enabled) {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current)
-      frameRef.current = 0
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current)
+        frameRef.current = 0
+      }
       return undefined
     }
 
@@ -46,21 +43,30 @@ export function useSmoothedProximityVisual(targetProgress, { enabled = true } = 
         const next = current + delta * PROXIMITY_VISUAL_LERP
         currentRef.current = next
         setVisualProgress(next)
-      } else if (current !== target) {
+        frameRef.current = requestAnimationFrame(step)
+        return
+      }
+
+      if (current !== target) {
         currentRef.current = target
         setVisualProgress(target)
       }
 
-      frameRef.current = requestAnimationFrame(step)
+      frameRef.current = 0
     }
 
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current)
+    }
     frameRef.current = requestAnimationFrame(step)
 
     return () => {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current)
-      frameRef.current = 0
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current)
+        frameRef.current = 0
+      }
     }
-  }, [enabled])
+  }, [enabled, targetProgress])
 
   return visualProgress
 }

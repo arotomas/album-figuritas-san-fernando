@@ -3,16 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
 import { AlbumBackground } from '../components/album/AlbumBackground'
-import { AlbumProgress } from '../components/album/AlbumProgress'
 import { AlbumScreenSkeleton } from '../components/album/AlbumFigureSkeleton'
 import { LockedFigureCard } from '../components/album/LockedFigureCard'
 import { NewBadge } from '../components/album/NewBadge'
 import { FigureDetailSheet } from '../components/album/FigureDetailSheet'
 import { RarityBadge } from '../components/ui/RarityBadge'
 import { useQaMode } from '../utils/qaMode'
-import { albumClasses } from '../theme/album'
 import { getRarity } from '../theme/rarity'
-import { typeClasses } from '../theme/typography'
 import { vibrateAlbumSwipe } from '../utils/vibration'
 import {
   myFiguresLog,
@@ -31,22 +28,41 @@ const STATUS_LABELS = {
   [ALBUM_STATUS.EN_REVISION]: 'En revisión',
 }
 
-function ProgressDots({ progress, total }) {
+function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
+  const ratio =
+    mainProgress.visibleTotal > 0 ? mainProgress.obtained / mainProgress.visibleTotal : 0
+
   return (
-    <div className="mt-3 flex items-center gap-1.5" aria-label={`${progress} de ${total} descubiertas`}>
-      {Array.from({ length: total }).map((_, index) => {
-        const filled = index < progress
-        return (
-          <span
-            key={index}
-            className={`h-2.5 w-2.5 rounded-full border transition ${
-              filled
-                ? 'border-progress bg-progress shadow-[0_0_12px_rgba(140,198,63,0.45)]'
-                : 'border-ink/15 bg-white/70'
-            }`}
-          />
-        )
-      })}
+    <div className="album-sticky-bar safe-x shrink-0 px-4 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-bold tabular-nums text-ink">
+          {mainProgress.obtained}
+          <span className="font-normal text-muted"> / {mainProgress.total}</span>
+        </p>
+        <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted">
+          {STATUS_LABELS[albumStatus] ?? albumStatus}
+        </span>
+      </div>
+
+      <div
+        className="mt-1.5 h-1 overflow-hidden rounded-full bg-border/55"
+        role="progressbar"
+        aria-valuenow={mainProgress.obtained}
+        aria-valuemin={0}
+        aria-valuemax={mainProgress.visibleTotal}
+        aria-label={`${mainProgress.obtained} de ${mainProgress.total} figuritas descubiertas`}
+      >
+        <div
+          className="album-progress-fill h-full rounded-full bg-progress transition-[width] duration-500 ease-out"
+          style={{ width: `${Math.min(100, ratio * 100)}%` }}
+        />
+      </div>
+
+      {missionLine && (
+        <p className="mt-1.5 truncate font-body text-[11px] leading-snug text-muted">
+          {missionLine}
+        </p>
+      )}
     </div>
   )
 }
@@ -173,6 +189,21 @@ export function MyFiguresScreen() {
     (figure) => figure.id === lastObtenidaFigureId,
   )
   const featuredRarity = nearFigure?.rareza ?? lastObtainedFigure?.rareza ?? nextMissionFigure?.rareza
+
+  const missionLine = useMemo(() => {
+    if (nearFigure) {
+      const hint =
+        getMapProximityHint(nearFigure.proximity?.phase ?? 'medium', {
+          isBonus: nearFigure.is_bonus,
+        }) ?? 'Hay algo cerca… seguí explorando.'
+      return nearFigure.nombre ? `${hint} · ${nearFigure.nombre}` : hint
+    }
+    if (nextMissionFigure) {
+      return `Próxima figurita: ${nextMissionFigure.nombre}`
+    }
+    return 'Explorá el mapa para descubrir secretos especiales.'
+  }, [nearFigure, nextMissionFigure])
+
   const selectedFigure = useMemo(
     () =>
       selectedFigureId
@@ -235,62 +266,19 @@ export function MyFiguresScreen() {
     <div className="my-figures-screen relative flex h-full min-h-0 flex-col overflow-hidden">
       <AlbumBackground rareza={featuredRarity ?? 'común'} />
 
-      <div className="my-figures-scroll safe-bottom relative z-10 min-h-0 flex-1 scroll-y-app px-4 pb-5">
-        <header className="my-figures-header px-1 pb-3 pt-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className={albumClasses.headerEyebrow}>Tu colección</p>
-              <h1 className={`${typeClasses.display} mt-1 text-xl text-ink`}>
-                Álbum de figuritas
-              </h1>
-              <p className="mt-1 font-body text-sm text-muted">
-                San Fernando · Colección del jugador
-              </p>
-            </div>
-            <span className="shrink-0 rounded-full border border-border/80 bg-white/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-muted backdrop-blur-sm">
-              {STATUS_LABELS[albumStatus] ?? albumStatus}
-            </span>
-          </div>
+      <AlbumStickyBar
+        mainProgress={mainProgress}
+        albumStatus={albumStatus}
+        missionLine={missionLine}
+      />
 
-          <div className="album-mission-card mt-4 rounded-[1.5rem] border border-white/70 bg-white/72 p-4 shadow-sm backdrop-blur-md">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className={`${typeClasses.micro} text-muted`}>Progreso principal</p>
-                <p className={`${typeClasses.display} mt-1 text-2xl text-ink`}>
-                  {mainProgress.obtained} de {mainProgress.total} descubiertas
-                </p>
-              </div>
-              <span className="rounded-full bg-progress px-3 py-1 text-xs font-black text-ink shadow-[0_0_18px_rgba(140,198,63,0.28)]">
-                {mainProgress.obtained}/{mainProgress.visibleTotal}
-              </span>
-            </div>
-            <AlbumProgress progress={mainProgress.obtained} total={mainProgress.visibleTotal} />
-            <ProgressDots progress={mainProgress.obtained} total={mainProgress.total} />
-            <div className="mt-4 rounded-2xl border border-border/60 bg-warm-white/80 px-3 py-2.5">
-              <p className={`${typeClasses.micro} text-muted`}>Próxima misión</p>
-              <p className="mt-1 font-body text-sm font-bold text-ink">
-                {nearFigure
-                  ? getMapProximityHint(nearFigure.proximity?.phase ?? 'medium', {
-                      isBonus: nearFigure.is_bonus,
-                    }) ?? 'Hay algo cerca… seguí explorando.'
-                  : nextMissionFigure
-                    ? `Próxima figurita disponible: ${nextMissionFigure.nombre}`
-                    : 'Explorá el mapa para encontrar secretos especiales.'}
-              </p>
-              {nearFigure && (
-                <p className="mt-0.5 font-body text-xs text-muted">{nearFigure.nombre}</p>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <section className="album-page-shell mx-auto w-full max-w-[720px] rounded-[2rem] px-3 py-4 sm:px-5">
-          <div className="mb-4 flex items-center justify-between px-1">
-            <div>
-              <p className={`${typeClasses.micro} text-muted`}>Página principal</p>
-              <h2 className={`${typeClasses.headline} text-lg text-ink`}>Álbum principal</h2>
-            </div>
-            <span className="rounded-full bg-progress/20 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-ink">
+      <div className="my-figures-scroll safe-x relative z-10 min-h-0 flex-1 scroll-y-app px-4 pt-3">
+        <section className="album-page-shell mx-auto w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
+          <div className="mb-3 flex items-center justify-between px-1">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-ink/80">
+              Álbum principal
+            </h2>
+            <span className="rounded-full bg-progress/15 px-2.5 py-0.5 text-[10px] font-black tabular-nums text-ink">
               {mainProgress.obtained}/{mainProgress.total}
             </span>
           </div>
@@ -307,14 +295,13 @@ export function MyFiguresScreen() {
           </div>
         </section>
 
-        <section className="album-page-shell album-secret-page mx-auto mt-4 w-full max-w-[720px] rounded-[2rem] px-3 py-4 sm:px-5">
-          <div className="mb-4 flex items-center justify-between px-1">
-            <div>
-              <p className={`${typeClasses.micro} text-amber-200/80`}>Sección secreta</p>
-              <h2 className={`${typeClasses.headline} text-lg text-amber-50`}>Bonus</h2>
-            </div>
+        <section className="album-page-shell album-secret-page mx-auto mt-3 w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
+          <div className="mb-3 flex items-center justify-between px-1">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-amber-50/90">
+              Bonus
+            </h2>
             {visibleBonusFigures.length > 0 && (
-              <span className="rounded-full bg-amber-300/15 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-amber-100">
+              <span className="rounded-full bg-amber-300/15 px-2.5 py-0.5 text-[10px] font-black tabular-nums text-amber-100">
                 {obtainedBonusCount}/{visibleBonusFigures.length}
               </span>
             )}
@@ -332,12 +319,12 @@ export function MyFiguresScreen() {
               ))}
             </div>
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-amber-200/20 bg-charcoal/82 p-6 text-center shadow-inner">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-amber-200/20 bg-amber-300/10 text-4xl text-amber-100/70 shadow-[0_0_42px_rgba(251,191,36,0.14)]">
+            <div className="rounded-[1.5rem] border border-dashed border-amber-200/20 bg-charcoal/82 p-5 text-center shadow-inner">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-amber-200/20 bg-amber-300/10 text-3xl text-amber-100/70">
                 ✦
               </div>
-              <h3 className={`${typeClasses.headline} mt-5 text-lg text-amber-50`}>
-                Hay secretos escondidos en San Fernando
+              <h3 className="mt-4 font-display text-base text-amber-50">
+                Secretos escondidos en San Fernando
               </h3>
               <p className="mt-2 font-body text-sm leading-6 text-white/55">
                 Algunas figuritas épicas y legendarias solo aparecen cuando explorás lugares especiales.

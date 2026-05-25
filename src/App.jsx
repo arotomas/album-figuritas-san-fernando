@@ -3,17 +3,16 @@ import { useLocation } from 'react-router-dom'
 import { syncQaModeFromUrl, isQaMode } from './utils/qaMode'
 import { LazyMotion, domAnimation } from 'framer-motion'
 import { AppRoutes } from './routes'
-import { HydrationScreen } from './components/layout/HydrationScreen'
+import { AppBootScreen } from './components/layout/AppBootScreen'
 import { ViewportProvider } from './components/layout/ViewportProvider'
 import { AppSkeleton } from './components/performance/AppSkeleton'
-import { usePersistedAlbum } from './hooks/usePersistedAlbum'
-import { useSupabaseBootstrap } from './hooks/useSupabaseBootstrap'
+import { ConnectionStatus } from './components/qa/ConnectionStatus'
+import { useAppBootGate } from './hooks/useAppBootGate'
 import { useAppStore } from './store/useAppStore'
 import { isDevMode } from './utils/devMode'
 
 function App() {
-  const { hasHydrated } = usePersistedAlbum()
-  useSupabaseBootstrap(hasHydrated)
+  const { isBooting, bootPhase } = useAppBootGate()
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const isAdminRoute = location.pathname.startsWith('/admin')
@@ -28,11 +27,11 @@ function App() {
     }
   }, [clearQaTestFigure, location.pathname, location.search])
 
-  if (!hasHydrated) {
+  if (isBooting) {
     return (
       <ViewportProvider>
         <div className="app-shell h-app overflow-hidden bg-[#0a0a0b] text-ink">
-          <HydrationScreen />
+          <AppBootScreen phase={bootPhase} />
         </div>
       </ViewportProvider>
     )
@@ -46,6 +45,7 @@ function App() {
             isAdminRoute ? 'app-shell-admin' : ''
           }`}
         >
+          <ConnectionStatus />
           <Suspense fallback={<AppSkeleton />}>
             <AppRoutes />
           </Suspense>

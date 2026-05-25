@@ -1,6 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
-import { PageSkeleton } from '../components/performance/AppSkeleton'
 
 export function ProtectedRoute({ children, requireCompleteProfile = true }) {
   const authBootstrapped = useAppStore((state) => state.authBootstrapped)
@@ -12,7 +11,7 @@ export function ProtectedRoute({ children, requireCompleteProfile = true }) {
   const location = useLocation()
 
   if (!authBootstrapped) {
-    return <PageSkeleton />
+    return null
   }
 
   if (!supabaseReady || !supabaseUserId) {
@@ -34,7 +33,7 @@ export function ProfileSetupRoute({ children }) {
   const location = useLocation()
 
   if (!authBootstrapped) {
-    return <PageSkeleton />
+    return null
   }
 
   if (!supabaseReady || !supabaseUserId) {
@@ -56,7 +55,7 @@ export function GuestRoute({ children }) {
   const location = useLocation()
 
   if (!authBootstrapped) {
-    return <PageSkeleton />
+    return null
   }
 
   if (supabaseReady && supabaseUserId) {

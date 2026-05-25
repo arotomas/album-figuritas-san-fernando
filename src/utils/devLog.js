@@ -1,4 +1,4 @@
-const CAPTURE_TRACE = true
+const CAPTURE_TRACE = import.meta.env.DEV
 
 function logCapture(level, message, detail) {
   if (!CAPTURE_TRACE && !import.meta.env.DEV) return

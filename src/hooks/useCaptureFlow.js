@@ -255,6 +255,7 @@ export function useCaptureFlow({
   const gpsProgress = inDetectionRange ? visualProgress : 0
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     if (!resolvedFigure || ringDistanceMeters == null) return
 
     console.info('[RING_DEBUG]', {
