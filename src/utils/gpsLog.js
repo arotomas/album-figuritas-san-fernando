@@ -1,7 +1,8 @@
-import { DEBUG_GPS, GPS_ACCEPT_MAX_ACCURACY_M } from '../config/gps'
+import { GPS_ACCEPT_MAX_ACCURACY_M } from '../config/gps'
+import { isDebugGpsLoggingEnabled } from '../qa/qaCore'
 
 function shouldLog() {
-  return import.meta.env.DEV || DEBUG_GPS
+  return isDebugGpsLoggingEnabled()
 }
 
 function emit(level, label, data) {

@@ -1,11 +1,12 @@
-import { isWithinSanFernandoArea } from '../config/gps'
+import { getEffectiveAcceptMaxAccuracyM } from '../qa/qaLocation'
+import { isPositionInPlayableArea } from '../geo/geoPolicy'
 
 const STORAGE_KEY = 'figuritas-last-known-pos'
 const MAX_AGE_MS = 30 * 60 * 1000
 
 function isValidCached(parsed) {
   if (!parsed || parsed.lat == null || parsed.lng == null) return false
-  if (!isWithinSanFernandoArea(parsed.lat, parsed.lng)) return false
+  if (!isPositionInPlayableArea(parsed.lat, parsed.lng)) return false
   const age = Date.now() - (parsed.timestamp ?? 0)
   if (parsed.timestamp && age > MAX_AGE_MS) return false
   return true
@@ -35,8 +36,9 @@ export function loadLastKnownPosition() {
 
 export function saveLastKnownPosition(position) {
   if (typeof sessionStorage === 'undefined' || !position) return
-  if (!isWithinSanFernandoArea(position.lat, position.lng)) return
-  if (position.accuracy > 80) return
+  if (!isPositionInPlayableArea(position.lat, position.lng)) return
+  const acceptMax = getEffectiveAcceptMaxAccuracyM()
+  if (position.accuracy > acceptMax) return
 
   try {
     sessionStorage.setItem(

@@ -1,23 +1,15 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Logo } from '../components/Logo'
-import { useQaMode } from '../utils/qaMode'
+import { QaBadge } from '../components/qa/QaBadge'
 
 export function AppLayout() {
-  const { isQaActive } = useQaMode()
   const location = useLocation()
   const hideChromeHeader = location.pathname === '/my-figures'
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-      {isQaActive && (
-        <div
-          data-qa-banner="true"
-          className="safe-top safe-x shrink-0 border-b border-cyan-500/40 bg-cyan-100 px-4 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-900"
-        >
-          QA ENABLED
-        </div>
-      )}
+      <QaBadge />
 
       {!hideChromeHeader && (
         <header className="safe-top safe-x shrink-0 border-b border-border/60 px-6 py-3">

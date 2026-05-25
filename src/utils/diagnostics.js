@@ -1,41 +1,10 @@
-const qaState = {
-  simulateOffline: false,
-  mockPosition: null,
-  forcePermissionDenied: false,
-  simulateCaptureSuccess: false,
-}
-
-const listeners = new Set()
-
-function notifyQaChange() {
-  listeners.forEach((fn) => fn())
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('qa-flags-changed'))
-  }
-}
-
-export function getQaState() {
-  return { ...qaState }
-}
-
-export function setQaFlag(key, value) {
-  if (!(key in qaState)) return
-  qaState[key] = value
-  notifyQaChange()
-}
-
-export function resetQaFlags() {
-  qaState.simulateOffline = false
-  qaState.mockPosition = null
-  qaState.forcePermissionDenied = false
-  qaState.simulateCaptureSuccess = false
-  notifyQaChange()
-}
-
-export function subscribeQaState(listener) {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
+/** @deprecated — usar `import from '../qa'` para estado QA */
+export {
+  getQaState,
+  resetQaFlags,
+  setQaFlag,
+  subscribeQaState,
+} from '../qa/qaState'
 
 export function readMemoryDiagnostics() {
   if (typeof performance === 'undefined') return null

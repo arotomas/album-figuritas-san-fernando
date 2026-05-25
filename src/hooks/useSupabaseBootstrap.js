@@ -10,7 +10,9 @@ import { ensureProfileFromAuthUser, touchProfileLogin } from '../services/supaba
 import { isAdmin, isModeratorOrAdmin } from '../services/supabase/admin'
 import { fetchPublicFigures } from '../services/supabase/figures'
 import { fetchAlbumCollectionsSafe } from '../services/supabase/collections'
+import { fetchAlbumEventsSafe } from '../services/supabase/events'
 import { setRemoteAlbumCollections } from '../utils/collectionRegistry'
+import { setRemoteAlbumEvents } from '../utils/eventRegistry'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { hasStoredSupabaseSession } from '../services/supabase/sessionRestore'
 import { supabaseLog } from '../utils/supabaseLog'
@@ -41,6 +43,11 @@ async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, r
     setRemoteAlbumCollections(collectionsResult.collections, {
       reason: collectionsResult.reason,
     })
+  }
+
+  const eventsResult = await fetchAlbumEventsSafe()
+  if (eventsResult.events) {
+    setRemoteAlbumEvents(eventsResult.events, { reason: eventsResult.reason })
   }
 
   setSupabaseAuth({

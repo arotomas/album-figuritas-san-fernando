@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { DEBUG_GPS } from '../../config/gps'
-import { useQaMode } from '../../utils/qaMode'
+import { isDebugGpsEnabled } from '../../qa/qaCore'
 import { useGpsDiagnostics } from '../../hooks/useGpsDiagnostics'
 import {
   buildGpsDiagnosticReport,
@@ -243,8 +242,10 @@ function GpsDiagnosticPanelInner({
 }
 
 export function GpsDiagnosticPanel(props) {
-  const { isQaActive } = useQaMode()
-  const visible = DEBUG_GPS || isQaActive
-  if (!visible) return null
-  return <GpsDiagnosticPanelInner {...props} defaultExpanded={DEBUG_GPS} />
+  return (
+    <GpsDiagnosticPanelInner
+      {...props}
+      defaultExpanded={isDebugGpsEnabled()}
+    />
+  )
 }

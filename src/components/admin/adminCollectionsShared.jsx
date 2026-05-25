@@ -15,6 +15,7 @@ export const UNLOCK_CONDITION_OPTIONS = [
   { value: UNLOCK_CONDITION.ALWAYS, label: 'Siempre' },
   { value: UNLOCK_CONDITION.NIGHT_ONLY, label: 'Solo de noche' },
   { value: UNLOCK_CONDITION.WEEKEND_ONLY, label: 'Solo fin de semana' },
+  { value: UNLOCK_CONDITION.EVENT_ACTIVE, label: 'Solo con evento activo' },
 ]
 
 export const COLLECTION_TRACK_OPTIONS = [

@@ -29,13 +29,15 @@ import {
   enrichFigureWithCollection,
   getAlbumGlobalProgress,
   getBonusCollectionGroups,
-  getEventCollectionGroups,
+  getLiveEventCollectionGroups,
+  getArchivedEventCollectionGroups,
   getMainAlbumCollectionGroups,
   detectCollectionCompletionTransition,
   detectCollectionDiscoveryTransition,
 } from '../utils/collectionModel'
 import { useAlbumCollectionsBootstrap } from '../hooks/useAlbumCollectionsBootstrap'
 import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailability'
+import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
 import { getMapProximityHint } from '../utils/proximityExperience'
 
 const STATUS_LABELS = {
@@ -215,18 +217,38 @@ export function MyFiguresScreen() {
     () => getBonusCollectionGroups(sanitizedFigures, availabilityOptions),
     [sanitizedFigures, availabilityOptions],
   )
-  const eventCollectionGroups = useMemo(
-    () => getEventCollectionGroups(sanitizedFigures, availabilityOptions),
+  const liveEventCollectionGroups = useMemo(
+    () => getLiveEventCollectionGroups(sanitizedFigures, availabilityOptions),
+    [sanitizedFigures, availabilityOptions],
+  )
+  const archivedEventCollectionGroups = useMemo(
+    () => getArchivedEventCollectionGroups(sanitizedFigures, availabilityOptions),
     [sanitizedFigures, availabilityOptions],
   )
   const globalProgress = useMemo(
     () => getAlbumGlobalProgress(sanitizedFigures, availabilityOptions),
     [sanitizedFigures, availabilityOptions],
   )
+
+  useEffect(() => {
+    logAlbumAvailabilitySnapshot(sanitizedFigures, availabilityOptions)
+  }, [sanitizedFigures, availabilityOptions])
+
   const openCollectionGroup = useMemo(() => {
-    const groups = [...mainCollectionGroups, ...bonusCollectionGroups, ...eventCollectionGroups]
+    const groups = [
+      ...mainCollectionGroups,
+      ...bonusCollectionGroups,
+      ...liveEventCollectionGroups,
+      ...archivedEventCollectionGroups,
+    ]
     return groups.find((group) => group.collection.id === openCollectionId) ?? null
-  }, [mainCollectionGroups, bonusCollectionGroups, eventCollectionGroups, openCollectionId])
+  }, [
+    mainCollectionGroups,
+    bonusCollectionGroups,
+    liveEventCollectionGroups,
+    archivedEventCollectionGroups,
+    openCollectionId,
+  ])
   const bonusFiguresTotal = useMemo(
     () => bonusCollectionGroups.reduce((sum, group) => sum + group.figures.length, 0),
     [bonusCollectionGroups],
@@ -264,11 +286,11 @@ export function MyFiguresScreen() {
     const bonus = bonusCollectionGroups.flatMap((group) =>
       group.figures.filter((figure) => figure.obtenida),
     )
-    const eventFigures = eventCollectionGroups.flatMap((group) =>
-      group.figures.filter((figure) => figure.obtenida),
+    const eventFigures = [...liveEventCollectionGroups, ...archivedEventCollectionGroups].flatMap(
+      (group) => group.figures.filter((figure) => figure.obtenida),
     )
     return [...main, ...bonus, ...eventFigures].map(enrichFigureWithCollection)
-  }, [mainFigures, bonusCollectionGroups, eventCollectionGroups])
+  }, [mainFigures, bonusCollectionGroups, liveEventCollectionGroups, archivedEventCollectionGroups])
 
   const sheetFigure = useMemo(
     () =>
@@ -457,38 +479,85 @@ export function MyFiguresScreen() {
           </div>
         </section>
 
-        {eventCollectionGroups.length > 0 && (
-          <section className="album-page-shell mx-auto mt-3 w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
+        {liveEventCollectionGroups.length > 0 && (
+          <section className="album-page-shell album-event-page mx-auto mt-3 w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
             <div className="mb-3 flex items-center justify-between px-1">
               <h2 className="font-display text-sm font-bold uppercase tracking-wide text-sky-100/90">
                 Eventos
               </h2>
             </div>
             <div className="space-y-5">
-              {eventCollectionGroups.map(({ collection, figures, progress }) => (
-                <m.section
-                  key={collection.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  className="album-collection-section"
-                >
-                  <CollectionSectionHeader
-                    progress={progress}
-                    onOpen={() => handleOpenCollection(collection.id)}
-                  />
-                  <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {figures.map((figure) => (
-                      <AlbumSlotCard
-                        key={figure.id}
-                        figure={figure}
-                        isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
-                        onSelect={handleSelect}
-                      />
-                    ))}
-                  </div>
-                </m.section>
-              ))}
+              {liveEventCollectionGroups.map(
+                ({ collection, figures, progress, countdownLabel, event }) => (
+                  <m.section
+                    key={collection.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="album-collection-section"
+                  >
+                    <CollectionSectionHeader
+                      progress={progress}
+                      variant="event"
+                      countdownLabel={countdownLabel}
+                      eventBadge={event?.badge}
+                      onOpen={() => handleOpenCollection(collection.id)}
+                    />
+                    <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {figures.map((figure) => (
+                        <AlbumSlotCard
+                          key={figure.id}
+                          figure={figure}
+                          isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
+                          onSelect={handleSelect}
+                        />
+                      ))}
+                    </div>
+                  </m.section>
+                ),
+              )}
+            </div>
+          </section>
+        )}
+
+        {archivedEventCollectionGroups.length > 0 && (
+          <section className="album-page-shell mx-auto mt-3 w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wide text-white/40">
+                Eventos pasados
+              </h2>
+            </div>
+            <div className="space-y-5">
+              {archivedEventCollectionGroups.map(
+                ({ collection, figures, progress, countdownLabel, event }) => (
+                  <m.section
+                    key={collection.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    className="album-collection-section"
+                  >
+                    <CollectionSectionHeader
+                      progress={progress}
+                      variant="event"
+                      archived
+                      countdownLabel={countdownLabel}
+                      eventBadge={event?.badge}
+                      onOpen={() => handleOpenCollection(collection.id)}
+                    />
+                    <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {figures.map((figure) => (
+                        <AlbumSlotCard
+                          key={figure.id}
+                          figure={figure}
+                          isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
+                          onSelect={handleSelect}
+                        />
+                      ))}
+                    </div>
+                  </m.section>
+                ),
+              )}
             </div>
           </section>
         )}

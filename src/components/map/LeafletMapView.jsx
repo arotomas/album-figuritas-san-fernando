@@ -15,6 +15,7 @@ import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
+import { logGpsSnapshot } from '../../utils/universeDiagnostics'
 import { FIGURE_ALERT_COOLDOWN_MS } from '../../config/proximity'
 import { vibrateFigureProximityAlert } from '../../utils/vibration'
 import { prefersReducedMotion } from '../../utils/performance'
@@ -22,7 +23,8 @@ import { FigureMarker } from './FigureMarker'
 import { UserLocationDot } from './UserLocationDot'
 import { NearFigureOverlay } from './NearFigureOverlay'
 import { MapGpsStatus } from './MapGpsStatus'
-import { GpsDiagnosticPanel } from './GpsDiagnosticPanel'
+import { GeoPolicyBanner } from './GeoPolicyBanner'
+import { MapQaOverlay } from '../qa/MapQaOverlay'
 import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
 
 import 'leaflet/dist/leaflet.css'
@@ -240,6 +242,7 @@ function LeafletMapViewInner({
     showPreciseLocationHelp,
     acquisitionStatus,
     acquisitionMessage,
+    isWatching,
     retryPreciseLocation,
     requestSingleFix,
     startTracking,
@@ -338,6 +341,30 @@ function LeafletMapViewInner({
     }
   }, [nearFigure, onBonusDiscovered, onNearFigureChange, visibleFigureIds])
 
+  useEffect(() => {
+    logGpsSnapshot({
+      geolocationAvailable,
+      isWatching,
+      mapPosition,
+      proximityPosition,
+      gpsPhase,
+      gpsStatusLabel,
+      qualityState,
+      nearFigureId: nearFigure?.id ?? null,
+      proximityFigureCount: proximityFigures?.length ?? 0,
+    })
+  }, [
+    geolocationAvailable,
+    gpsPhase,
+    gpsStatusLabel,
+    isWatching,
+    mapPosition,
+    nearFigure,
+    proximityFigures?.length,
+    proximityPosition,
+    qualityState,
+  ])
+
   const showAcquisitionBanner =
     (acquisitionStatus === 'initializing' ||
       acquisitionStatus === 'waiting' ||
@@ -426,6 +453,8 @@ function LeafletMapViewInner({
         />
       )}
 
+      <GeoPolicyBanner position={mapPosition} />
+
       {showGpsBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
@@ -512,7 +541,7 @@ function LeafletMapViewInner({
         </button>
       )}
 
-      <GpsDiagnosticPanel
+      <MapQaOverlay
         geolocationAvailable={geolocationAvailable}
         permission={permission}
         trustedPosition={trustedPosition}
@@ -526,6 +555,9 @@ function LeafletMapViewInner({
         rawNearest={rawNearest}
         isNearFigure={isNearFigure}
         nearFigure={nearFigure}
+        mapPosition={mapPosition}
+        isWatching={isWatching}
+        figures={figures}
       />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">

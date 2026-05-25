@@ -6,7 +6,9 @@ import {
   toggleCollectionActive,
   updateCollectionAdmin,
 } from '../../services/supabase/collections'
+import { getEventsAdmin } from '../../services/supabase/events'
 import { setRemoteAlbumCollections } from '../../utils/collectionRegistry'
+import { setRemoteAlbumEvents } from '../../utils/eventRegistry'
 import { useAlbumCollectionsBootstrap } from '../../hooks/useAlbumCollectionsBootstrap'
 import {
   AdminErrorBanner,
@@ -24,11 +26,13 @@ import {
   UNLOCK_CONDITION_OPTIONS,
   validateCollectionForm,
 } from '../../components/admin/adminCollectionsShared'
+import { getEventSelectOptions } from '../../components/admin/adminEventsShared'
 
 export function AdminCollectionsPage() {
   useAlbumCollectionsBootstrap(true)
 
   const [collections, setCollections] = useState([])
+  const [eventOptions, setEventOptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -44,9 +48,11 @@ export function AdminCollectionsPage() {
     if (!silent) setLoading(true)
     setError(null)
     try {
-      const rows = await getCollectionsAdmin()
+      const [rows, events] = await Promise.all([getCollectionsAdmin(), getEventsAdmin()])
       setCollections(rows)
+      setEventOptions(getEventSelectOptions(events))
       setRemoteAlbumCollections(rows.filter((item) => item.active), { reason: 'admin-refresh' })
+      setRemoteAlbumEvents(events.filter((item) => item.active), { reason: 'admin-refresh' })
     } catch (loadError) {
       setError(loadError?.message ?? 'No pudimos cargar las colecciones.')
     } finally {
@@ -325,12 +331,19 @@ export function AdminCollectionsPage() {
               </select>
             </label>
             <label className="block text-xs font-bold uppercase tracking-wide text-muted">
-              Event ID
-              <input
+              Evento vinculado
+              <select
                 value={form.event_id}
                 onChange={(event) => updateForm('event_id', event.target.value)}
                 className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
-              />
+              >
+                <option value="">Sin evento (fechas propias)</option>
+                {eventOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block text-xs font-bold uppercase tracking-wide text-muted">
               Disponible desde

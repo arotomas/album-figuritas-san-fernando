@@ -1,4 +1,11 @@
 import { COLLECTION_VISIBILITY } from '../config/albumCollections'
+import { getEventById } from './eventRegistry'
+import {
+  EVENT_LIFECYCLE,
+  isEventLifecycleCurrent,
+  isEventLifecyclePast,
+  resolveEventLifecycle,
+} from './eventLifecycle'
 
 export const COLLECTION_AVAILABILITY_REASON = {
   PUBLIC: 'public',
@@ -16,6 +23,7 @@ export const UNLOCK_CONDITION = {
   ALWAYS: 'always',
   NIGHT_ONLY: 'night_only',
   WEEKEND_ONLY: 'weekend_only',
+  EVENT_ACTIVE: 'event_active',
 }
 
 /** conditional + hidden_until_discovered → “descubierta al revelar”. */
@@ -34,7 +42,37 @@ export function isStrictHiddenCollection(collection) {
   )
 }
 
-export function evaluateUnlockCondition(condition, now = new Date()) {
+export function collectionHasExplicitTimeOverride(collection) {
+  return Boolean(collection?.availableFrom || collection?.availableUntil)
+}
+
+/** Evento = source of truth temporal salvo override explícito en colección. */
+export function resolveCollectionTimeWindow(collection, context = buildAvailabilityContext()) {
+  const linkedEvent = collection?.eventId ? getEventById(collection.eventId) : null
+  const hasOverride = collectionHasExplicitTimeOverride(collection)
+
+  if (linkedEvent && !hasOverride) {
+    return {
+      source: 'event',
+      event: linkedEvent,
+      lifecycle: resolveEventLifecycle(linkedEvent, context.now),
+      startsAt: linkedEvent.startsAt ?? null,
+      endsAt: linkedEvent.endsAt ?? null,
+      active: linkedEvent.active !== false,
+    }
+  }
+
+  return {
+    source: hasOverride ? 'collection-override' : linkedEvent ? 'collection' : 'none',
+    event: linkedEvent,
+    lifecycle: linkedEvent ? resolveEventLifecycle(linkedEvent, context.now) : null,
+    startsAt: collection?.availableFrom ?? null,
+    endsAt: collection?.availableUntil ?? null,
+    active: collection?.active !== false,
+  }
+}
+
+export function evaluateUnlockCondition(condition, now = new Date(), context = {}) {
   const key = String(condition ?? UNLOCK_CONDITION.ALWAYS).trim()
   if (!key || key === UNLOCK_CONDITION.ALWAYS) return true
   if (key === UNLOCK_CONDITION.NIGHT_ONLY) {
@@ -45,10 +83,16 @@ export function evaluateUnlockCondition(condition, now = new Date()) {
     const day = now.getDay()
     return day === 0 || day === 6
   }
-  return true
+  if (key === UNLOCK_CONDITION.EVENT_ACTIVE) {
+    const eventId = context.eventId ?? context.collectionEventId
+    if (!eventId) return Boolean(context.activeEventSet?.size)
+    return context.activeEventSet?.has(String(eventId)) ?? false
+  }
+  return Boolean(context[key])
 }
 
-export function buildUnlockContext(now = new Date()) {
+export function buildUnlockContext(now = new Date(), activeEventIds = []) {
+  const activeEventSet = new Set(activeEventIds.map(String))
   return {
     always: true,
     [UNLOCK_CONDITION.ALWAYS]: true,
@@ -57,11 +101,14 @@ export function buildUnlockContext(now = new Date()) {
       UNLOCK_CONDITION.WEEKEND_ONLY,
       now,
     ),
+    activeEventIds: [...activeEventSet],
+    activeEventSet,
   }
 }
 
 export function buildAvailabilityContext({
   discoveredCollectionIds = [],
+  activeEventIds = [],
   debugReveal = false,
   now = Date.now(),
 } = {}) {
@@ -74,7 +121,7 @@ export function buildAvailabilityContext({
     debugReveal: Boolean(debugReveal),
     now,
     nowDate,
-    ...buildUnlockContext(nowDate),
+    ...buildUnlockContext(nowDate, activeEventIds),
   }
 }
 
@@ -83,37 +130,51 @@ export function resolveCollectionAvailability(collection, context = buildAvailab
     return { visible: false, reason: COLLECTION_AVAILABILITY_REASON.HIDDEN, collection: null }
   }
 
+  const timeWindow = resolveCollectionTimeWindow(collection, context)
+  const lifecycle = timeWindow.lifecycle
+
   if (context.debugReveal) {
     return {
       visible: true,
       reason: COLLECTION_AVAILABILITY_REASON.DEBUG,
       collection,
+      timeWindow,
+      lifecycle,
     }
   }
 
-  if (collection.active === false) {
+  if (timeWindow.active === false) {
     return {
       visible: false,
       reason: COLLECTION_AVAILABILITY_REASON.INACTIVE,
       collection,
+      timeWindow,
+      lifecycle,
+      showArchived: Boolean(lifecycle && isEventLifecyclePast(lifecycle)),
     }
   }
 
-  if (collection.availableFrom && context.now < Date.parse(collection.availableFrom)) {
+  if (timeWindow.startsAt && context.now < Date.parse(timeWindow.startsAt)) {
     return {
       visible: false,
       reason: COLLECTION_AVAILABILITY_REASON.BEFORE_WINDOW,
       collection,
-      startsAt: collection.availableFrom,
+      timeWindow,
+      lifecycle,
+      startsAt: timeWindow.startsAt,
+      showUpcoming: lifecycle === EVENT_LIFECYCLE.UPCOMING,
     }
   }
 
-  if (collection.availableUntil && context.now > Date.parse(collection.availableUntil)) {
+  if (timeWindow.endsAt && context.now > Date.parse(timeWindow.endsAt)) {
     return {
       visible: false,
       reason: COLLECTION_AVAILABILITY_REASON.AFTER_WINDOW,
       collection,
-      endsAt: collection.availableUntil,
+      timeWindow,
+      lifecycle,
+      endsAt: timeWindow.endsAt,
+      showArchived: true,
     }
   }
 
@@ -121,12 +182,18 @@ export function resolveCollectionAvailability(collection, context = buildAvailab
   if (
     unlockCondition &&
     unlockCondition !== UNLOCK_CONDITION.ALWAYS &&
-    !context[unlockCondition]
+    !evaluateUnlockCondition(unlockCondition, context.nowDate, {
+      ...context,
+      eventId: collection.eventId,
+      collectionEventId: collection.eventId,
+    })
   ) {
     return {
       visible: false,
       reason: COLLECTION_AVAILABILITY_REASON.UNLOCK_BLOCKED,
       collection,
+      timeWindow,
+      lifecycle,
       unlockCondition,
     }
   }
@@ -138,6 +205,8 @@ export function resolveCollectionAvailability(collection, context = buildAvailab
       visible: false,
       reason: COLLECTION_AVAILABILITY_REASON.HIDDEN,
       collection,
+      timeWindow,
+      lifecycle,
     }
   }
 
@@ -148,12 +217,16 @@ export function resolveCollectionAvailability(collection, context = buildAvailab
         visible: true,
         reason: COLLECTION_AVAILABILITY_REASON.DISCOVERED,
         collection,
+        timeWindow,
+        lifecycle,
       }
     }
     return {
       visible: false,
       reason: COLLECTION_AVAILABILITY_REASON.NOT_DISCOVERED,
       collection,
+      timeWindow,
+      lifecycle,
     }
   }
 
@@ -161,11 +234,37 @@ export function resolveCollectionAvailability(collection, context = buildAvailab
     visible: true,
     reason: COLLECTION_AVAILABILITY_REASON.PUBLIC,
     collection,
+    timeWindow,
+    lifecycle,
   }
 }
 
 export function isCollectionVisible(collection, context) {
   return resolveCollectionAvailability(collection, context).visible
+}
+
+/** Visible en sección activa/próxima de eventos. */
+export function isCollectionVisibleInLiveEvents(collection, context) {
+  const availability = resolveCollectionAvailability(collection, context)
+  if (availability.visible) return true
+  if (availability.showUpcoming && availability.lifecycle === EVENT_LIFECYCLE.UPCOMING) {
+    return true
+  }
+  return false
+}
+
+/** Visible en sección archivada de eventos. */
+export function isCollectionVisibleInArchivedEvents(collection, context) {
+  const availability = resolveCollectionAvailability(collection, context)
+  if (!availability.showArchived) return false
+  const lifecycle = availability.lifecycle ?? availability.timeWindow?.lifecycle
+  return isEventLifecyclePast(lifecycle) || availability.reason === COLLECTION_AVAILABILITY_REASON.AFTER_WINDOW
+}
+
+export function isCollectionVisibleInCurrentEvents(collection, context) {
+  const availability = resolveCollectionAvailability(collection, context)
+  const lifecycle = availability.lifecycle ?? availability.timeWindow?.lifecycle
+  return isEventLifecycleCurrent(lifecycle) || availability.visible
 }
 
 export function getCollectionAvailabilityLabel(availability) {

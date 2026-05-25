@@ -1,32 +1,40 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { useQaMode } from '../utils/qaMode'
+import { useQaCore } from '../qa/useQaCore'
 import { buildAvailabilityContext } from '../utils/collectionAvailability'
+import { getActiveEventIds } from '../utils/eventRegistry'
+import { useAvailabilityTick } from './useAvailabilityTick'
 
 /** Contexto unificado de availability para álbum, dashboard y progreso. */
 export function useCollectionAvailabilityContext() {
   const discoveredCollectionIds = useAppStore((state) => state.discoveredCollectionIds)
-  const { isQaActive } = useQaMode()
+  const { features } = useQaCore()
+  const now = useAvailabilityTick({ enabled: true })
 
   return useMemo(
     () =>
       buildAvailabilityContext({
         discoveredCollectionIds,
-        debugReveal: isQaActive,
+        activeEventIds: getActiveEventIds(now),
+        debugReveal: features.debugReveal,
+        now,
       }),
-    [discoveredCollectionIds, isQaActive],
+    [discoveredCollectionIds, features.debugReveal, now],
   )
 }
 
 export function useCollectionAvailabilityOptions() {
   const discoveredCollectionIds = useAppStore((state) => state.discoveredCollectionIds)
-  const { isQaActive } = useQaMode()
+  const { features } = useQaCore()
+  const now = useAvailabilityTick({ enabled: true })
 
   return useMemo(
     () => ({
       discoveredCollectionIds,
-      debugReveal: isQaActive,
+      activeEventIds: getActiveEventIds(now),
+      debugReveal: features.debugReveal,
+      now,
     }),
-    [discoveredCollectionIds, isQaActive],
+    [discoveredCollectionIds, features.debugReveal, now],
   )
 }

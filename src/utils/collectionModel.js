@@ -11,8 +11,13 @@ import {
 import {
   buildAvailabilityContext,
   isCollectionVisible,
+  isCollectionVisibleInArchivedEvents,
+  isCollectionVisibleInLiveEvents,
   requiresCollectionDiscovery,
+  resolveCollectionAvailability,
 } from './collectionAvailability'
+import { getEventById } from './eventRegistry'
+import { getEventCountdownLabel, resolveEventLifecycle } from './eventLifecycle'
 import { getBonusFigures, getMainProgressState, getRevealedNormalFigures, isBonusFigure } from './figureGameRules'
 
 export function resolveFigureCollectionId(figure) {
@@ -158,6 +163,69 @@ export function getEventCollectionGroups(figures, availabilityOptions = {}) {
     ...availabilityOptions,
     track: COLLECTION_TRACK.EVENT,
   })
+}
+
+function enrichEventGroup(group, context) {
+  const event = group.collection?.eventId ? getEventById(group.collection.eventId) : null
+  const availability = resolveCollectionAvailability(group.collection, context)
+  const lifecycle =
+    availability.lifecycle ??
+    availability.timeWindow?.lifecycle ??
+    (event ? resolveEventLifecycle(event, context.now) : null)
+
+  return {
+    ...group,
+    event,
+    availability,
+    lifecycle,
+    countdownLabel: getEventCountdownLabel(event, { now: context.now }),
+  }
+}
+
+export function getLiveEventCollectionGroups(figures, availabilityOptions = {}) {
+  const context = resolveAvailabilityContext(availabilityOptions)
+  const enriched = enrichFiguresWithCollections(figures)
+
+  return getCollectionList({ track: COLLECTION_TRACK.EVENT })
+    .map((collection) => {
+      if (!isCollectionVisibleInLiveEvents(collection, context)) return null
+
+      const items = enriched.filter(
+        (figure) => resolveFigureCollectionId(figure) === collection.id,
+      )
+      if (items.length === 0) return null
+
+      const group = {
+        collection,
+        figures: items,
+        progress: getCollectionProgressState(enriched, collection.id),
+      }
+      return enrichEventGroup(group, context)
+    })
+    .filter(Boolean)
+}
+
+export function getArchivedEventCollectionGroups(figures, availabilityOptions = {}) {
+  const context = resolveAvailabilityContext(availabilityOptions)
+  const enriched = enrichFiguresWithCollections(figures)
+
+  return getCollectionList({ track: COLLECTION_TRACK.EVENT })
+    .map((collection) => {
+      if (!isCollectionVisibleInArchivedEvents(collection, context)) return null
+
+      const items = enriched.filter(
+        (figure) => resolveFigureCollectionId(figure) === collection.id,
+      )
+      if (items.length === 0) return null
+
+      const group = {
+        collection,
+        figures: items,
+        progress: getCollectionProgressState(enriched, collection.id),
+      }
+      return enrichEventGroup(group, context)
+    })
+    .filter(Boolean)
 }
 
 export function getAllCollectionProgress(

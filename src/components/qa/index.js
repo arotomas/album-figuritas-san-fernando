@@ -1,3 +1,8 @@
 export { AppErrorBoundary } from './AppErrorBoundary'
 export { ConnectionStatus } from './ConnectionStatus'
+export { MapQaOverlay } from './MapQaOverlay'
 export { PermissionFallback } from './PermissionFallback'
+export { QaBadge } from './QaBadge'
+export { QaDevShell } from './QaDevShell'
+export { QaLauncher } from './QaLauncher'
+export { QaLocationPanel } from './QaLocationPanel'

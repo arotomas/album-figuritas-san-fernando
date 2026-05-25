@@ -9,6 +9,7 @@ import {
   getMainProgressState,
   getPlayerMapFigures,
 } from '../utils/figureGameRules'
+import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -44,6 +45,13 @@ export function MapScreen() {
   }, [])
 
   useEffect(() => {
+    logMapFigurePipeline({
+      figures,
+      visiblePlayerFigures,
+      mapFigures,
+      proximityFigures,
+      discoveredBonusIds,
+    })
     console.info('[map-figures]', 'render input', JSON.stringify({
       storedCount: figures.length,
       renderedCount: mapFigures.length,

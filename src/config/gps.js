@@ -1,6 +1,6 @@
 /** Configuración GPS — optimizada para mobile urbano / caminando */
 
-/** Diagnóstico GPS: false en producción; activar con VITE_DEBUG_GPS=true o ?qa=1 */
+/** Diagnóstico GPS build-time — runtime: `isDebugGpsEnabled()` en `src/qa/qaCore.js` */
 export const DEBUG_GPS =
   typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEBUG_GPS === 'true'
 
@@ -63,7 +63,7 @@ export const GPS_HARD_ERROR_MS = 12_000
 /** Timeouts consecutivos sin fix antes de aviso fuerte */
 export const GPS_MAX_TIMEOUTS_BEFORE_WARN = 4
 
-/** Bounds aproximados San Fernando + margen (validar fix no absurdos) */
+/** Bounds aproximados San Fernando + margen — geometría del área principal. */
 export const SF_BOUNDS = {
   minLat: -34.48,
   maxLat: -34.40,
@@ -71,6 +71,7 @@ export const SF_BOUNDS = {
   maxLng: -58.52,
 }
 
+/** Geometría pura del área principal — usar geoPolicy para decisiones de aceptación. */
 export function isWithinSanFernandoArea(lat, lng) {
   return (
     lat >= SF_BOUNDS.minLat &&
@@ -80,21 +81,23 @@ export function isWithinSanFernandoArea(lat, lng) {
   )
 }
 
-export function getAccuracyTier(accuracyMeters) {
+export function getAccuracyTier(accuracyMeters, { acceptMaxAccuracyM } = {}) {
+  const acceptMax = acceptMaxAccuracyM ?? GPS_ACCEPT_MAX_ACCURACY_M
   if (accuracyMeters == null) return 'none'
   if (accuracyMeters <= GPS_CAPTURE_MAX_ACCURACY_M) return 'high'
   if (accuracyMeters <= GPS_PROXIMITY_MAX_ACCURACY_M) return 'medium'
-  if (accuracyMeters <= GPS_ACCEPT_MAX_ACCURACY_M) return 'low'
+  if (accuracyMeters <= acceptMax) return 'low'
   return 'poor'
 }
 
 /** Estado de calidad para UX y panel DEV */
-export function getGpsQualityState(position) {
+export function getGpsQualityState(position, { acceptMaxAccuracyM } = {}) {
   if (!position) return 'searching'
 
   const { accuracy } = position
+  const acceptMax = acceptMaxAccuracyM ?? GPS_ACCEPT_MAX_ACCURACY_M
 
-  if (accuracy > GPS_ACCEPT_MAX_ACCURACY_M) return 'searching'
+  if (accuracy > acceptMax) return 'searching'
   if (accuracy > GPS_PROXIMITY_MAX_ACCURACY_M) return 'refining'
   if (accuracy > GPS_CAPTURE_MAX_ACCURACY_M) return 'proximity'
   return 'capture_ready'

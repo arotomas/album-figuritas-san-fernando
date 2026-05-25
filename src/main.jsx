@@ -3,11 +3,11 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AppErrorBoundary } from './components/qa/AppErrorBoundary.jsx'
-import { syncQaModeFromUrl } from './utils/qaMode'
+import { syncQaFromUrl } from './qa/qaCore'
 import './lib/supabase.js'
 import './styles/index.css'
 
-syncQaModeFromUrl()
+syncQaFromUrl()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

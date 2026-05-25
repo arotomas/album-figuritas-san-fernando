@@ -9,6 +9,8 @@ import {
   toggleFigureActive,
   updateFigureAdmin,
 } from '../../services/supabase/adminDashboard'
+import { getEventsAdmin } from '../../services/supabase/events'
+import { getEventSelectOptions } from '../../components/admin/adminEventsShared'
 import {
   MARKER_ICON_MAX_BYTES,
   MARKER_ICON_MIME_TYPES,
@@ -29,7 +31,8 @@ import { CHALLENGE_TYPES, getFigureChallenge } from '../../utils/figureChallenge
 
 export function AdminFiguresPage() {
   const collectionsMeta = useAlbumCollectionsBootstrap(true)
-  const collectionOptions = useMemo(() => getCollectionOptions(), [collectionsMeta.source])
+  const collectionOptions = useMemo(() => getCollectionOptions(), [collectionsMeta])
+  const [eventOptions, setEventOptions] = useState([])
   const [figures, setFigures] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -65,6 +68,12 @@ export function AdminFiguresPage() {
   useEffect(() => {
     void loadFigures()
   }, [loadFigures])
+
+  useEffect(() => {
+    void getEventsAdmin()
+      .then((rows) => setEventOptions(getEventSelectOptions(rows)))
+      .catch(() => setEventOptions([]))
+  }, [])
 
   const filteredFigures = useMemo(
     () =>
@@ -588,13 +597,19 @@ export function AdminFiguresPage() {
                     </p>
                     <div className="mt-2 grid grid-cols-1 gap-3">
                       <label className="block text-xs font-bold uppercase tracking-wide text-muted">
-                        Event ID
-                        <input
+                        Evento vinculado
+                        <select
                           value={figureForm.event_id}
                           onChange={(event) => updateFigureForm('event_id', event.target.value)}
-                          placeholder="verano-2026"
                           className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
-                        />
+                        >
+                          <option value="">Sin evento</option>
+                          {eventOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </label>
                       <div className="grid grid-cols-2 gap-3">
                         <label className="block text-xs font-bold uppercase tracking-wide text-muted">

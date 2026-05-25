@@ -3,14 +3,13 @@ import { getCurrentPosition, watchPosition } from '../services/geoService'
 import { throttle } from '../utils/performance'
 import { cancelScheduled } from '../utils/cleanup'
 import { classifyGeoError } from '../utils/recovery'
-import { getQaState, subscribeQaState } from '../utils/diagnostics'
+import { getQaRuntimeState, subscribeQaRuntime } from '../qa/qaState'
 import { useGpsRecovery } from './useGpsRecovery'
 import {
   GPS_HIGH_ACCURACY_OPTIONS,
   GPS_HARD_ERROR_MS,
   GPS_MAX_TIMEOUTS_BEFORE_WARN,
   GPS_UPDATE_INTERVAL_MS,
-  GPS_ACCEPT_MAX_ACCURACY_M,
   GPS_PROXIMITY_MAX_ACCURACY_M,
   GPS_INITIAL_FIX_RETRY_MS,
   GPS_INITIAL_FIX_MAX_ATTEMPTS,
@@ -19,7 +18,6 @@ import {
   GPS_STALLED_LABEL,
   GPS_ACQUISITION_LABEL,
   GPS_NO_FIX_MESSAGE,
-  DEBUG_GPS,
   canUseProximity,
   canUseCaptureProximity,
   getAccuracyTier,
@@ -27,7 +25,6 @@ import {
   getGpsPhase,
   getGpsQualityState,
   getGpsStatusLabel,
-  isWithinSanFernandoArea,
 } from '../config/gps'
 import {
   estimateFixSource,
@@ -40,14 +37,23 @@ import {
 import { gpsLog } from '../utils/gpsLog'
 import { patchGpsDiagnostics, getGpsDiagnostics } from '../utils/gpsDiagnostics'
 import { saveLastKnownPosition, clearLastKnownPosition } from '../utils/lastKnownPosition'
+import {
+  getEffectiveAcceptMaxAccuracyM,
+  isAcceptedGpsPosition,
+} from '../qa/qaLocation'
+import {
+  allowsPreviewOutsidePrimaryArea,
+  isPositionInPlayableArea,
+  isWithinPrimaryArea,
+  shouldRejectFixForGeoPolicy,
+} from '../geo/geoPolicy'
+import { isDebugGpsLoggingEnabled } from '../qa/qaCore'
 
 const GEOLOCATION_AVAILABLE =
   typeof navigator !== 'undefined' && Boolean(navigator.geolocation)
 
 function isAcceptedPosition(position) {
-  if (!position) return false
-  if (position.accuracy > GPS_ACCEPT_MAX_ACCURACY_M) return false
-  return isWithinSanFernandoArea(position.lat, position.lng)
+  return isAcceptedGpsPosition(position)
 }
 
 /**
@@ -190,8 +196,9 @@ export function useGeolocation(options = {}) {
   markAnyFixReceivedRef.current = markAnyFixReceived
 
   const syncDerivedState = useCallback((nextPosition, refining) => {
-    const tier = getAccuracyTier(nextPosition?.accuracy)
-    const quality = getGpsQualityState(nextPosition)
+    const acceptMax = getEffectiveAcceptMaxAccuracyM()
+    const tier = getAccuracyTier(nextPosition?.accuracy, { acceptMaxAccuracyM: acceptMax })
+    const quality = getGpsQualityState(nextPosition, { acceptMaxAccuracyM: acceptMax })
     const hasPosition = Boolean(nextPosition)
     const phase = getGpsPhase({
       hasPosition,
@@ -358,7 +365,7 @@ export function useGeolocation(options = {}) {
 
       markAnyFixReceivedRef.current?.()
 
-      if (DEBUG_GPS || import.meta.env.DEV) {
+      if (isDebugGpsLoggingEnabled()) {
         gpsLog.rawReading({ ...next, apiSource, phase })
       }
 
@@ -376,17 +383,18 @@ export function useGeolocation(options = {}) {
         geolocationAvailable: GEOLOCATION_AVAILABLE,
       })
 
-      if (isWithinSanFernandoArea(next.lat, next.lng)) {
+      if (isWithinPrimaryArea(next.lat, next.lng) || allowsPreviewOutsidePrimaryArea()) {
         setPreviewPosition(next)
         patchGpsDiagnostics({ previewPosition: next, lastRawReading: next })
       }
 
-      if (!isWithinSanFernandoArea(next.lat, next.lng)) {
+      if (shouldRejectFixForGeoPolicy(next.lat, next.lng)) {
         recordDiscard(next, 'outside_bounds', { source, phase, apiSource })
         return false
       }
 
-      if (next.accuracy > GPS_ACCEPT_MAX_ACCURACY_M) {
+      const acceptMax = getEffectiveAcceptMaxAccuracyM()
+      if (next.accuracy > acceptMax) {
         recordDiscard(next, 'accuracy_too_poor', { source, phase, apiSource })
         return false
       }
@@ -434,7 +442,7 @@ export function useGeolocation(options = {}) {
   }
 
   const applyMockIfNeeded = useCallback(() => {
-    const mock = getQaState().mockPosition
+    const mock = getQaRuntimeState().mockPosition
     if (mock) {
       const normalized = {
         ...mock,
@@ -686,7 +694,7 @@ export function useGeolocation(options = {}) {
   }, [handleWatchError, ingestPosition, scheduleStallCheck])
 
   const startWatching = useCallback(() => {
-    if (getQaState().forcePermissionDenied) {
+    if (getQaRuntimeState().forcePermissionDenied) {
       setError('Permiso de ubicación denegado (simulado).')
       setErrorType('denied')
       setIsLoading(false)
@@ -845,9 +853,9 @@ export function useGeolocation(options = {}) {
     queryPermission()
     startWatching()
 
-    const unsubQa = subscribeQaState(() => {
-      if (getQaState().mockPosition) applyMockIfNeeded()
-      else if (getQaState().forcePermissionDenied) startWatchingRef.current?.()
+    const unsubQa = subscribeQaRuntime(() => {
+      if (getQaRuntimeState().mockPosition) applyMockIfNeeded()
+      else if (getQaRuntimeState().forcePermissionDenied) startWatchingRef.current?.()
     })
 
     return () => {
@@ -867,11 +875,12 @@ export function useGeolocation(options = {}) {
   const mapPosition = position ?? previewPosition
   const proximityPosition = canUseCaptureProximity(mapPosition) ? mapPosition : null
   const hasUsablePosition = Boolean(proximityPosition)
+  const acceptMax = getEffectiveAcceptMaxAccuracyM()
   const showPreciseLocationHelp =
     permission === 'granted' &&
     !position &&
-    (lastRawReading?.accuracy > GPS_ACCEPT_MAX_ACCURACY_M ||
-      previewPosition?.accuracy > GPS_ACCEPT_MAX_ACCURACY_M)
+    (lastRawReading?.accuracy > acceptMax ||
+      previewPosition?.accuracy > acceptMax)
 
   return {
     position: mapPosition,

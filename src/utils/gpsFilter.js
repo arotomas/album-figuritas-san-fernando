@@ -1,8 +1,8 @@
 import { getDistanceMeters } from './geo'
 import {
-  GPS_ACCEPT_MAX_ACCURACY_M,
   GPS_FAST_MAX_AGE_MS,
 } from '../config/gps'
+import { getEffectiveAcceptMaxAccuracyM } from '../qa/qaLocation'
 
 /** Edad del fix respecto al reloj del dispositivo. */
 export function getFixAgeMs(position) {
@@ -45,7 +45,8 @@ export function isAbsurdJump(from, to, { maxSpeedMps = 12 } = {}) {
 export function rejectFixReason(current, next, { maximumAge = 0, isCoarsePhase = false } = {}) {
   if (!next) return 'empty'
 
-  if (next.accuracy > GPS_ACCEPT_MAX_ACCURACY_M) {
+  const acceptMax = getEffectiveAcceptMaxAccuracyM()
+  if (next.accuracy > acceptMax) {
     return 'accuracy_too_poor'
   }
 
@@ -78,7 +79,7 @@ export function shouldReplacePosition(current, next) {
 
   if (next.accuracy <= current.accuracy) return true
 
-  if (ageMs != null && ageMs > 12_000 && next.accuracy <= GPS_ACCEPT_MAX_ACCURACY_M) {
+  if (ageMs != null && ageMs > 12_000 && next.accuracy <= getEffectiveAcceptMaxAccuracyM()) {
     return true
   }
 
