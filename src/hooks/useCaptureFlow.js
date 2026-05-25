@@ -205,16 +205,13 @@ export function useCaptureFlow({
   }, [hasLiveGps, livePosition, resolvedFigure])
 
   const bootstrapDistanceMeters = useMemo(() => {
-    if (sessionSnapshot?.distanceToFigure != null) {
-      return sessionSnapshot.distanceToFigure
-    }
     if (bootstrapPosition && resolvedFigure) {
       return getDistanceToFigure(bootstrapPosition, resolvedFigure)
     }
     return null
-  }, [bootstrapPosition, resolvedFigure, sessionSnapshot?.distanceToFigure])
+  }, [bootstrapPosition, resolvedFigure])
 
-  /** El aro y la fase usan GPS en vivo; el snapshot solo arranca sin señal. */
+  /** Siempre recalcular desde coords en vivo; snapshot solo si aún no hay fix. */
   const ringDistanceMeters = liveDistanceMeters ?? bootstrapDistanceMeters
 
   const activeFigure = pendingFigureRef.current ?? pendingFigure ?? resolvedFigure
@@ -231,28 +228,18 @@ export function useCaptureFlow({
 
   const inCaptureRange = useMemo(() => {
     if (isRetake) return true
-    if (liveDistanceMeters != null) {
-      return isWithinCaptureRange(liveDistanceMeters, captureRadiusMeters)
-    }
-    if (bootstrapDistanceMeters != null) {
-      return isWithinCaptureRange(bootstrapDistanceMeters, captureRadiusMeters)
-    }
-    return false
-  }, [bootstrapDistanceMeters, captureRadiusMeters, isRetake, liveDistanceMeters])
+    if (ringDistanceMeters == null) return false
+    return isWithinCaptureRange(ringDistanceMeters, captureRadiusMeters)
+  }, [captureRadiusMeters, isRetake, ringDistanceMeters])
 
   const inDetectionRange = useMemo(() => {
     if (isRetake) return true
-    if (liveDistanceMeters != null) {
-      return isWithinDetectionRange(liveDistanceMeters, detectionRadiusMeters)
-    }
-    if (bootstrapDistanceMeters != null) {
-      return isWithinDetectionRange(bootstrapDistanceMeters, detectionRadiusMeters)
-    }
-    return false
-  }, [bootstrapDistanceMeters, detectionRadiusMeters, isRetake, liveDistanceMeters])
+    if (ringDistanceMeters == null) return false
+    return isWithinDetectionRange(ringDistanceMeters, detectionRadiusMeters)
+  }, [detectionRadiusMeters, isRetake, ringDistanceMeters])
 
-  const rawRingProgress = proximitySnapshot?.easedProgress ?? 0
-  const visualProgress = useSmoothedProximityVisual(rawRingProgress, {
+  const normalizedRingProgress = proximitySnapshot?.rawProgress ?? 0
+  const visualProgress = useSmoothedProximityVisual(normalizedRingProgress, {
     enabled: Boolean(resolvedFigure) && inDetectionRange && !isRetake && ringDistanceMeters != null,
   })
 
@@ -266,6 +253,33 @@ export function useCaptureFlow({
     livePosition.accuracy > GPS_APPROXIMATE_CAPTURE_WARNING_M
 
   const gpsProgress = inDetectionRange ? visualProgress : 0
+
+  useEffect(() => {
+    if (!resolvedFigure || ringDistanceMeters == null) return
+
+    console.info('[RING_DEBUG]', {
+      distance: Math.round(ringDistanceMeters * 10) / 10,
+      detectionRadius: detectionRadiusMeters,
+      captureRadius: captureRadiusMeters,
+      normalized: Math.round(normalizedRingProgress * 1000) / 1000,
+      eased: Math.round((proximitySnapshot?.easedProgress ?? 0) * 1000) / 1000,
+      finalGpsProgress: Math.round(gpsProgress * 1000) / 1000,
+      distanceSource: liveDistanceMeters != null ? 'live' : 'bootstrap',
+      inDetectionRange,
+      inCaptureRange,
+    })
+  }, [
+    captureRadiusMeters,
+    detectionRadiusMeters,
+    gpsProgress,
+    inCaptureRange,
+    inDetectionRange,
+    liveDistanceMeters,
+    normalizedRingProgress,
+    proximitySnapshot?.easedProgress,
+    resolvedFigure,
+    ringDistanceMeters,
+  ])
 
   const isReady =
     camera.isReady &&

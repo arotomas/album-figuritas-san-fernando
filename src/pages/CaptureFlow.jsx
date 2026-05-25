@@ -58,6 +58,7 @@ export function CaptureFlow() {
   const isRetake = captureMode === 'retake'
 
   const {
+    trustedPosition,
     mapPosition,
     proximityPosition,
     gpsStatusLabel,
@@ -94,7 +95,7 @@ export function CaptureFlow() {
     }
   }, [captureSession?.locationSnapshot])
 
-  const liveGpsPosition = proximityPosition ?? mapPosition ?? null
+  const liveGpsPosition = trustedPosition ?? proximityPosition ?? mapPosition ?? null
 
   const hasTrustedSessionGeo = Boolean(captureSession?.locationSnapshot?.lat != null)
 
