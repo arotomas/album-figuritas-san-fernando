@@ -6,6 +6,16 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 const projectRef = getSupabaseProjectRef(supabaseUrl)
 
+console.log('[SUPABASE-CHECK]', {
+  url: supabaseUrl || '(missing)',
+  project: projectRef ?? '(unknown)',
+  source: 'src/lib/supabase.js',
+  pathname: typeof window !== 'undefined' ? window.location.pathname : '(ssr)',
+  mode: import.meta.env.MODE,
+  urlConfigured: Boolean(supabaseUrl),
+  keyConfigured: Boolean(supabaseAnonKey),
+})
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,

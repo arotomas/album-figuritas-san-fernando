@@ -20,6 +20,25 @@ import { authLog } from '../utils/authLog'
 import { authRestoreLog } from '../utils/authRestoreLog'
 import { isProfileComplete } from '../utils/profileValidation'
 
+async function syncRemoteUniverse(replaceCatalogFromRemote) {
+  const remoteCatalog = await fetchPublicFigures()
+  replaceCatalogFromRemote(remoteCatalog)
+
+  const collectionsResult = await fetchAlbumCollectionsSafe()
+  if (collectionsResult.collections) {
+    setRemoteAlbumCollections(collectionsResult.collections, {
+      reason: collectionsResult.reason,
+    })
+  }
+
+  const eventsResult = await fetchAlbumEventsSafe()
+  if (eventsResult.events) {
+    setRemoteAlbumEvents(eventsResult.events, { reason: eventsResult.reason })
+  }
+
+  return remoteCatalog
+}
+
 async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, replaceCatalogFromRemote, mergeRemoteUserFigures }) {
   const userId = session.user.id
   let profile = await fetchProfile(userId)
@@ -34,21 +53,7 @@ async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, r
 
   const admin = await isAdmin(userId)
   const moderatorOrAdmin = await isModeratorOrAdmin(userId)
-  const remoteCatalog = await fetchPublicFigures()
-
-  replaceCatalogFromRemote(remoteCatalog)
-
-  const collectionsResult = await fetchAlbumCollectionsSafe()
-  if (collectionsResult.collections) {
-    setRemoteAlbumCollections(collectionsResult.collections, {
-      reason: collectionsResult.reason,
-    })
-  }
-
-  const eventsResult = await fetchAlbumEventsSafe()
-  if (eventsResult.events) {
-    setRemoteAlbumEvents(eventsResult.events, { reason: eventsResult.reason })
-  }
+  const remoteCatalog = await syncRemoteUniverse(replaceCatalogFromRemote)
 
   setSupabaseAuth({
     userId,
@@ -118,6 +123,7 @@ export function useSupabaseBootstrap(enabled) {
         if (!result?.session?.user?.id) {
           authRestoreLog.info('no session')
           clearAuthState()
+          await syncRemoteUniverse(replaceCatalogFromRemote)
           return
         }
 
@@ -125,6 +131,7 @@ export function useSupabaseBootstrap(enabled) {
           authLog.info('legacy anonymous session cleared — real auth required')
           await signOutSupabase().catch(() => {})
           clearAuthState()
+          await syncRemoteUniverse(replaceCatalogFromRemote)
           return
         }
 
@@ -168,7 +175,17 @@ export function useSupabaseBootstrap(enabled) {
           authRestoreLog.info('no session')
         }
 
-        if (!cancelled) clearAuthState()
+        if (!cancelled) {
+          clearAuthState()
+          try {
+            await syncRemoteUniverse(replaceCatalogFromRemote)
+          } catch (catalogError) {
+            authLog.error('catalog sync failed after bootstrap error', {
+              message: catalogError?.message ?? String(catalogError),
+            })
+            replaceCatalogFromRemote([])
+          }
+        }
       } finally {
         if (!cancelled) {
           setAuthBootstrapped(true)
@@ -200,6 +217,9 @@ export function useSupabaseBootstrap(enabled) {
       if (event === 'SIGNED_OUT') {
         authRestoreLog.info('no session', { reason: 'signed_out_event' })
         clearAuthState()
+        void fetchPublicFigures()
+          .then((catalog) => useAppStore.getState().replaceCatalogFromRemote(catalog))
+          .catch(() => useAppStore.getState().replaceCatalogFromRemote([]))
       }
 
       if (event === 'TOKEN_REFRESHED' && session?.user?.id) {

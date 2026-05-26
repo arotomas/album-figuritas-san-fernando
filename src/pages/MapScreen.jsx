@@ -57,7 +57,7 @@ export function MapScreen() {
       renderedCount: mapFigures.length,
       storedIds: figures.map((figure) => String(figure.id)),
       renderedIds: mapFigures.map((figure) => String(figure.id)),
-      fallback: figures.some((figure) => figure.source === 'local-fallback'),
+      catalogSource: figures.length === 0 ? 'empty' : 'remote',
       mainProgress,
     }))
   }, [figures, mainProgress, mapFigures])

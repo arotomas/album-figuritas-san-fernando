@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import { isAdmin, isModeratorOrAdmin } from '../services/supabase/admin'
 import { pullRemoteAlbum } from '../services/supabase/sync'
+import { fetchPublicFigures } from '../services/supabase/figures'
 import { publishAuthSuccessSnapshot } from '../services/supabase/auth'
 import { isProfileComplete } from '../utils/profileValidation'
 import { isQaMode, withQaParam } from '../utils/qaMode'
@@ -13,12 +14,20 @@ export function useAuthNavigation() {
   const login = useAppStore((state) => state.login)
   const setSupabaseAuth = useAppStore((state) => state.setSupabaseAuth)
   const mergeRemoteUserFigures = useAppStore((state) => state.mergeRemoteUserFigures)
+  const replaceCatalogFromRemote = useAppStore((state) => state.replaceCatalogFromRemote)
 
   const finalizeAuth = useCallback(
     async ({ userId, user, session, profile }) => {
       const admin = await isAdmin(userId)
       const moderatorOrAdmin = await isModeratorOrAdmin(userId)
       setSupabaseAuth({ userId, isAdmin: admin, isModeratorOrAdmin: moderatorOrAdmin, profile })
+
+      try {
+        const remoteCatalog = await fetchPublicFigures()
+        replaceCatalogFromRemote(remoteCatalog)
+      } catch {
+        replaceCatalogFromRemote([])
+      }
 
       try {
         const remoteRows = await pullRemoteAlbum()
@@ -48,7 +57,7 @@ export function useAuthNavigation() {
       navigate(nextPath, { replace: true })
       return { completed, profile }
     },
-    [location.search, login, mergeRemoteUserFigures, navigate, setSupabaseAuth],
+    [location.search, login, mergeRemoteUserFigures, navigate, replaceCatalogFromRemote, setSupabaseAuth],
   )
 
   return { finalizeAuth }

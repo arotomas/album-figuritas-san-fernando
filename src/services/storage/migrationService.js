@@ -1,5 +1,4 @@
 import { STORAGE_VERSION } from '../../config/persistence'
-import { mockFigures } from '../../data/mockFigures'
 import { computeAlbumStatus } from '../../store/albumUtils'
 import { inferDiscoveredCollectionIds } from '../../utils/collectionModel'
 import { persistLog } from '../../utils/persistLog'
@@ -47,47 +46,25 @@ export function sanitizePersistedState(raw) {
 }
 
 /**
- * Fusiona figuritas persistidas con el template mock (coords, rareza, etc.).
- * Permite agregar figuritas nuevas sin romper datos guardados.
+ * Extrae solo progreso por figurita desde storage — nunca reconstruye catálogo mock.
  */
+export function extractPersistedFigureProgress(storedFigures) {
+  return (Array.isArray(storedFigures) ? storedFigures : [])
+    .filter((figure) => figure?.id != null)
+    .map(({ id, slug, obtenida, foto, fotoSizeBytes, obtenidaEn, captureMeta }) => ({
+      id: String(id),
+      slug: slug ?? null,
+      obtenida: Boolean(obtenida),
+      foto: foto ?? null,
+      fotoSizeBytes: fotoSizeBytes ?? null,
+      obtenidaEn: obtenidaEn ?? null,
+      captureMeta: captureMeta ?? null,
+    }))
+}
+
+/** @deprecated Usar extractPersistedFigureProgress — ya no inyecta mockFigures. */
 export function mergeFiguresWithTemplate(storedFigures) {
-  const list = Array.isArray(storedFigures) ? storedFigures : []
-  const storedById = new Map(
-    list
-      .filter((figure) => figure && figure.id != null)
-      .map((figure) => [String(figure.id), figure]),
-  )
-
-  return mockFigures.map((template, index) => {
-    const stored = storedById.get(String(template.id))
-    const defaults = {
-      id: String(template.id),
-      capture_radius: 250,
-      is_bonus: false,
-      is_hidden: false,
-      unlock_order: index + 1,
-      reveal_after_count: Math.max(0, index + 1 - 5),
-      bonus_type: null,
-      reveal_radius: 200,
-      marker_icon_url: null,
-      marker_icon_size: 48,
-      challenge_title: null,
-      challenge_description: null,
-      challenge_type: null,
-      challenge_example_image_url: null,
-    }
-    if (!stored) return { ...template, ...defaults }
-
-    return {
-      ...template,
-      ...defaults,
-      obtenida: Boolean(stored.obtenida),
-      foto: stored.foto ?? null,
-      fotoSizeBytes: stored.fotoSizeBytes ?? null,
-      obtenidaEn: stored.obtenidaEn ?? null,
-      captureMeta: stored.captureMeta ?? null,
-    }
-  })
+  return extractPersistedFigureProgress(storedFigures)
 }
 
 export function stripOversizedPhotos(figures) {
@@ -113,7 +90,7 @@ export function stripOversizedPhotos(figures) {
 
 /**
  * Migra datos entre versiones del esquema local.
- * Preparado para futura sync con WordPress Headless.
+ * v2: el catálogo vive solo en Supabase; persist guarda progreso por id.
  */
 export function migratePersistedState(raw) {
   if (!raw || typeof raw !== 'object') {
@@ -125,45 +102,42 @@ export function migratePersistedState(raw) {
     const sanitized = sanitizePersistedState(raw)
     if (!sanitized) return null
 
-    let state = { ...sanitized }
+    const progressRecords = stripOversizedPhotos(
+      extractPersistedFigureProgress(sanitized.figures ?? []),
+    )
 
-    if (version < 1) {
-      state = {
-        ...state,
-        figures: mergeFiguresWithTemplate(state.figures),
-      }
+    if (version < 2) {
+      console.info('[CATALOG-PERSIST-CLEARED]', {
+        reason: 'migrate-v2',
+        fromVersion: version,
+        droppedCatalogEntries: sanitized.figures?.length ?? 0,
+        progressKept: progressRecords.length,
+      })
     }
 
-    const figures = stripOversizedPhotos(
-      mergeFiguresWithTemplate(state.figures ?? []),
-    )
-
-    const obtenidas = figures.filter((f) => f.obtenida && !f.is_bonus).length
     const discoveredCollectionIds = inferDiscoveredCollectionIds(
-      figures,
-      state.discoveredCollectionIds ?? [],
+      progressRecords,
+      sanitized.discoveredCollectionIds ?? [],
     )
     const acknowledgedDiscoveryCollectionIds =
-      Array.isArray(state.acknowledgedDiscoveryCollectionIds) &&
-      state.acknowledgedDiscoveryCollectionIds.length > 0
-        ? state.acknowledgedDiscoveryCollectionIds
+      Array.isArray(sanitized.acknowledgedDiscoveryCollectionIds) &&
+      sanitized.acknowledgedDiscoveryCollectionIds.length > 0
+        ? sanitized.acknowledgedDiscoveryCollectionIds
         : discoveredCollectionIds
 
     return {
       version: STORAGE_VERSION,
       state: {
-        figures,
+        figures: progressRecords,
         albumStatus:
-          state.albumStatus ??
-          computeAlbumStatus(figures, state.lastViewedFigureId),
-        lastObtenidaFigureId: state.lastObtenidaFigureId ?? null,
-        lastViewedFigureId: state.lastViewedFigureId ?? null,
-        lastSavedAt: state.lastSavedAt ?? null,
-        celebratedCollectionIds: state.celebratedCollectionIds ?? [],
+          sanitized.albumStatus ??
+          computeAlbumStatus([], sanitized.lastViewedFigureId),
+        lastObtenidaFigureId: sanitized.lastObtenidaFigureId ?? null,
+        lastViewedFigureId: sanitized.lastViewedFigureId ?? null,
+        lastSavedAt: sanitized.lastSavedAt ?? null,
+        celebratedCollectionIds: sanitized.celebratedCollectionIds ?? [],
         discoveredCollectionIds,
         acknowledgedDiscoveryCollectionIds,
-        progressSnapshot: obtenidas,
-        totalFigures: figures.filter((f) => !f.is_bonus).length,
       },
     }
   } catch (error) {
@@ -182,7 +156,6 @@ export function serializeForBackend(localState) {
       slug,
       obtenida,
       obtenidaEn,
-      // foto se subirá por separado al backend en el futuro
     })),
   }
 }

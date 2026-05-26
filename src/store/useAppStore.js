@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mockFigures } from '../data/mockFigures'
 import {
   ALBUM_STATUS,
   PERSISTED_FIELDS,
@@ -9,7 +8,7 @@ import {
 } from '../config/persistence'
 import { createZustandStorage, storageService } from '../services/storage/storageService'
 import {
-  mergeFiguresWithTemplate,
+  extractPersistedFigureProgress,
   migratePersistedState,
   sanitizePersistedState,
 } from '../services/storage/migrationService'
@@ -37,32 +36,24 @@ export { QA_TEST_FIGURE_ID_PREFIX }
 
 const zustandStorage = createJSONStorage(() => createZustandStorage())
 
-const createInitialFigures = () =>
-  mockFigures.map((figure, index) => ({
-    ...figure,
-    id: String(figure.id),
-    source: 'local-fallback',
-    capture_radius: 250,
-    is_bonus: false,
-    is_hidden: false,
-    unlock_order: index + 1,
-    reveal_after_count: Math.max(0, index + 1 - 5),
-    bonus_type: null,
-    reveal_radius: 200,
-    marker_icon_url: null,
-    marker_icon_size: 48,
-    challenge_title: null,
-    challenge_description: null,
-    challenge_type: null,
-    challenge_example_image_url: null,
-    obtenida: false,
-    foto: null,
-    fotoSizeBytes: null,
-    obtenidaEn: null,
-  }))
+/** Catálogo vacío hasta que Supabase responda — nunca mock local. */
+const createInitialFigures = () => []
+
+function collectFigureProgressRecords(state) {
+  const progressById = new Map()
+  const cached = Array.isArray(state?._figureProgressRecords) ? state._figureProgressRecords : []
+  const current = Array.isArray(state?.figures) ? state.figures : []
+
+  for (const record of [...cached, ...current]) {
+    if (record?.id == null) continue
+    progressById.set(String(record.id), record)
+  }
+
+  return [...progressById.values()]
+}
 
 function clearAllFigureProgress(figures) {
-  const source = Array.isArray(figures) && figures.length > 0 ? figures : createInitialFigures()
+  const source = Array.isArray(figures) ? figures : []
   return source.map((figure) => ({
     ...figure,
     obtenida: false,
@@ -126,6 +117,7 @@ function pickPersistedFields(source) {
 function resetStoreToDefaults() {
   useAppStore.setState({
     figures: createInitialFigures(),
+    _figureProgressRecords: [],
     albumStatus: ALBUM_STATUS.EN_PROGRESO,
     lastObtenidaFigureId: null,
     lastViewedFigureId: null,
@@ -155,10 +147,13 @@ function resetStoreToDefaults() {
 }
 
 function buildPersistedSnapshot(state) {
-  const figures = Array.isArray(state.figures) ? state.figures : createInitialFigures()
+  const progressById = new Map()
+  for (const record of collectFigureProgressRecords(state)) {
+    progressById.set(String(record.id), record)
+  }
 
   return {
-    figures: figures.map(
+    figures: [...progressById.values()].map(
       ({ id, obtenida, foto, fotoSizeBytes, obtenidaEn, slug, captureMeta }) => ({
         id,
         slug,
@@ -235,6 +230,7 @@ export const useAppStore = create(
       isAuthenticated: false,
       user: null,
       figures: createInitialFigures(),
+      _figureProgressRecords: [],
     nearFigure: null,
     qaTestFigure: null,
       captureSession: null,
@@ -302,15 +298,31 @@ export const useAppStore = create(
 
       replaceCatalogFromRemote: (remoteFigures) =>
         set((state) => {
-          if (!Array.isArray(remoteFigures) || remoteFigures.length === 0) {
-          console.warn('[figures-fallback]', 'remote catalog empty — keeping current catalog', JSON.stringify({
-              currentCount: state.figures.length,
-              fallback: true,
-            }))
-            return state
+          const remote = Array.isArray(remoteFigures) ? remoteFigures : []
+          const progressSources = collectFigureProgressRecords(state)
+
+          if (remote.length === 0) {
+            console.info('[CATALOG-EMPTY]', {
+              remoteCount: 0,
+              previousCatalogCount: state.figures.length,
+              progressKept: progressSources.length,
+            })
+            console.info('[CATALOG-SOURCE]', {
+              source: 'remote',
+              count: 0,
+            })
+
+            return {
+              figures: [],
+              _figureProgressRecords: progressSources,
+              lastViewedFigureId: null,
+              lastObtenidaFigureId: null,
+              albumStatus: ALBUM_STATUS.EN_PROGRESO,
+              lastSavedAt: Date.now(),
+            }
           }
 
-          const figures = mergeCatalogWithProgress(remoteFigures, state.figures)
+          const figures = mergeCatalogWithProgress(remote, progressSources)
           const ids = figures.map((figure) => String(figure.id))
           const validIds = new Set(ids)
           const lastViewedFigureId = validIds.has(String(state.lastViewedFigureId))
@@ -320,14 +332,15 @@ export const useAppStore = create(
             ? state.lastObtenidaFigureId
             : null
 
-          console.info('[figures-bootstrap]', 'catalog applied', JSON.stringify({
+          console.info('[CATALOG-SOURCE]', {
+            source: 'remote',
             count: figures.length,
             ids,
-            fallback: false,
-          }))
+          })
 
           return {
             figures,
+            _figureProgressRecords: [],
             lastViewedFigureId,
             lastObtenidaFigureId,
             albumStatus: computeAlbumStatus(figures, lastViewedFigureId),
@@ -981,6 +994,7 @@ export const useAppStore = create(
         useAppStore.persist.clearStorage()
         set({
           figures: createInitialFigures(),
+          _figureProgressRecords: [],
           albumStatus: ALBUM_STATUS.EN_PROGRESO,
           lastObtenidaFigureId: null,
           lastViewedFigureId: null,
@@ -1037,21 +1051,37 @@ export const useAppStore = create(
             }
           }
 
-          const figures = mergeFiguresWithTemplate(sanitized.figures)
+          const progressRecords = extractPersistedFigureProgress(sanitized.figures)
+          console.info('[CATALOG-PERSIST-CLEARED]', {
+            persistedProgressCount: progressRecords.length,
+            droppedCatalogFromStorage:
+              (sanitized.figures?.length ?? 0) > 0 &&
+              sanitized.figures.some(
+                (figure) =>
+                  figure?.lat != null ||
+                  figure?.lng != null ||
+                  figure?.nombre != null ||
+                  figure?.title != null,
+              ),
+          })
+
           const persistedFields = pickPersistedFields(sanitized)
+          delete persistedFields.figures
+
           const discoveredCollectionIds = inferDiscoveredCollectionIds(
-            figures,
+            progressRecords,
             persistedFields.discoveredCollectionIds ?? [],
           )
 
           return {
             ...currentState,
             ...persistedFields,
-            figures,
+            figures: [],
+            _figureProgressRecords: progressRecords,
             discoveredCollectionIds,
             albumStatus:
               persistedFields.albumStatus ??
-              computeAlbumStatus(figures, persistedFields.lastViewedFigureId),
+              computeAlbumStatus([], persistedFields.lastViewedFigureId),
             nearFigure: null,
             qaTestFigure: null,
             _hasHydrated: true,

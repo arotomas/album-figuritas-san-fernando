@@ -55,8 +55,22 @@ export function AdminFiguresPage() {
   const loadFigures = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
     setError(null)
+    console.log('[SUPABASE-CHECK]', {
+      url: import.meta.env.VITE_SUPABASE_URL ?? '(missing)',
+      project: import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] ?? '(unknown)',
+      source: 'AdminFiguresPage.loadFigures',
+      pathname: typeof window !== 'undefined' ? window.location.pathname : '(ssr)',
+    })
     try {
       const nextFigures = await getFiguresAdmin()
+      console.log('[SUPABASE-CHECK]', {
+        url: import.meta.env.VITE_SUPABASE_URL ?? '(missing)',
+        project: import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] ?? '(unknown)',
+        source: 'AdminFiguresPage.loadFigures:result',
+        pathname: typeof window !== 'undefined' ? window.location.pathname : '(ssr)',
+        figureCount: nextFigures.length,
+        ids: nextFigures.map((figure) => figure.id),
+      })
       setFigures(nextFigures)
     } catch (loadError) {
       setError(loadError?.message ?? 'No pudimos cargar las figuritas.')

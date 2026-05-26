@@ -134,6 +134,15 @@ export async function getFiguresAdmin() {
   }
 
   if (error) handleAdminError('figures', error)
+  console.log('[SUPABASE-CHECK]', {
+    url: import.meta.env.VITE_SUPABASE_URL ?? '(missing)',
+    project: import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] ?? '(unknown)',
+    source: 'getFiguresAdmin',
+    pathname: typeof window !== 'undefined' ? window.location.pathname : '(ssr)',
+    figureCount: data?.length ?? 0,
+    hadError: Boolean(error),
+    usedSchemaFallback: Boolean(error && FIGURE_SCHEMA_FALLBACK_PATTERN.test(error?.message ?? '')),
+  })
   adminLog.info('figures loaded', { count: data?.length ?? 0 })
   return data ?? []
 }

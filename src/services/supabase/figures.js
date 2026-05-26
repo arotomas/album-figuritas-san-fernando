@@ -61,6 +61,7 @@ function normalizeRemoteFigure(row) {
     event_starts_at: row.event_starts_at ?? null,
     event_ends_at: row.event_ends_at ?? null,
     active: row.active !== false,
+    source: 'remote',
     emoji: '📍',
     obtenida: false,
     foto: null,
@@ -76,7 +77,15 @@ export async function fetchPublicFigures() {
     .eq('active', true)
     .order('created_at', { ascending: true })
 
+  let usedSchemaColumnFallback = false
+
   if (error && FIGURE_SCHEMA_FALLBACK_PATTERN.test(error.message ?? '')) {
+    usedSchemaColumnFallback = true
+    console.warn('[figures-remote]', 'schema column fallback — using core columns only', JSON.stringify({
+      message: error.message,
+      code: error.code,
+    }))
+
     const fallback = await supabase
       .from('figures')
       .select(FIGURE_CORE_COLUMNS)
@@ -113,11 +122,29 @@ export async function fetchPublicFigures() {
     })
   })
 
-  console.info('[figures-remote]', 'loaded', JSON.stringify({
-    count: figuresWithRevealDefaults.length,
-    ids: figuresWithRevealDefaults.map((figure) => figure.id),
-    fallback: false,
-  }))
+  if (figuresWithRevealDefaults.length === 0) {
+    console.info('[CATALOG-EMPTY]', {
+      remoteCount: 0,
+      schemaColumnFallback: usedSchemaColumnFallback,
+    })
+    console.info('[CATALOG-SOURCE]', { source: 'remote', count: 0 })
+  } else {
+    console.info('[CATALOG-SOURCE]', {
+      source: 'remote',
+      count: figuresWithRevealDefaults.length,
+      ids: figuresWithRevealDefaults.map((figure) => figure.id),
+    })
+  }
+
+  console.log('[SUPABASE-CHECK]', {
+    url: import.meta.env.VITE_SUPABASE_URL ?? '(missing)',
+    project: import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] ?? '(unknown)',
+    source: 'fetchPublicFigures',
+    pathname: typeof window !== 'undefined' ? window.location.pathname : '(ssr)',
+    figureCount: figuresWithRevealDefaults.length,
+    hadError: Boolean(error),
+    schemaColumnFallback: usedSchemaColumnFallback,
+  })
 
   return figuresWithRevealDefaults
 }
