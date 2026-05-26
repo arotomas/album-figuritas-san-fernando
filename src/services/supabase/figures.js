@@ -304,3 +304,28 @@ export async function upsertUserFigure({
   })
   return data
 }
+
+/** Borra todo el progreso remoto del usuario (reset completo). */
+export async function deleteAllUserFigures(userId) {
+  if (!userId) return { deleted: 0 }
+
+  const { error, count } = await supabase
+    .from('user_figures')
+    .delete({ count: 'exact' })
+    .eq('user_id', userId)
+
+  if (error) {
+    supabaseLog.figures.warn('delete all user figures failed', { message: error.message })
+    captureSyncLog.error('user_figures delete all error', {
+      userId,
+      message: error.message,
+      code: error.code,
+    })
+    throw error
+  }
+
+  const deleted = count ?? 0
+  supabaseLog.figures.info('user figures deleted', { userId, deleted })
+  captureSyncLog.info('user_figures delete all success', { userId, deleted })
+  return { deleted }
+}

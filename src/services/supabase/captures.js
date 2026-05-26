@@ -62,3 +62,28 @@ export async function insertCapture({
   })
   return data
 }
+
+/** Borra el historial de capturas del usuario (reset completo). */
+export async function deleteAllUserCaptures(userId) {
+  if (!userId) return { deleted: 0 }
+
+  const { error, count } = await supabase
+    .from('captures')
+    .delete({ count: 'exact' })
+    .eq('user_id', userId)
+
+  if (error) {
+    supabaseLog.sync.warn('delete all captures failed', { message: error.message })
+    captureSyncLog.error('captures delete all error', {
+      userId,
+      message: error.message,
+      code: error.code,
+    })
+    throw error
+  }
+
+  const deleted = count ?? 0
+  supabaseLog.sync.info('captures deleted', { userId, deleted })
+  captureSyncLog.info('captures delete all success', { userId, deleted })
+  return { deleted }
+}

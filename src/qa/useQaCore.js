@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom'
 import {
   canUseTestFigure,
   getQaCoreSnapshot,
+  isGpsPanelVisible,
+  isLocationPanelVisible,
   isQaMasterActive,
   isDevBuild,
   isQaShellActive,
@@ -43,6 +45,22 @@ export function useQaCore() {
       withQa: (path) => withQaParam(path, qaActive),
     }
   }, [location.pathname, location.search, revision])
+}
+
+export function useQaPanelVisibility() {
+  const [revision, setRevision] = useState(0)
+
+  useEffect(() => {
+    return subscribeQaRuntime(() => setRevision((value) => value + 1))
+  }, [])
+
+  return useMemo(
+    () => ({
+      gps: isGpsPanelVisible(),
+      location: isLocationPanelVisible(),
+    }),
+    [revision],
+  )
 }
 
 /** @deprecated alias — usar useQaCore */

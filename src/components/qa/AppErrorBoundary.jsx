@@ -1,13 +1,11 @@
 import { Component } from 'react'
+import { isQaMasterActive } from '../../qa/qaCore'
 import { logDiagnostic } from '../../utils/diagnostics'
 import { PremiumButton } from '../ui/PremiumButton'
 
 function mapPathWithQa() {
   try {
-    if (
-      sessionStorage.getItem('album-qa-mode') === '1' ||
-      localStorage.getItem('album-qa-mode') === '1'
-    ) {
+    if (sessionStorage.getItem('album-qa-mode') === '1' && isQaMasterActive()) {
       return '/map?qa=1'
     }
   } catch {

@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Logo } from '../components/Logo'
-import { QaBadge } from '../components/qa/QaBadge'
 
 export function AppLayout() {
   const location = useLocation()
@@ -9,7 +8,6 @@ export function AppLayout() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-      <QaBadge />
 
       {!hideChromeHeader && (
         <header className="safe-top safe-x shrink-0 border-b border-border/60 px-6 py-3">

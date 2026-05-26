@@ -17,9 +17,11 @@ export {
   isQaMode,
   isQaShellActive,
   isUniverseDiagnosticsEnabled,
+  isViteDev,
   openQaPanel,
   resetQaAll,
   setDebugRevealOverride,
+  setQaAccessContext,
   syncQaFromUrl,
   syncQaModeFromUrl,
   toggleDebugRevealOverride,
@@ -66,4 +68,4 @@ export {
   isWithinPrimaryArea,
 } from '../geo/geoPolicy'
 
-export { useQaCore, useQaMode } from './useQaCore'
+export { useQaCore, useQaMode, useQaPanelVisibility } from './useQaCore'

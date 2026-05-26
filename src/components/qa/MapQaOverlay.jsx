@@ -1,4 +1,5 @@
-import { isGpsPanelVisible, isLocationPanelVisible } from '../../qa/qaCore'
+import { isQaShellActive } from '../../qa/qaCore'
+import { useQaPanelVisibility } from '../../qa/useQaCore'
 import { GpsDiagnosticPanel } from '../map/GpsDiagnosticPanel'
 import { QaLocationPanel } from './QaLocationPanel'
 
@@ -24,9 +25,9 @@ export function MapQaOverlay({
   isWatching,
   figures,
 }) {
-  const showGps = isGpsPanelVisible()
-  const showLocation = isLocationPanelVisible()
+  const { gps: showGps, location: showLocation } = useQaPanelVisibility()
 
+  if (!isQaShellActive()) return null
   if (!showGps && !showLocation) return null
 
   return (

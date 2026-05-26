@@ -1,6 +1,15 @@
+import { isQaShellActive } from '../../qa/qaCore'
+import { QaBadge } from './QaBadge'
 import { QaLauncher } from './QaLauncher'
 
-/** Shell global DEV/QA — launcher y futuros overlays app-wide. */
+/** Shell global DEV/QA — badge discreto + launcher; paneles opt-in. */
 export function QaDevShell() {
-  return <QaLauncher />
+  if (!isQaShellActive()) return null
+
+  return (
+    <>
+      <QaBadge />
+      <QaLauncher />
+    </>
+  )
 }

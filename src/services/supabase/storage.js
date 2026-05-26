@@ -367,3 +367,55 @@ export async function uploadCapturePhoto({
     return payload
   }
 }
+
+/** Elimina fotos del bucket captures/{userId}/ (best-effort). */
+export async function deleteUserCaptureStorage(userId) {
+  if (!userId) return { deleted: 0, skipped: true }
+
+  const folder = String(userId).replace(/^captures\//, '').split('/')[0]
+  const { data: files, error: listError } = await supabase.storage.from(CAPTURES_BUCKET).list(folder, {
+    limit: 200,
+  })
+
+  if (listError) {
+    supabaseLog.upload.warn('capture storage list failed', {
+      folder,
+      message: listError.message,
+    })
+    captureSyncLog.error('capture storage list error', {
+      folder,
+      message: listError.message,
+    })
+    throw listError
+  }
+
+  if (!files?.length) {
+    return { deleted: 0 }
+  }
+
+  const paths = files
+    .filter((file) => file?.name && !file.name.endsWith('/'))
+    .map((file) => `${folder}/${file.name}`)
+
+  if (!paths.length) {
+    return { deleted: 0 }
+  }
+
+  const { error: deleteError } = await supabase.storage.from(CAPTURES_BUCKET).remove(paths)
+
+  if (deleteError) {
+    supabaseLog.upload.warn('capture storage delete failed', {
+      folder,
+      message: deleteError.message,
+    })
+    captureSyncLog.error('capture storage delete error', {
+      folder,
+      message: deleteError.message,
+    })
+    throw deleteError
+  }
+
+  supabaseLog.upload.info('capture storage deleted', { folder, deleted: paths.length })
+  captureSyncLog.info('capture storage delete success', { folder, deleted: paths.length })
+  return { deleted: paths.length }
+}

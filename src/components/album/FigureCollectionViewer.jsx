@@ -40,7 +40,7 @@ function FigureSlideContent({
 
   return (
     <m.div
-      className="relative flex h-full w-full max-w-md flex-col justify-end px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(3.5rem+env(safe-area-inset-top))]"
+      className="relative flex h-full w-full max-w-md flex-col overflow-hidden px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(3.25rem+env(safe-area-inset-top))]"
       style={{ y: dragY, opacity: backdropOpacity }}
       drag="y"
       dragConstraints={{ top: 0, bottom: 0 }}
@@ -51,65 +51,61 @@ function FigureSlideContent({
         }
       }}
     >
-      <div className="relative mx-auto w-full" onClick={(event) => event.stopPropagation()}>
-        <div
-          className={`relative overflow-hidden rounded-[1.6rem] border bg-gradient-to-b ${rarity.tailwind.gradient} p-3`}
-          style={getRarityFrameStyle(figure.rareza)}
-        >
-          <RarityAmbience rareza={figure.rareza} />
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 justify-center">
+          <div
+            className={`relative w-full overflow-hidden rounded-[1.6rem] border bg-gradient-to-b ${rarity.tailwind.gradient} p-2.5`}
+            style={getRarityFrameStyle(figure.rareza)}
+          >
+            <RarityAmbience rareza={figure.rareza} />
 
-          <div className="relative overflow-hidden rounded-[1.25rem] border border-white/12 bg-black/30 p-1.5">
-            <m.div
-              animate={{ y: [0, -3, 0] }}
-              transition={{
-                duration: Number.parseFloat(rarity.animation.floatDuration) || 3,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            >
+            <div className="relative overflow-hidden rounded-[1.25rem] border border-white/12 bg-black/30 p-1.5">
               {hasPhoto ? (
                 <img
                   src={figure.foto}
                   alt={figure.nombre}
                   loading="eager"
                   decoding="async"
-                  className="aspect-[3/4] w-full rounded-xl object-cover"
+                  className="mx-auto block w-full max-h-[min(72dvh,calc(100dvh-13rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] rounded-xl object-contain"
                 />
               ) : (
-                <div className="flex aspect-[3/4] items-center justify-center text-6xl">
+                <div className="flex min-h-[40dvh] items-center justify-center text-6xl">
                   {figure.emoji ?? '📍'}
                 </div>
               )}
-            </m.div>
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 space-y-3 rounded-[1.35rem] border border-white/10 bg-charcoal/92 px-4 py-4 backdrop-blur-md">
+        <div className="mt-3 shrink-0 space-y-2.5 rounded-[1.25rem] border border-white/10 bg-charcoal/92 px-3.5 py-3.5 backdrop-blur-md">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className={`${typeClasses.micro} text-white/45`}>{collectionLabel}</p>
-              <h2 className={`${typeClasses.headline} mt-1 truncate text-xl text-warm-white`}>
+              <h2 className={`${typeClasses.headline} mt-0.5 truncate text-lg text-warm-white`}>
                 {figure.nombre}
               </h2>
             </div>
             <RarityBadge rareza={figure.rareza} size="sm" />
           </div>
 
-          <p className="text-sm font-semibold text-progress/90">Estado: Descubierta</p>
+          <p className="text-xs font-semibold text-progress/90">Estado: Descubierta</p>
 
           {figure.obtenidaEn && (
-            <p className="text-sm text-white/55">
+            <p className="text-xs text-white/55">
               Capturada: {formatCapturedAt(figure.obtenidaEn)}
             </p>
           )}
 
           <FigureChallengeCard figure={figure} />
 
-          <div className="space-y-2 pt-1">
+          <div className="space-y-2 pt-0.5">
             <button
               type="button"
               onClick={() => onRetakePhoto?.(figure)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-progress px-4 py-3 text-sm font-black text-ink shadow-[0_0_24px_rgba(140,198,63,0.22)]"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-progress px-4 py-2.5 text-sm font-black text-ink shadow-[0_0_24px_rgba(140,198,63,0.22)]"
             >
               <span aria-hidden>📸</span>
               Mejorar foto
@@ -119,7 +115,7 @@ function FigureSlideContent({
               <button
                 type="button"
                 onClick={handleDelete}
-                className={`w-full rounded-2xl px-4 py-3 text-sm font-bold transition ${
+                className={`w-full rounded-2xl px-4 py-2.5 text-sm font-bold transition ${
                   confirmDelete
                     ? 'bg-red-500/90 text-white'
                     : 'border border-red-300/25 bg-red-500/10 text-red-100'

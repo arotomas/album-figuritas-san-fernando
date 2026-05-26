@@ -3,9 +3,9 @@ import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
 import { getSessionUserId, isSupabaseConfigured } from './auth'
-import { fetchUserFigures, deleteUserFigurePhoto, replaceUserFigurePhoto, upsertUserFigure } from './figures'
-import { insertCapture } from './captures'
-import { uploadCapturePhoto } from './storage'
+import { fetchUserFigures, deleteUserFigurePhoto, deleteAllUserFigures, replaceUserFigurePhoto, upsertUserFigure } from './figures'
+import { insertCapture, deleteAllUserCaptures } from './captures'
+import { uploadCapturePhoto, deleteUserCaptureStorage } from './storage'
 
 function resolveRealFigureId(figureId, qaTargetFigureId = null) {
   const figureKey = String(figureId)
@@ -356,5 +356,58 @@ export async function pullRemoteAlbum() {
   } catch (error) {
     supabaseLog.sync.warn('album pull failed', { message: error?.message })
     return []
+  }
+}
+
+/**
+ * Reset remoto completo: user_figures, captures e imágenes del bucket.
+ */
+export async function syncResetUserProgressToSupabase() {
+  if (!isSupabaseConfigured()) {
+    supabaseLog.sync.warn('progress reset skipped — supabase not configured')
+    return { ok: true, skipped: true, reason: 'not_configured' }
+  }
+
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) {
+      supabaseLog.sync.warn('progress reset skipped — no auth session')
+      return { ok: true, skipped: true, reason: 'no_session' }
+    }
+
+    supabaseLog.sync.info('progress reset start', { userId })
+    captureSyncLog.info('progress reset start', { userId })
+
+    const [figuresResult, capturesResult, storageResult] = await Promise.all([
+      deleteAllUserFigures(userId),
+      deleteAllUserCaptures(userId),
+      deleteUserCaptureStorage(userId).catch((error) => {
+        captureSyncLog.error('progress reset storage cleanup failed', {
+          userId,
+          message: error?.message ?? String(error),
+        })
+        return { deleted: 0, storageError: error?.message ?? String(error) }
+      }),
+    ])
+
+    const summary = {
+      userFiguresDeleted: figuresResult.deleted ?? 0,
+      capturesDeleted: capturesResult.deleted ?? 0,
+      storageFilesDeleted: storageResult.deleted ?? 0,
+      storageError: storageResult.storageError ?? null,
+    }
+
+    supabaseLog.sync.info('progress reset success', { userId, ...summary })
+    captureSyncLog.info('progress reset success', { userId, ...summary })
+
+    return { ok: true, ...summary }
+  } catch (error) {
+    supabaseLog.sync.warn('progress reset failed', {
+      message: error?.message ?? String(error),
+    })
+    captureSyncLog.error('progress reset error', {
+      message: error?.message ?? String(error),
+    })
+    return { ok: false, reason: error?.message ?? 'reset_failed' }
   }
 }

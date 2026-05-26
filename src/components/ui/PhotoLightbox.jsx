@@ -18,7 +18,7 @@ export function PhotoLightbox({ photo, title, open, onClose }) {
     <AnimatePresence>
       {open && photo && (
         <m.div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/92 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          className="fixed inset-0 z-[200] bg-black/92"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -33,16 +33,22 @@ export function PhotoLightbox({ photo, title, open, onClose }) {
             <FaXmark size={18} />
           </button>
 
-          <m.img
-            src={photo}
-            alt={title ?? 'Foto ampliada'}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="max-h-[88dvh] w-full max-w-3xl object-contain"
+          <div
+            className="h-full w-full overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
             onClick={(event) => event.stopPropagation()}
-          />
+          >
+            <div className="flex min-h-[100dvh] items-center justify-center px-4 py-[calc(3.75rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <m.img
+                src={photo}
+                alt={title ?? 'Foto ampliada'}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.99 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="w-full max-w-3xl object-contain"
+              />
+            </div>
+          </div>
         </m.div>
       )}
     </AnimatePresence>

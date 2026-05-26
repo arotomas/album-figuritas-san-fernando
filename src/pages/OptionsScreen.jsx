@@ -24,7 +24,7 @@ export function OptionsScreen() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout, updateProfile, supabaseProfile, isSubmitting } = useAuth()
-  const resetProgress = useAppStore((state) => state.resetProgress)
+  const resetUserProgress = useAppStore((state) => state.resetUserProgress)
   const setQaTestFigureNear = useAppStore((state) => state.setQaTestFigureNear)
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const qaTestFigure = useAppStore((state) => state.qaTestFigure)
@@ -48,9 +48,40 @@ export function OptionsScreen() {
   const [selectedAddress, setSelectedAddress] = useState(null)
   const [profileMessage, setProfileMessage] = useState(null)
   const [profileError, setProfileError] = useState(null)
+  const [resetPhase, setResetPhase] = useState('idle')
+  const [resetError, setResetError] = useState(null)
 
   const { isQaActive: qaEnabled, withQa } = useQaMode()
   const devEnabled = isDevMode()
+
+  const handleResetRequest = () => {
+    setResetError(null)
+    setResetPhase('confirm')
+  }
+
+  const handleResetCancel = () => {
+    setResetPhase('idle')
+    setResetError(null)
+  }
+
+  const handleResetConfirm = async () => {
+    setResetPhase('loading')
+    setResetError(null)
+
+    const result = await resetUserProgress()
+
+    if (result.ok) {
+      setResetPhase('done')
+      return
+    }
+
+    setResetPhase('error')
+    setResetError(
+      result.reason === 'REMOTE_RESET_FAILED' || result.reason?.includes('policy')
+        ? 'No pudimos borrar tu progreso en el servidor. Probá de nuevo en unos segundos.'
+        : 'No pudimos reiniciar tu progreso. Probá de nuevo.',
+    )
+  }
 
   useEffect(() => {
     console.log('[QA options]', {
@@ -301,9 +332,52 @@ export function OptionsScreen() {
       )}
 
       <div className="mt-auto space-y-3 pb-2 pt-8">
-        <Button variant="outline" onClick={resetProgress}>
-          Reiniciar progreso
-        </Button>
+        {resetPhase === 'done' ? (
+          <div
+            className="rounded-2xl border border-progress/30 bg-progress/10 px-4 py-4 text-center"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-sm font-bold text-progress">Tu progreso fue reiniciado</p>
+            <p className="mt-1 text-xs text-white/55">
+              El álbum quedó vacío. ¡A explorar de nuevo!
+            </p>
+            <Button variant="ghost" className="mt-3" onClick={handleResetCancel}>
+              Entendido
+            </Button>
+          </div>
+        ) : resetPhase === 'confirm' ? (
+          <div className="rounded-2xl border border-red-300/20 bg-red-500/10 px-4 py-4">
+            <p className="text-sm font-bold text-red-100">¿Reiniciar todo tu progreso?</p>
+            <p className="mt-2 text-xs leading-5 text-red-100/75">
+              Se borrarán figuritas obtenidas, fotos, descubrimientos y recompensas. Esta acción
+              no se puede deshacer.
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <Button variant="outline" onClick={handleResetConfirm}>
+                Sí, reiniciar todo
+              </Button>
+              <Button variant="ghost" onClick={handleResetCancel}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              disabled={resetPhase === 'loading'}
+              onClick={handleResetRequest}
+            >
+              {resetPhase === 'loading' ? 'Reiniciando progreso…' : 'Reiniciar progreso'}
+            </Button>
+            {resetPhase === 'error' && resetError && (
+              <p className="text-center text-xs text-red-300" role="alert">
+                {resetError}
+              </p>
+            )}
+          </>
+        )}
         <Button variant="ghost" onClick={logout}>
           Cerrar sesión
         </Button>

@@ -31,16 +31,17 @@ export {
   STORAGE_BUCKET_MAX_BYTES,
 } from './storage'
 
-export { insertCapture } from './captures'
+export { insertCapture, deleteAllUserCaptures } from './captures'
 
 export {
   fetchUserFigures,
   replaceUserFigurePhoto,
   upsertUserFigure,
+  deleteAllUserFigures,
   toRemoteFigureId,
 } from './figures'
 
-export { syncUnlockToSupabase, syncReplaceFigurePhoto, pullRemoteAlbum } from './sync'
+export { syncUnlockToSupabase, syncReplaceFigurePhoto, pullRemoteAlbum, syncResetUserProgressToSupabase } from './sync'
 
 export {
   getAdminPlayers,

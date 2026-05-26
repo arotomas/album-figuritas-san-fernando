@@ -31,7 +31,7 @@ export function QaLocationPanel({
   figures = [],
 }) {
   const availabilityContext = useCollectionAvailabilityContext()
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [mockActive, setMockActive] = useState(() => Boolean(getQaRuntimeState().mockPosition))
 
   useEffect(() => {

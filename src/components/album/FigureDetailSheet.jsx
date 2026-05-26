@@ -60,11 +60,12 @@ export function FigureDetailSheet({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 24, scale: 0.98 }}
               transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="max-h-[min(92dvh,720px)] w-full max-w-md overflow-y-auto rounded-[1.75rem] border border-white/10 bg-charcoal shadow-2xl"
+              className="flex max-h-[min(92dvh,720px)] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-charcoal shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className={`h-1.5 w-full ${rarity.tailwind.accent}`} />
+              <div className={`h-1.5 w-full shrink-0 ${rarity.tailwind.accent}`} />
 
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               {obtained ? (
                 <div className={`bg-gradient-to-b ${rarity.tailwind.gradient} p-4`}>
                   <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-black/25 p-2">
@@ -78,14 +79,14 @@ export function FigureDetailSheet({
                         <img
                           src={figure.foto}
                           alt={figure.nombre}
-                          className="aspect-[3/4] w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                          className="mx-auto block max-h-[min(58dvh,calc(92dvh-16rem))] w-full object-contain transition duration-300 group-hover:scale-[1.01]"
                         />
                         <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-3 py-3 text-left text-xs font-semibold text-white/85">
                           Tocá para ampliar
                         </span>
                       </button>
                     ) : (
-                      <div className="flex aspect-[3/4] items-center justify-center text-6xl">
+                      <div className="flex min-h-[40dvh] items-center justify-center text-6xl">
                         {figure.emoji ?? '📍'}
                       </div>
                     )}
@@ -97,7 +98,7 @@ export function FigureDetailSheet({
                 </div>
               )}
 
-              <div className="space-y-4 px-5 py-5">
+              <div className="space-y-3 px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className={`${typeClasses.micro} text-white/45`}>
@@ -162,6 +163,7 @@ export function FigureDetailSheet({
                 >
                   Cerrar
                 </button>
+              </div>
               </div>
             </m.div>
           </m.div>

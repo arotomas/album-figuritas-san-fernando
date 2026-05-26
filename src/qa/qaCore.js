@@ -1,8 +1,9 @@
 /**
  * Capa única QA/debug/dev — activación, URL params, feature flags y visibilidad.
- * Producción pública: inactivo salvo ?qa=1 o sub-flags explícitas persistidas.
+ * Producción pública: inactivo salvo rol privilegiado, ?qa=1 en sesión o tester whitelist.
  */
 
+import { isSuperAdminProfile } from '../utils/roles'
 import {
   getQaRuntimeState,
   resetQaRuntime,
@@ -21,9 +22,15 @@ export const QA_URL_PARAMS = {
 }
 
 const STORAGE_SESSION_QA = 'album-qa-mode'
-const STORAGE_LOCAL_QA = 'album-qa-mode'
 const STORAGE_LEGACY_QA = 'figuritas-qa-mode'
+const STORAGE_LOCAL_QA = 'album-qa-mode'
 const STORAGE_QA_FLAGS = 'album-qa-flags'
+
+let qaAccessContext = {
+  profile: null,
+  userId: null,
+  email: null,
+}
 
 const urlFlagListeners = new Set()
 
@@ -44,8 +51,59 @@ export function subscribeQaUrlFlags(listener) {
   return () => urlFlagListeners.delete(listener)
 }
 
+export function isViteDev() {
+  return import.meta.env.DEV
+}
+
+/** Build de desarrollo/staging — no habilita shell QA en prod por sí solo. */
 export function isDevBuild() {
   return import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true'
+}
+
+export function setQaAccessContext({ profile, userId, email } = {}) {
+  qaAccessContext = {
+    profile: profile ?? null,
+    userId: userId ?? null,
+    email: email ?? null,
+  }
+  notifyUrlFlagChange()
+}
+
+function isQaTesterWhitelisted() {
+  const raw = import.meta.env.VITE_QA_TESTER_IDS?.trim()
+  if (!raw) return false
+
+  const tokens = raw
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+  if (!tokens.length) return false
+
+  const userId = String(qaAccessContext.userId ?? '').toLowerCase()
+  const email = String(qaAccessContext.email ?? '').toLowerCase()
+  return tokens.some((token) => token === userId || token === email)
+}
+
+function isQaPrivilegedUser() {
+  return isSuperAdminProfile(qaAccessContext.profile) || isQaTesterWhitelisted()
+}
+
+function purgeLegacyLocalStorageQa() {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem(STORAGE_LOCAL_QA)
+    localStorage.removeItem(STORAGE_LEGACY_QA)
+  } catch {
+    // ignore
+  }
+}
+
+function readSessionQaFlag() {
+  try {
+    return sessionStorage.getItem(STORAGE_SESSION_QA) === '1'
+  } catch {
+    return false
+  }
 }
 
 function isViteDebugGps() {
@@ -58,17 +116,12 @@ function persistQaMasterFlag() {
   } catch {
     // ignore
   }
-  try {
-    localStorage.setItem(STORAGE_LOCAL_QA, '1')
-  } catch {
-    // ignore
-  }
 }
 
 function readPersistedQaMasterFlag() {
+  if (readSessionQaFlag()) return true
+
   try {
-    if (sessionStorage.getItem(STORAGE_SESSION_QA) === '1') return true
-    if (localStorage.getItem(STORAGE_LOCAL_QA) === '1') return true
     if (sessionStorage.getItem(STORAGE_LEGACY_QA) === '1') {
       persistQaMasterFlag()
       return true
@@ -76,6 +129,7 @@ function readPersistedQaMasterFlag() {
   } catch {
     // ignore
   }
+
   return false
 }
 
@@ -172,20 +226,24 @@ export function activateQaMode({ log = true } = {}) {
   return true
 }
 
-/** Shell QA visible: DEV build o sesión ?qa=1 persistida. */
+/** Shell QA visible: Vite DEV, super admin, tester whitelist o ?qa=1 en sesión. */
 export function isQaShellActive() {
-  if (typeof window === 'undefined') return isDevBuild()
-  return isDevBuild() || urlFlags.qa || readPersistedQaMasterFlag()
+  if (typeof window === 'undefined') return isViteDev()
+  if (isViteDev()) return true
+  if (isQaPrivilegedUser()) return true
+  if (urlFlags.qa || readSessionQaFlag()) return true
+  return false
 }
 
-/** Sesión QA explícita (?qa=1 o storage). */
+/** QA master activo — mismo gate que shell para prod pública. */
 export function isQaMasterActive() {
-  if (typeof window === 'undefined') return false
-  return urlFlags.qa || readPersistedQaMasterFlag()
+  return isQaShellActive()
 }
 
 export function syncQaFromUrl(searchString) {
   if (typeof window === 'undefined') return false
+
+  purgeLegacyLocalStorageQa()
 
   const search =
     searchString ??
@@ -215,17 +273,19 @@ export function isDebugGpsEnabled() {
 }
 
 export function isDebugGpsLoggingEnabled() {
-  return isDevBuild() || isDebugGpsEnabled()
+  return isViteDev() || isDebugGpsEnabled()
 }
 
 export function isLocationBypassEnabled() {
   if (!isQaShellActive()) return false
-  return isDevBuild() || urlFlags.mockLocation || urlFlags.qa
+  if (isViteDev()) return true
+  return urlFlags.mockLocation || urlFlags.qa
 }
 
 export function isUniverseDiagnosticsEnabled() {
   if (!isQaShellActive()) return false
-  return isDevBuild() || urlFlags.debugUniverse || urlFlags.qa
+  if (isViteDev()) return true
+  return urlFlags.debugUniverse || urlFlags.qa
 }
 
 export function isDebugRevealEnabled() {
@@ -246,20 +306,18 @@ export function toggleDebugRevealOverride() {
   return setDebugRevealOverride(next)
 }
 
-function resolvePanelVisibility(panelKey, autoEnabled) {
-  const override = getQaRuntimeState().panels[panelKey]
-  if (override != null) return override
-  return autoEnabled
+function resolvePanelVisibility(panelKey) {
+  return getQaRuntimeState().panels[panelKey] === true
 }
 
 export function isGpsPanelVisible() {
   if (!isQaShellActive()) return false
-  return resolvePanelVisibility('gps', isDebugGpsEnabled())
+  return resolvePanelVisibility('gps')
 }
 
 export function isLocationPanelVisible() {
   if (!isQaShellActive()) return false
-  return resolvePanelVisibility('location', isLocationBypassEnabled())
+  return resolvePanelVisibility('location')
 }
 
 export function isQaBadgeVisible() {

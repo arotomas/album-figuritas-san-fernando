@@ -40,9 +40,11 @@ export function QaLauncher() {
         }
         break
       case 'teleport':
-        openQaPanel('location')
         if (location.pathname !== '/map') {
+          openQaPanel('location')
           navigate(withQa('/map'))
+        } else {
+          toggleQaPanel('location')
         }
         break
       case 'availability':

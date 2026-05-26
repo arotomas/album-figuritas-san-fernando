@@ -1,8 +1,46 @@
 /** Estado runtime QA — mocks, overrides y toggles de paneles. */
 
+const PANELS_SESSION_KEY = 'album-qa-panels'
+
 const DEFAULT_PANELS = {
-  gps: null,
-  location: null,
+  gps: false,
+  location: false,
+}
+
+function readPersistedPanels() {
+  if (typeof sessionStorage === 'undefined') {
+    return { ...DEFAULT_PANELS }
+  }
+
+  try {
+    const raw = sessionStorage.getItem(PANELS_SESSION_KEY)
+    if (!raw) return { ...DEFAULT_PANELS }
+    const parsed = JSON.parse(raw)
+    return {
+      gps: parsed?.gps === true,
+      location: parsed?.location === true,
+    }
+  } catch {
+    return { ...DEFAULT_PANELS }
+  }
+}
+
+function persistPanels() {
+  if (typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.setItem(PANELS_SESSION_KEY, JSON.stringify(qaRuntime.panels))
+  } catch {
+    // ignore
+  }
+}
+
+function clearPersistedPanels() {
+  if (typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.removeItem(PANELS_SESSION_KEY)
+  } catch {
+    // ignore
+  }
 }
 
 const qaRuntime = {
@@ -12,7 +50,7 @@ const qaRuntime = {
   simulateCaptureSuccess: false,
   /** null = usar URL/qa; boolean = override desde launcher */
   debugRevealOverride: null,
-  panels: { ...DEFAULT_PANELS },
+  panels: readPersistedPanels(),
 }
 
 const listeners = new Set()
@@ -49,14 +87,15 @@ export function setQaFlag(key, value) {
 
 export function setQaPanelVisibility(panel, visible) {
   if (!Object.hasOwn(qaRuntime.panels, panel)) return
-  qaRuntime.panels[panel] = visible
+  qaRuntime.panels[panel] = Boolean(visible)
+  persistPanels()
   notifyQaRuntimeChange()
 }
 
 export function toggleQaPanelVisibility(panel) {
   if (!Object.hasOwn(qaRuntime.panels, panel)) return false
-  const current = qaRuntime.panels[panel]
-  qaRuntime.panels[panel] = current == null ? true : !current
+  qaRuntime.panels[panel] = !qaRuntime.panels[panel]
+  persistPanels()
   notifyQaRuntimeChange()
   return qaRuntime.panels[panel]
 }
@@ -68,6 +107,7 @@ export function resetQaRuntime() {
   qaRuntime.simulateCaptureSuccess = false
   qaRuntime.debugRevealOverride = null
   qaRuntime.panels = { ...DEFAULT_PANELS }
+  clearPersistedPanels()
   notifyQaRuntimeChange()
 }
 

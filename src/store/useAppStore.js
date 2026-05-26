@@ -17,7 +17,8 @@ import { computeAlbumStatus } from './albumUtils'
 import { persistLog } from '../utils/persistLog'
 import { offsetCoordinates } from '../utils/geoOffset'
 import { getDistanceMeters } from '../utils/geo'
-import { syncUnlockToSupabase, syncReplaceFigurePhoto, syncDeleteFigurePhoto } from '../services/supabase/sync'
+import { syncUnlockToSupabase, syncReplaceFigurePhoto, syncDeleteFigurePhoto, syncResetUserProgressToSupabase } from '../services/supabase/sync'
+import { isSupabaseConfigured } from '../services/supabase/auth'
 import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
 import { canUseTestFigure } from '../qa/qaCore'
 import { myFiguresLog } from '../utils/myFiguresLog'
@@ -59,6 +60,35 @@ const createInitialFigures = () =>
     fotoSizeBytes: null,
     obtenidaEn: null,
   }))
+
+function clearAllFigureProgress(figures) {
+  const source = Array.isArray(figures) && figures.length > 0 ? figures : createInitialFigures()
+  return source.map((figure) => ({
+    ...figure,
+    obtenida: false,
+    foto: null,
+    fotoSizeBytes: null,
+    obtenidaEn: null,
+    captureMeta: null,
+  }))
+}
+
+function buildLocalProgressResetPatch(state) {
+  return {
+    figures: clearAllFigureProgress(state.figures),
+    albumStatus: ALBUM_STATUS.EN_PROGRESO,
+    lastObtenidaFigureId: null,
+    lastViewedFigureId: null,
+    lastSavedAt: Date.now(),
+    celebratedCollectionIds: [],
+    discoveredCollectionIds: [],
+    acknowledgedDiscoveryCollectionIds: [],
+    nearFigure: null,
+    qaTestFigure: null,
+    captureSession: null,
+    lastSupabaseSyncWarning: null,
+  }
+}
 
 function mergeCatalogWithProgress(catalogFigures, currentFigures) {
   const catalog = Array.isArray(catalogFigures) ? catalogFigures : []
@@ -201,6 +231,7 @@ export const useAppStore = create(
   persist(
     (set, get) => ({
       _hasHydrated: false,
+      progressResetInFlight: false,
       isAuthenticated: false,
       user: null,
       figures: createInitialFigures(),
@@ -306,6 +337,7 @@ export const useAppStore = create(
 
       mergeRemoteUserFigures: (remoteRows) =>
         set((state) => {
+          if (state.progressResetInFlight) return state
           if (!Array.isArray(remoteRows) || remoteRows.length === 0) return state
 
           const catalogIds = new Set(
@@ -862,19 +894,69 @@ export const useAppStore = create(
           }
         }),
 
-      resetProgress: () =>
-        set({
-          figures: createInitialFigures(),
-          albumStatus: ALBUM_STATUS.EN_PROGRESO,
-          lastObtenidaFigureId: null,
-          lastViewedFigureId: null,
-          lastSavedAt: Date.now(),
-          celebratedCollectionIds: [],
-          discoveredCollectionIds: [],
-          acknowledgedDiscoveryCollectionIds: [],
-          nearFigure: null,
-          qaTestFigure: null,
-        }),
+      resetUserProgress: async () => {
+        const state = get()
+        const obtainedCount = state.figures.filter((figure) => figure.obtenida).length
+
+        persistLog.persist('reset start', {
+          userId: state.supabaseUserId ?? null,
+          obtainedCount,
+          supabaseReady: state.supabaseReady,
+        })
+
+        if (import.meta.env.DEV) {
+          console.info('[RESET] start', {
+            userId: state.supabaseUserId,
+            obtainedCount,
+            discoveredCollections: state.discoveredCollectionIds?.length ?? 0,
+            celebratedCollections: state.celebratedCollectionIds?.length ?? 0,
+          })
+        }
+
+        set({ progressResetInFlight: true })
+
+        try {
+          if (state.supabaseReady && isSupabaseConfigured()) {
+            const remote = await syncResetUserProgressToSupabase()
+            if (!remote.ok && !remote.skipped) {
+              throw new Error(remote.reason ?? 'REMOTE_RESET_FAILED')
+            }
+
+            if (import.meta.env.DEV) {
+              console.info('[RESET] remote complete', remote)
+            }
+          }
+
+          const patch = buildLocalProgressResetPatch(get())
+          set({ ...patch, progressResetInFlight: false })
+
+          persistLog.persist('reset complete', {
+            figures: patch.figures.length,
+          })
+
+          if (import.meta.env.DEV) {
+            console.info('[RESET] local complete', {
+              figures: patch.figures.length,
+              albumStatus: patch.albumStatus,
+            })
+          }
+
+          return { ok: true }
+        } catch (error) {
+          set({ progressResetInFlight: false })
+          const reason = error?.message ?? 'RESET_FAILED'
+          persistLog.persistWarn('reset failed', reason)
+
+          if (import.meta.env.DEV) {
+            console.warn('[RESET] failed', reason)
+          }
+
+          return { ok: false, reason }
+        }
+      },
+
+      /** @deprecated alias — usar resetUserProgress */
+      resetProgress: async () => get().resetUserProgress(),
 
       unlockAllFigures: () =>
         set((state) => {

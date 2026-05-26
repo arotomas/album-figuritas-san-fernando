@@ -1,6 +1,6 @@
 import { useQaCore } from '../../qa/useQaCore'
 
-export function QaBadge({ className = '' }) {
+export function QaBadge() {
   const { showQaTools } = useQaCore()
 
   if (!showQaTools) return null
@@ -8,9 +8,12 @@ export function QaBadge({ className = '' }) {
   return (
     <div
       data-qa-banner="true"
-      className={`safe-top safe-x shrink-0 border-b border-amber-500/40 bg-amber-100 px-4 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-amber-900 ${className}`}
+      className="pointer-events-none fixed left-3 z-[600] safe-top"
+      style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
     >
-      QA MODE
+      <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-zinc-950/80 px-2.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-200/75 shadow-sm backdrop-blur-sm">
+        QA
+      </span>
     </div>
   )
 }

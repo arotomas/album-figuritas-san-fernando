@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { isQaShellActive, syncQaFromUrl } from './qa/qaCore'
+import { isQaShellActive, setQaAccessContext, syncQaFromUrl } from './qa/qaCore'
 import { LazyMotion, domAnimation } from 'framer-motion'
 import { AppRoutes } from './routes'
 import { AppBootScreen } from './components/layout/AppBootScreen'
@@ -15,7 +15,17 @@ function App() {
   const { isBooting, bootPhase } = useAppBootGate()
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
+  const supabaseProfile = useAppStore((state) => state.supabaseProfile)
+  const supabaseUserId = useAppStore((state) => state.supabaseUserId)
   const isAdminRoute = location.pathname.startsWith('/admin')
+
+  useEffect(() => {
+    setQaAccessContext({
+      profile: supabaseProfile,
+      userId: supabaseUserId,
+      email: supabaseProfile?.email ?? null,
+    })
+  }, [supabaseProfile, supabaseUserId])
 
   useEffect(() => {
     syncQaFromUrl(location.search)
