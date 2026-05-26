@@ -12,6 +12,7 @@ import { getDistanceMeters } from '../utils/geo'
 import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
 import {
   buildProximitySnapshot,
+  getProximityPhase,
   getProximityRadii,
   isWithinCaptureRange,
   isWithinDetectionRange,
@@ -239,11 +240,26 @@ export function useCaptureFlow({
   }, [detectionRadiusMeters, isRetake, ringDistanceMeters])
 
   const normalizedRingProgress = proximitySnapshot?.rawProgress ?? 0
-  const visualProgress = useSmoothedProximityVisual(normalizedRingProgress, {
+  const easedRingProgress = proximitySnapshot?.easedProgress ?? 0
+
+  const visualProgress = useSmoothedProximityVisual(easedRingProgress, {
     enabled: Boolean(resolvedFigure) && inDetectionRange && !isRetake && ringDistanceMeters != null,
+    snap: inCaptureRange,
   })
 
-  const proximityPhase = proximitySnapshot?.phase ?? 'none'
+  /** Señal única para ring, glow, fases visuales y feedback textual. */
+  const ringProgress = inDetectionRange ? visualProgress : 0
+
+  const proximityPhase = useMemo(
+    () =>
+      getProximityPhase(ringProgress, {
+        inDetectionRange,
+        inCaptureRange,
+        visualMode: true,
+      }),
+    [inCaptureRange, inDetectionRange, ringProgress],
+  )
+
   const figureRarity = proximitySnapshot?.rarity ?? 'común'
 
   const effectivePosition = hasLiveGps ? livePosition : snapshotToPosition(sessionSnapshot)
@@ -252,42 +268,44 @@ export function useCaptureFlow({
     livePosition?.accuracy != null &&
     livePosition.accuracy > GPS_APPROXIMATE_CAPTURE_WARNING_M
 
-  const gpsProgress = inDetectionRange ? visualProgress : 0
+  const gpsProgress = ringProgress
+
+  const lastProximityPhaseRef = useRef(proximityPhase)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
     if (!resolvedFigure || ringDistanceMeters == null) return
 
-    console.info('[RING_DEBUG]', {
-      distance: Math.round(ringDistanceMeters * 10) / 10,
-      detectionRadius: detectionRadiusMeters,
-      captureRadius: captureRadiusMeters,
-      normalized: Math.round(normalizedRingProgress * 1000) / 1000,
-      eased: Math.round((proximitySnapshot?.easedProgress ?? 0) * 1000) / 1000,
-      finalGpsProgress: Math.round(gpsProgress * 1000) / 1000,
-      distanceSource: liveDistanceMeters != null ? 'live' : 'bootstrap',
-      inDetectionRange,
-      inCaptureRange,
-    })
+    if (lastProximityPhaseRef.current !== proximityPhase) {
+      console.info('[PROXIMITY]', {
+        phase: proximityPhase,
+        distance: Math.round(ringDistanceMeters * 10) / 10,
+        raw: Math.round(normalizedRingProgress * 1000) / 1000,
+        eased: Math.round(easedRingProgress * 1000) / 1000,
+        visual: Math.round(ringProgress * 1000) / 1000,
+        inCaptureRange,
+      })
+      lastProximityPhaseRef.current = proximityPhase
+    }
   }, [
-    captureRadiusMeters,
-    detectionRadiusMeters,
-    gpsProgress,
+    easedRingProgress,
     inCaptureRange,
-    inDetectionRange,
-    liveDistanceMeters,
     normalizedRingProgress,
-    proximitySnapshot?.easedProgress,
+    proximityPhase,
     resolvedFigure,
     ringDistanceMeters,
+    ringProgress,
   ])
 
-  const isReady =
+  const captureReady =
     camera.isReady &&
     inCaptureRange &&
     phase === CAPTURE_PHASES.CAMERA &&
     !isProcessing &&
     Boolean(resolvedFigure)
+
+  /** Visual alineado con el aro — el shutter espera a que el progreso visual confirme. */
+  const isReady = captureReady && ringProgress >= 0.88
 
   const lastPulsePhaseRef = useRef(null)
 
@@ -502,9 +520,16 @@ export function useCaptureFlow({
   )
 
   useEffect(() => {
-    if (isReady && !hasVibratedReadyRef.current && camera.isEmbeddedActive) {
+    if (isReady && !hasVibratedReadyRef.current) {
       if (vibrateReady()) {
         hasVibratedReadyRef.current = true
+        if (import.meta.env.DEV) {
+          console.info('[CAPTURE-READY]', {
+            figureId: resolvedFigure?.id ?? null,
+            ringProgress: Math.round(ringProgress * 1000) / 1000,
+            embeddedCamera: camera.isEmbeddedActive,
+          })
+        }
         captureLog.info('ready to capture', { figureId: resolvedFigure?.id })
       }
     }
@@ -512,7 +537,7 @@ export function useCaptureFlow({
     if (!isReady) {
       hasVibratedReadyRef.current = false
     }
-  }, [camera.isEmbeddedActive, isReady, resolvedFigure?.id])
+  }, [camera.isEmbeddedActive, isReady, resolvedFigure?.id, ringProgress])
 
   const runObtainAndReward = useCallback(
     async (photoPayload, figureSnapshot) => {
@@ -1126,6 +1151,7 @@ export function useCaptureFlow({
     phase,
     camera,
     gpsProgress,
+    ringProgress,
     visualProgress,
     proximityPhase,
     figureRarity,

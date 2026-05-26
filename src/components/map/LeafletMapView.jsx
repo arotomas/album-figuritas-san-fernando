@@ -16,7 +16,7 @@ import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
-import { FIGURE_ALERT_COOLDOWN_MS } from '../../config/proximity'
+import { FIGURE_ALERT_COOLDOWN_MS, MAP_PROXIMITY_DEBOUNCE_MS } from '../../config/proximity'
 import { vibrateFigureProximityAlert } from '../../utils/vibration'
 import { prefersReducedMotion } from '../../utils/performance'
 import { FigureMarker } from './FigureMarker'
@@ -156,10 +156,12 @@ function FigureMarkersLayer({ figures, nearFigureIds }) {
   const cacheRef = useRef({})
 
   useEffect(() => {
-    console.info('[map-figures]', 'markers render', JSON.stringify({
-      count: figures.length,
-      ids: figures.map((figure) => String(figure.id)),
-    }))
+    if (import.meta.env.DEV) {
+      console.info('[map-figures]', 'markers render', JSON.stringify({
+        count: figures.length,
+        ids: figures.map((figure) => String(figure.id)),
+      }))
+    }
 
     markersRef.current.forEach((marker) => marker.remove())
     rootsRef.current.forEach((root) => root.unmount())
@@ -249,7 +251,7 @@ function LeafletMapViewInner({
     stopTracking,
   } = useGeolocation()
 
-  const debouncedProximity = useDebouncedLocation(proximityPosition, 900)
+  const debouncedProximity = useDebouncedLocation(proximityPosition, MAP_PROXIMITY_DEBOUNCE_MS)
   const {
     nearFigure,
     isNearFigure,

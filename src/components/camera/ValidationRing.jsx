@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react'
-import { motion, useSpring, useTransform } from 'framer-motion'
+import { useEffect, useMemo, useRef } from 'react'
+import { motion } from 'framer-motion'
 import {
   getRingProximityColors,
   getRingVisualStyle,
@@ -16,7 +16,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 function RingParticles({ intensity, color }) {
   if (intensity <= 0) return null
 
-  const count = Math.max(2, Math.round(intensity * 8))
+  const count = Math.max(2, Math.min(5, Math.round(intensity * 6)))
   return (
     <div className="pointer-events-none absolute inset-0">
       {Array.from({ length: count }).map((_, index) => (
@@ -27,18 +27,17 @@ function RingParticles({ intensity, color }) {
             backgroundColor: color,
             left: `${12 + ((index * 17) % 76)}%`,
             top: `${8 + ((index * 23) % 84)}%`,
-            opacity: 0.25 + intensity * 0.45,
+            opacity: 0.2 + intensity * 0.35,
           }}
           animate={{
-            y: [0, -10 - intensity * 8, 0],
-            opacity: [0.2, 0.55 + intensity * 0.35, 0.2],
-            scale: [0.8, 1.1 + intensity * 0.2, 0.8],
+            y: [0, -8 - intensity * 6, 0],
+            opacity: [0.18, 0.45 + intensity * 0.25, 0.18],
           }}
           transition={{
-            duration: 2.4 + index * 0.15,
+            duration: 2.8 + index * 0.12,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: index * 0.12,
+            delay: index * 0.15,
           }}
         />
       ))}
@@ -51,32 +50,10 @@ export function ValidationRing({
   isReady = false,
   proximityPhase = PROXIMITY_PHASES.NONE,
 }) {
-  const springProgress = useSpring(progress, {
-    stiffness: 42,
-    damping: 18,
-    mass: 0.9,
-  })
-
-  useEffect(() => {
-    springProgress.set(progress)
-  }, [progress, springProgress])
-
-  const dashOffset = useTransform(springProgress, (value) => {
-    const clamped = Math.min(1, Math.max(0, value))
-    return CIRCUMFERENCE * (1 - clamped)
-  })
-
-  const progressOpacity = useTransform(springProgress, (value) => {
-    const clamped = Math.min(1, Math.max(0, value))
-    if (clamped <= 0) return 0
-    return 0.55 + clamped * 0.45
-  })
-
-  const haloOpacity = useTransform(springProgress, (value) => {
-    const clamped = Math.min(1, Math.max(0, value))
-    if (clamped <= 0) return 0
-    return 0.12 + clamped * 0.22
-  })
+  const clamped = Math.min(1, Math.max(0, progress))
+  const dashOffset = CIRCUMFERENCE * (1 - clamped)
+  const progressOpacity = clamped <= 0 ? 0 : 0.55 + clamped * 0.45
+  const haloOpacity = clamped <= 0 ? 0 : 0.1 + clamped * 0.18
 
   const phase = isReady ? PROXIMITY_PHASES.CAPTURE : proximityPhase
   const visualStyle = useMemo(() => getRingVisualStyle(phase), [phase])
@@ -85,9 +62,21 @@ export function ValidationRing({
     [isReady, progress],
   )
 
+  const lastPhaseRef = useRef(phase)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    if (lastPhaseRef.current === phase) return
+    lastPhaseRef.current = phase
+    console.info('[RING-STATE]', {
+      phase,
+      progress: Math.round(clamped * 1000) / 1000,
+      isReady,
+    })
+  }, [clamped, isReady, phase])
+
   const containerOpacity = Math.max(
     visualStyle.opacity,
-    progress > 0.02 ? 0.42 : visualStyle.opacity,
+    progress > 0.02 ? 0.4 : visualStyle.opacity,
   )
 
   return (
@@ -97,15 +86,15 @@ export function ValidationRing({
         opacity: containerOpacity,
         scale: visualStyle.scale,
       }}
-      transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
       <motion.div
         animate={{
-          opacity: isReady ? [0.35, 0.75, 0.35] : ringColors.glowIntensity * 0.85 + 0.08,
-          scale: isReady ? [1, 1.12, 1] : 0.92 + ringColors.glowIntensity * 0.08,
+          opacity: isReady ? [0.28, 0.58, 0.28] : ringColors.glowIntensity * 0.7 + 0.06,
+          scale: isReady ? [1, 1.08, 1] : 0.94 + ringColors.glowIntensity * 0.06,
         }}
         transition={{
-          duration: isReady ? 1.6 : 0.55,
+          duration: isReady ? 1.8 : 0.45,
           repeat: isReady ? Infinity : 0,
           ease: 'easeInOut',
         }}
@@ -121,7 +110,7 @@ export function ValidationRing({
       <svg width={SIZE} height={SIZE} className="-rotate-90" aria-hidden="true">
         <defs>
           <filter id="ring-progress-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -129,7 +118,6 @@ export function ValidationRing({
           </filter>
         </defs>
 
-        {/* Capa 1 — base fija: aro blanco tenue siempre completo */}
         <circle
           cx={SIZE / 2}
           cy={SIZE / 2}
@@ -139,23 +127,19 @@ export function ValidationRing({
           strokeWidth={visualStyle.strokeWidth}
         />
 
-        {/* Capa 2a — halo suave del arco verde (scanner/radar) */}
         <motion.circle
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
           stroke={RING_PROGRESS_COLOR}
-          strokeWidth={visualStyle.strokeWidth + 3}
+          strokeWidth={visualStyle.strokeWidth + 2}
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
-          style={{
-            strokeDashoffset: dashOffset,
-            opacity: haloOpacity,
-          }}
+          animate={{ strokeDashoffset: dashOffset, opacity: haloOpacity }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
         />
 
-        {/* Capa 2b — progreso radial verde institucional */}
         <motion.circle
           cx={SIZE / 2}
           cy={SIZE / 2}
@@ -166,20 +150,16 @@ export function ValidationRing({
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
           filter="url(#ring-progress-glow)"
-          style={{
-            strokeDashoffset: dashOffset,
-            opacity: progressOpacity,
-          }}
+          animate={{ strokeDashoffset: dashOffset, opacity: progressOpacity }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
         />
       </svg>
 
       <div className="absolute inset-0 flex items-center justify-center">
         <motion.div
-          animate={{
-            boxShadow: ringColors.frameGlow,
-          }}
-          transition={{ duration: 0.55, ease: 'easeOut' }}
-          className="relative h-44 w-44 rounded-3xl border-2 transition-colors duration-700"
+          animate={{ boxShadow: ringColors.frameGlow }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+          className="relative h-44 w-44 rounded-3xl border-2 transition-colors duration-500"
           style={{ borderColor: ringColors.frameBorder }}
         >
           <span className="absolute -left-px -top-px h-6 w-6 border-l-2 border-t-2 border-white/50" />

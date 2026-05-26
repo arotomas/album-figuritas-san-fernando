@@ -45,6 +45,7 @@ export function MapScreen() {
   }, [])
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     logMapFigurePipeline({
       figures,
       visiblePlayerFigures,

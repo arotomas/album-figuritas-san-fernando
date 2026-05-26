@@ -53,11 +53,26 @@ export function isWithinCaptureRange(distanceMeters, captureMeters) {
   return distanceMeters != null && distanceMeters <= captureMeters
 }
 
-export function getProximityPhase(easedProgress, { inDetectionRange, inCaptureRange }) {
+export function getProximityPhase(
+  easedProgress,
+  { inDetectionRange, inCaptureRange, visualMode = false } = {},
+) {
   if (!inDetectionRange) return PROXIMITY_PHASES.NONE
-  if (inCaptureRange || easedProgress >= 0.995) return PROXIMITY_PHASES.CAPTURE
-  if (easedProgress >= 0.72) return PROXIMITY_PHASES.CLOSE
-  if (easedProgress >= 0.22) return PROXIMITY_PHASES.MEDIUM
+
+  const progress = Math.min(1, Math.max(0, easedProgress ?? 0))
+
+  if (visualMode) {
+    if (progress >= 0.94 || (inCaptureRange && progress >= 0.82)) {
+      return PROXIMITY_PHASES.CAPTURE
+    }
+    if (progress >= 0.7) return PROXIMITY_PHASES.CLOSE
+    if (progress >= 0.2) return PROXIMITY_PHASES.MEDIUM
+    return PROXIMITY_PHASES.FAR
+  }
+
+  if (inCaptureRange || progress >= 0.995) return PROXIMITY_PHASES.CAPTURE
+  if (progress >= 0.72) return PROXIMITY_PHASES.CLOSE
+  if (progress >= 0.22) return PROXIMITY_PHASES.MEDIUM
   return PROXIMITY_PHASES.FAR
 }
 
@@ -120,9 +135,9 @@ export function getMapProximityHint(phase, { isBonus = false } = {}) {
 
 export function getRingVisualStyle(phase) {
   const base = {
-    opacity: 0.2,
+    opacity: 0.18,
     scale: 0.82,
-    glowOpacity: 0.08,
+    glowOpacity: 0.06,
     particleIntensity: 0,
     strokeWidth: 4,
   }
@@ -131,27 +146,27 @@ export function getRingVisualStyle(phase) {
     case PROXIMITY_PHASES.FAR:
       return {
         ...base,
-        opacity: 0.38,
+        opacity: 0.34,
         scale: 0.84,
-        glowOpacity: 0.1,
-        particleIntensity: 0.1,
+        glowOpacity: 0.08,
+        particleIntensity: 0.08,
       }
     case PROXIMITY_PHASES.MEDIUM:
       return {
         ...base,
-        opacity: 0.62,
-        scale: 0.92,
-        glowOpacity: 0.22,
-        particleIntensity: 0.4,
+        opacity: 0.56,
+        scale: 0.9,
+        glowOpacity: 0.16,
+        particleIntensity: 0.28,
         strokeWidth: 4.5,
       }
     case PROXIMITY_PHASES.CLOSE:
       return {
         ...base,
-        opacity: 0.86,
-        scale: 0.97,
-        glowOpacity: 0.36,
-        particleIntensity: 0.7,
+        opacity: 0.78,
+        scale: 0.96,
+        glowOpacity: 0.28,
+        particleIntensity: 0.5,
         strokeWidth: 5,
       }
     case PROXIMITY_PHASES.CAPTURE:
@@ -159,8 +174,8 @@ export function getRingVisualStyle(phase) {
         ...base,
         opacity: 1,
         scale: 1,
-        glowOpacity: 0.55,
-        particleIntensity: 1,
+        glowOpacity: 0.42,
+        particleIntensity: 0.72,
         strokeWidth: 5.5,
       }
     default:
@@ -214,28 +229,28 @@ export function getRingProgressFeedbackStyle(progress) {
 export function getRingProximityColors(progress, { isReady = false } = {}) {
   if (isReady) {
     return {
-      glow: 'rgba(140,198,63,0.52)',
-      glowIntensity: 1,
+      glow: 'rgba(140,198,63,0.38)',
+      glowIntensity: 0.85,
       particle: RING_PROGRESS_COLOR,
-      frameGlow: '0 0 28px rgba(140,198,63,0.5)',
-      frameBorder: 'rgba(140,198,63,0.85)',
+      frameGlow: '0 0 22px rgba(140,198,63,0.38)',
+      frameBorder: 'rgba(140,198,63,0.78)',
     }
   }
 
   const fill = Math.min(1, Math.max(0, progress))
-  const glowIntensity = fill ** 1.15
+  const glowIntensity = fill ** 1.2
 
   return {
-    glow: `rgba(140,198,63,${0.04 + glowIntensity * 0.36})`,
+    glow: `rgba(140,198,63,${0.03 + glowIntensity * 0.28})`,
     glowIntensity,
     particle:
       fill >= 0.35
         ? RING_PROGRESS_COLOR
-        : `rgba(255,255,255,${0.32 + fill * 0.42})`,
-    frameGlow: `0 0 ${6 + fill * 24}px rgba(140,198,63,${0.06 + fill * 0.34})`,
+        : `rgba(255,255,255,${0.28 + fill * 0.38})`,
+    frameGlow: `0 0 ${4 + fill * 18}px rgba(140,198,63,${0.05 + fill * 0.26})`,
     frameBorder:
       fill >= 0.8
-        ? `rgba(140,198,63,${0.5 + fill * 0.35})`
-        : `rgba(255,255,255,${0.2 + fill * 0.3})`,
+        ? `rgba(140,198,63,${0.42 + fill * 0.28})`
+        : `rgba(255,255,255,${0.18 + fill * 0.26})`,
   }
 }
