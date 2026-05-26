@@ -7,9 +7,10 @@ import {
 } from '../utils/nativePhotoPrepare'
 import { compressImageWithFallback } from '../utils/imageCompression'
 import { withTimeout } from '../utils/withTimeout'
-import { vibrateCapture, vibrateReady, vibrateUnlock, vibrateProximityPulse } from '../utils/vibration'
+import { vibrateCapture, vibrateReady, vibrateProximityPulse } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
 import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
+import { REWARD_ENTRY_BEAT_MS } from '../config/captureFeel'
 import {
   buildProximitySnapshot,
   getProximityPhase,
@@ -606,6 +607,7 @@ export function useCaptureFlow({
       }
 
       setCapturedFigure(figureSnapshot)
+      await new Promise((resolve) => window.setTimeout(resolve, REWARD_ENTRY_BEAT_MS))
       setPhase(CAPTURE_PHASES.REWARD)
       phaseRef.current = CAPTURE_PHASES.REWARD
       camera.stop()
@@ -1127,7 +1129,6 @@ export function useCaptureFlow({
 
   const showRewardComplete = useCallback(() => {
     rewardLog.info('reward complete → unlock')
-    vibrateUnlock()
     setPhase(CAPTURE_PHASES.UNLOCK)
   }, [])
 

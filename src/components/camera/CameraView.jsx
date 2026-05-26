@@ -126,10 +126,10 @@ export function CameraView({
       <AnimatePresence>
         {isCapturing && (
           <motion.div
-            initial={{ opacity: 0.9 }}
-            animate={{ opacity: 0 }}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: [1, 1, 0] }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.46, times: [0, 0.22, 1], ease: 'easeOut' }}
             className="pointer-events-none absolute inset-0 z-30 bg-white"
           />
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   getRingProximityColors,
@@ -55,6 +55,23 @@ export function ValidationRing({
   const progressOpacity = clamped <= 0 ? 0 : 0.55 + clamped * 0.45
   const haloOpacity = clamped <= 0 ? 0 : 0.1 + clamped * 0.18
 
+  const [readyBurst, setReadyBurst] = useState(false)
+  const wasReadyRef = useRef(false)
+
+  useEffect(() => {
+    if (isReady && !wasReadyRef.current) {
+      setReadyBurst(true)
+      const timer = window.setTimeout(() => setReadyBurst(false), 420)
+      wasReadyRef.current = true
+      return () => window.clearTimeout(timer)
+    }
+    if (!isReady) {
+      wasReadyRef.current = false
+      setReadyBurst(false)
+    }
+    return undefined
+  }, [isReady])
+
   const phase = isReady ? PROXIMITY_PHASES.CAPTURE : proximityPhase
   const visualStyle = useMemo(() => getRingVisualStyle(phase), [phase])
   const ringColors = useMemo(
@@ -84,18 +101,26 @@ export function ValidationRing({
       className="pointer-events-none relative flex items-center justify-center"
       animate={{
         opacity: containerOpacity,
-        scale: visualStyle.scale,
+        scale: readyBurst ? 1.06 : isReady ? 1.02 : visualStyle.scale,
       }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={
+        readyBurst
+          ? { duration: 0.12, ease: [0.22, 1, 0.36, 1] }
+          : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
+      }
     >
       <motion.div
         animate={{
-          opacity: isReady ? [0.28, 0.58, 0.28] : ringColors.glowIntensity * 0.7 + 0.06,
-          scale: isReady ? [1, 1.08, 1] : 0.94 + ringColors.glowIntensity * 0.06,
+          opacity: readyBurst
+            ? 0.72
+            : isReady
+              ? [0.32, 0.52, 0.32]
+              : ringColors.glowIntensity * 0.7 + 0.06,
+          scale: readyBurst ? 1.14 : isReady ? [1, 1.07, 1] : 0.94 + ringColors.glowIntensity * 0.06,
         }}
         transition={{
-          duration: isReady ? 1.8 : 0.45,
-          repeat: isReady ? Infinity : 0,
+          duration: readyBurst ? 0.12 : isReady ? 2.2 : 0.45,
+          repeat: readyBurst ? 0 : isReady ? Infinity : 0,
           ease: 'easeInOut',
         }}
         className="absolute h-56 w-56 rounded-full blur-md"
