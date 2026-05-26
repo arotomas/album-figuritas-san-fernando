@@ -59,6 +59,7 @@ export {
 } from './qaLocation'
 
 export {
+  DEFAULT_GEO_POLICY_MODE,
   GEO_OUTSIDE_PRIMARY_LABEL,
   GEO_POLICY_MODE,
   evaluateGeoFix,

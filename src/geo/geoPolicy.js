@@ -1,15 +1,19 @@
 /**
  * Política geográfica central — desacopla geometría SF de decisiones de aceptación.
  *
+ * SWITCH GLOBAL (único lugar):
+ *   1. VITE_GEO_POLICY en .env / Vercel  → strict | soft | unrestricted
+ *   2. DEFAULT_GEO_POLICY_MODE abajo     → fallback si no hay env
+ *
  * Modos:
- * - strict       → solo área principal (prod default)
- * - soft         → acepta fuera de SF + aviso visual (DEV default)
- * - unrestricted → sin restricción geográfica
+ * - strict       → rechaza fixes GPS fuera de San Fernando
+ * - soft         → acepta fuera de SF + banner informativo
+ * - unrestricted → sin restricción geográfica (testing masivo)
  * - qa           → bypass total vía qaCore (bounds + accuracy en qaLocation)
  */
 
 import { isWithinSanFernandoArea, SF_BOUNDS } from '../config/gps'
-import { isLocationBypassEnabled, isDevBuild } from '../qa/qaCore'
+import { isLocationBypassEnabled } from '../qa/qaCore'
 
 export const GEO_POLICY_MODE = {
   STRICT: 'strict',
@@ -17,6 +21,9 @@ export const GEO_POLICY_MODE = {
   UNRESTRICTED: 'unrestricted',
   QA: 'qa',
 }
+
+/** Fallback temporal — cambiar acá o vía VITE_GEO_POLICY para volver a strict/soft. */
+export const DEFAULT_GEO_POLICY_MODE = GEO_POLICY_MODE.UNRESTRICTED
 
 export const GEO_PRIMARY_AREA = {
   id: 'san-fernando',
@@ -38,16 +45,14 @@ function readConfiguredMode() {
   return null
 }
 
-/** Modo efectivo en runtime. QA override tiene prioridad sobre env/DEV. */
+/** Modo efectivo en runtime. QA override > VITE_GEO_POLICY > DEFAULT_GEO_POLICY_MODE. */
 export function getGeoPolicyMode() {
   if (isLocationBypassEnabled()) return GEO_POLICY_MODE.QA
 
   const configured = readConfiguredMode()
   if (configured) return configured
 
-  if (isDevBuild()) return GEO_POLICY_MODE.SOFT
-
-  return GEO_POLICY_MODE.STRICT
+  return DEFAULT_GEO_POLICY_MODE
 }
 
 /** Geometría pura — identidad geográfica SF, sin política. */
