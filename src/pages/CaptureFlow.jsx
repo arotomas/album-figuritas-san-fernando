@@ -7,6 +7,7 @@ import { PermissionFallback } from '../components/qa/PermissionFallback'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useCaptureFlow, CAPTURE_PHASES, isPostCaptureFlowPhase } from '../hooks/useCaptureFlow'
 import { CaptureChallengeInterstitial } from '../components/camera/CaptureChallengeInterstitial'
+import { CaptureRewardErrorBoundary } from '../components/reward/CaptureRewardErrorBoundary'
 import { useAppLifecycle } from '../hooks/useAppLifecycle'
 import { useAppStore } from '../store/useAppStore'
 import { stopVibration } from '../utils/vibration'
@@ -15,23 +16,49 @@ import { delay } from '../utils/recovery'
 import { useQaMode } from '../utils/qaMode'
 import { captureSyncLog } from '../utils/captureSyncLog'
 import { captureFlowLog } from '../utils/captureFlowLog'
+import {
+  capturePipelineTrace,
+  traceCaptureSessionChange,
+  traceMounted,
+  traceNavigate,
+  traceRender,
+  updateCapturePipelineSnapshot,
+} from '../utils/capturePipelineTrace'
 
-const RewardAnimation = lazy(() =>
-  import('../components/reward/RewardAnimation').then((m) => ({
-    default: m.RewardAnimation,
-  })),
+function lazyRewardModule(load, label) {
+  return lazy(() =>
+    load().catch((error) => {
+      capturePipelineTrace('ERROR', `lazy chunk failed — ${label}`, {
+        message: error?.message,
+        stack: error?.stack,
+      })
+      throw error
+    }),
+  )
+}
+
+const RewardAnimation = lazyRewardModule(
+  () =>
+    import('../components/reward/RewardAnimation').then((m) => ({
+      default: m.RewardAnimation,
+    })),
+  'RewardAnimation',
 )
 
-const UnlockAnimation = lazy(() =>
-  import('../components/reward/UnlockAnimation').then((m) => ({
-    default: m.UnlockAnimation,
-  })),
+const UnlockAnimation = lazyRewardModule(
+  () =>
+    import('../components/reward/UnlockAnimation').then((m) => ({
+      default: m.UnlockAnimation,
+    })),
+  'UnlockAnimation',
 )
 
-const PhotoUpdatedAnimation = lazy(() =>
-  import('../components/reward/PhotoUpdatedAnimation').then((m) => ({
-    default: m.PhotoUpdatedAnimation,
-  })),
+const PhotoUpdatedAnimation = lazyRewardModule(
+  () =>
+    import('../components/reward/PhotoUpdatedAnimation').then((m) => ({
+      default: m.PhotoUpdatedAnimation,
+    })),
+  'PhotoUpdatedAnimation',
 )
 
 function RewardSkeleton() {
@@ -125,6 +152,7 @@ export function CaptureFlow() {
     clearPendingCapture,
     showRewardComplete,
     complete,
+    isUnlockSubmitted,
   } = useCaptureFlow({
     figure: captureFigure,
     position: liveGpsPosition,
@@ -135,19 +163,35 @@ export function CaptureFlow() {
     onReplacePhoto: handleReplacePhoto,
   })
 
-  const isPostCapturePhase =
+  useEffect(() => {
+    updateCapturePipelineSnapshot({
+      phase,
+      route: location.pathname,
+      captureSession,
+      unlockSubmitted: isUnlockSubmitted,
+      rewardFigureId: rewardFigure?.id ?? null,
+    })
+  }, [captureSession, isUnlockSubmitted, location.pathname, phase, rewardFigure?.id])
+
+  useEffect(() => {
+    traceCaptureSessionChange(captureSession, 'store-update')
+  }, [captureSession])
+
+  const isRewardPhase =
     phase === CAPTURE_PHASES.REWARD ||
     phase === CAPTURE_PHASES.UNLOCK ||
     phase === CAPTURE_PHASES.PHOTO_UPDATED ||
     phase === CAPTURE_PHASES.DONE
 
+  /** Protege contra abort/redirect mientras save+reveal están en curso. */
+  const isCaptureFlowProtected =
+    isRewardPhase || isUnlockSubmitted || isPostCaptureFlowPhase(phase)
+
   const isChallengePhase = phase === CAPTURE_PHASES.CHALLENGE
 
   const isCaptureSessionActive =
     isChallengePhase ||
-    isPostCapturePhase ||
-    phase === CAPTURE_PHASES.CAPTURING ||
-    phase === CAPTURE_PHASES.COMPRESSING ||
+    isCaptureFlowProtected ||
     isProcessing ||
     Boolean(pendingFigure) ||
     Boolean(captureSession)
@@ -157,8 +201,8 @@ export function CaptureFlow() {
   const isPostCaptureRef = useRef(false)
 
   useEffect(() => {
-    isPostCaptureRef.current = isPostCapturePhase
-  }, [isPostCapturePhase])
+    isPostCaptureRef.current = isRewardPhase || isUnlockSubmitted
+  }, [isRewardPhase, isUnlockSubmitted])
 
   const abortCaptureFlow = useCallback(
     ({ reason = 'unknown', navigateAway = false, clearNear = false } = {}) => {
@@ -186,6 +230,7 @@ export function CaptureFlow() {
 
       if (navigateAway) {
         const target = isRetake ? withQa('/my-figures') : withQa('/map')
+        traceNavigate(target, reason)
         if (import.meta.env.DEV) {
           captureFlowLog('ROUTER', 'abort navigate', { target, reason })
         }
@@ -209,11 +254,13 @@ export function CaptureFlow() {
 
   useEffect(() => {
     isExitingRef.current = false
+    traceMounted('CaptureFlow', true)
     if (import.meta.env.DEV) {
       captureFlowLog('CAPTURE', 'mount', { pathname: location.pathname })
     }
 
     return () => {
+      traceMounted('CaptureFlow', false)
       if (import.meta.env.DEV) {
         captureFlowLog('UNMOUNT', 'capture flow teardown', {
           postCapture: isPostCaptureRef.current,
@@ -240,7 +287,7 @@ export function CaptureFlow() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isRetake || isExitingRef.current || isPostCapturePhase) return
+    if (isRetake || isExitingRef.current || isCaptureFlowProtected) return
     if (location.pathname !== '/capture') return
     if (!nearFigure || isCaptureSessionActive) return
 
@@ -249,16 +296,22 @@ export function CaptureFlow() {
       (f) => String(f.id) === String(targetId) || String(f.id) === String(nearFigure.id),
     )
     if (stored?.obtenida) {
+      capturePipelineTrace('CAPTURE', 'abort already-obtained', {
+        figureId: stored.id,
+        phase,
+        isCaptureSessionActive,
+      })
       abortCaptureFlow({ reason: 'already-obtained', navigateAway: true, clearNear: true })
     }
   }, [
     abortCaptureFlow,
     figures,
+    isCaptureFlowProtected,
     isCaptureSessionActive,
-    isPostCapturePhase,
     isRetake,
     location.pathname,
     nearFigure,
+    phase,
   ])
 
   useAppLifecycle({
@@ -283,17 +336,18 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
-    if (isRetake || isExitingRef.current || isPostCapturePhase) return
+    if (isRetake || isExitingRef.current || isCaptureFlowProtected) return
     if (location.pathname !== '/capture') return
     if (nearFigure || isCaptureSessionActive) return
 
     if (import.meta.env.DEV) {
       captureFlowLog('ROUTER', 'redirect — no active capture session')
     }
+    traceNavigate(withQa('/map'), 'no-active-session')
     navigate(withQa('/map'), { replace: true })
   }, [
+    isCaptureFlowProtected,
     isCaptureSessionActive,
-    isPostCapturePhase,
     isRetake,
     location.pathname,
     nearFigure,
@@ -340,6 +394,7 @@ export function CaptureFlow() {
 
   const handleComplete = useCallback(() => {
     isExitingRef.current = true
+    traceNavigate(withQa('/my-figures'), 'unlock-complete')
     complete()
     clearCaptureSession()
     clearQaTestFigure()
@@ -406,38 +461,69 @@ export function CaptureFlow() {
     )
   }
 
+  const handleRewardDegrade = useCallback(() => {
+    capturePipelineTrace('CAPTURE', 'reward degrade → my-figures', {
+      figureId: rewardFigure?.id ?? null,
+    })
+    window.setTimeout(() => {
+      handleComplete()
+    }, 1200)
+  }, [handleComplete, rewardFigure?.id])
+
+  useEffect(() => {
+    if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
+      traceRender('RewardAnimation', { figureId: rewardFigure.id })
+    } else if (phase === CAPTURE_PHASES.PHOTO_UPDATED && rewardFigure) {
+      traceRender('PhotoUpdatedAnimation', { figureId: rewardFigure.id })
+    } else if (phase === CAPTURE_PHASES.UNLOCK) {
+      traceRender('UnlockAnimation')
+    }
+  }, [phase, rewardFigure?.id])
+
   if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
     if (import.meta.env.DEV) {
       captureSyncLog.info('reward phase render', { figureId: rewardFigure.id })
     }
     return (
-      <Suspense fallback={<RewardSkeleton />}>
-        <RewardAnimation
-          figure={rewardFigure}
-          photoUrl={compressedPhoto}
-          onComplete={showRewardComplete}
-        />
-      </Suspense>
+      <CaptureRewardErrorBoundary
+        degradeReason="reward-reveal"
+        onDegrade={handleRewardDegrade}
+      >
+        <Suspense fallback={<RewardSkeleton />}>
+          <RewardAnimation
+            figure={rewardFigure}
+            photoUrl={compressedPhoto}
+            onComplete={showRewardComplete}
+          />
+        </Suspense>
+      </CaptureRewardErrorBoundary>
     )
   }
 
   if (phase === CAPTURE_PHASES.PHOTO_UPDATED && rewardFigure) {
     return (
-      <Suspense fallback={<RewardSkeleton />}>
-        <PhotoUpdatedAnimation
-          figure={rewardFigure}
-          photoUrl={compressedPhoto}
-          onComplete={handlePhotoUpdatedComplete}
-        />
-      </Suspense>
+      <CaptureRewardErrorBoundary
+        degradeReason="photo-updated-reveal"
+        onDegrade={handlePhotoUpdatedComplete}
+      >
+        <Suspense fallback={<RewardSkeleton />}>
+          <PhotoUpdatedAnimation
+            figure={rewardFigure}
+            photoUrl={compressedPhoto}
+            onComplete={handlePhotoUpdatedComplete}
+          />
+        </Suspense>
+      </CaptureRewardErrorBoundary>
     )
   }
 
   if (phase === CAPTURE_PHASES.UNLOCK) {
     return (
-      <Suspense fallback={<RewardSkeleton />}>
-        <UnlockAnimation onComplete={handleComplete} />
-      </Suspense>
+      <CaptureRewardErrorBoundary degradeReason="unlock-animation" onDegrade={handleComplete}>
+        <Suspense fallback={<RewardSkeleton />}>
+          <UnlockAnimation onComplete={handleComplete} />
+        </Suspense>
+      </CaptureRewardErrorBoundary>
     )
   }
 

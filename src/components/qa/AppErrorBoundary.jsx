@@ -1,6 +1,10 @@
 import { Component } from 'react'
 import { isQaMasterActive } from '../../qa/qaCore'
 import { logDiagnostic } from '../../utils/diagnostics'
+import {
+  capturePipelineError,
+  getCapturePipelineSnapshot,
+} from '../../utils/capturePipelineTrace'
 import { PremiumButton } from '../ui/PremiumButton'
 
 function mapPathWithQa() {
@@ -25,14 +29,15 @@ export class AppErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    const pipeline = getCapturePipelineSnapshot()
     logDiagnostic('error-boundary', {
       error: error?.message,
       stack: error?.stack,
       componentStack: info?.componentStack,
+      capturePipeline: pipeline,
     })
-    if (import.meta.env.DEV) {
-      console.error('[ERROR-BOUNDARY]', error?.message, error?.stack, info?.componentStack)
-    } else {
+    capturePipelineError(error, info, { boundary: 'AppErrorBoundary' })
+    if (!import.meta.env.DEV) {
       console.error('[error-boundary]', error?.message)
     }
   }

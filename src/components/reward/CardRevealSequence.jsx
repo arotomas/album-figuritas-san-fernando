@@ -9,6 +9,7 @@ import { PremiumRewardCard } from './PremiumRewardCard'
 import { RarityDiscoveryBeat } from './RarityDiscoveryBeat'
 import { prefersReducedMotion } from '../../utils/performance'
 import { rewardLog } from '../../utils/devLog'
+import { capturePipelineTrace, traceMounted } from '../../utils/capturePipelineTrace'
 import {
   getRarityDiscoveryBeatMs,
   isSpecialRarityDiscovery,
@@ -58,6 +59,23 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const reduced = prefersReducedMotion()
   const onCompleteRef = useRef(onComplete)
   const discoveryPlayedRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    traceMounted('CardRevealSequence', true)
+    capturePipelineTrace('CAPTURE', 'reward mount', {
+      figureId: figure?.id ?? null,
+      rareza: figure?.rareza ?? null,
+    })
+    return () => {
+      mountedRef.current = false
+      traceMounted('CardRevealSequence', false)
+      capturePipelineTrace('CAPTURE', 'reward unmount', {
+        figureId: figure?.id ?? null,
+      })
+    }
+  }, [figure?.id, figure?.rareza])
 
   const isSpecial = useMemo(
     () => isSpecialRarityDiscovery(figure?.rareza),
@@ -98,15 +116,31 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
 
     const timers = [
       ...(isSpecial
-        ? [window.setTimeout(() => setPhase(PHASES.ENTER), offset)]
+        ? [window.setTimeout(() => {
+            if (mountedRef.current) setPhase(PHASES.ENTER)
+          }, offset)]
         : []),
-      window.setTimeout(() => setPhase(PHASES.FLIP), offset + timings.enter),
-      window.setTimeout(() => setPhase(PHASES.REVEAL), offset + timings.flip),
-      window.setTimeout(() => setPhase(PHASES.SHINE), offset + timings.reveal),
-      window.setTimeout(() => setPhase(PHASES.INFO), offset + timings.shine),
-      window.setTimeout(() => setPhase(PHASES.DONE), offset + timings.info),
       window.setTimeout(() => {
+        if (mountedRef.current) setPhase(PHASES.FLIP)
+      }, offset + timings.enter),
+      window.setTimeout(() => {
+        if (mountedRef.current) setPhase(PHASES.REVEAL)
+      }, offset + timings.flip),
+      window.setTimeout(() => {
+        if (mountedRef.current) setPhase(PHASES.SHINE)
+      }, offset + timings.reveal),
+      window.setTimeout(() => {
+        if (mountedRef.current) setPhase(PHASES.INFO)
+      }, offset + timings.shine),
+      window.setTimeout(() => {
+        if (mountedRef.current) setPhase(PHASES.DONE)
+      }, offset + timings.info),
+      window.setTimeout(() => {
+        if (!mountedRef.current) return
         rewardLog.info('reveal finished', { figureId: figure?.id })
+        capturePipelineTrace('CAPTURE', 'reward complete callback', {
+          figureId: figure?.id ?? null,
+        })
         onCompleteRef.current?.()
       }, offset + timings.done),
     ]

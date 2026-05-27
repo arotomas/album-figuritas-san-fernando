@@ -35,6 +35,12 @@ import { useMobilePhotoDebugStore } from '../store/useMobilePhotoDebugStore'
 import { getQaState, setQaFlag } from '../utils/diagnostics'
 import { cameraLog } from '../utils/cameraLog'
 import { captureLog, albumLog, rewardLog } from '../utils/devLog'
+import {
+  capturePipelineTrace,
+  prefetchRewardChunks,
+  traceAsync,
+  tracePhaseChange,
+} from '../utils/capturePipelineTrace'
 import { mobilePhotoLog } from '../utils/mobilePhotoLog'
 import { hasCaptureChallenge } from '../utils/figureChallenges'
 
@@ -187,6 +193,7 @@ export function useCaptureFlow({
   const [captureError, setCaptureError] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingMessage, setProcessingMessage] = useState(null)
+  const [isUnlockSubmitted, setIsUnlockSubmitted] = useState(false)
 
   const hasVibratedReadyRef = useRef(false)
   const processingRef = useRef(false)
@@ -210,11 +217,14 @@ export function useCaptureFlow({
     if (!mountedRef.current) {
       if (import.meta.env.DEV) {
         captureLog.warn('phase update skipped — unmounted', { nextPhase })
+        capturePipelineTrace('STATE', 'phase skipped — unmounted', { nextPhase })
       }
       return
     }
+    const from = phaseRef.current
     phaseRef.current = nextPhase
     setPhase(nextPhase)
+    tracePhaseChange(from, nextPhase, { unlockSubmitted: unlockSubmittedRef.current })
   }, [])
 
   useEffect(() => {
@@ -618,7 +628,10 @@ export function useCaptureFlow({
 
       const isMobilePhoto = photoPayload.photoSource === 'mobile-native'
       unlockSubmittedRef.current = true
+      setIsUnlockSubmitted(true)
       setCaptureError(null)
+      prefetchRewardChunks()
+      traceAsync('unlock-submitted', { figureId: figureSnapshot.id })
 
       if (isMobilePhoto) {
         setProcessingMessage(isRetake ? 'Actualizando foto…' : 'Guardando foto…')
@@ -630,6 +643,7 @@ export function useCaptureFlow({
 
         if (saved === false) {
           unlockSubmittedRef.current = false
+          setIsUnlockSubmitted(false)
           processingRef.current = false
           setIsProcessing(false)
           setProcessingMessage(null)
@@ -654,12 +668,18 @@ export function useCaptureFlow({
         figureId: figureSnapshot.id,
         isQaTest: Boolean(figureSnapshot.isQaTest),
       })
+      capturePipelineTrace('CAPTURE', 'save start', { figureId: figureSnapshot.id })
       albumLog.info('saving figure', { figureId: figureSnapshot.id })
 
       const saved = await onObtainFigure?.(figureSnapshot.id, photoPayload)
+      capturePipelineTrace('CAPTURE', 'save end', {
+        figureId: figureSnapshot.id,
+        saved: saved !== false,
+      })
 
       if (saved === false) {
         unlockSubmittedRef.current = false
+        setIsUnlockSubmitted(false)
         processingRef.current = false
         setIsProcessing(false)
         setProcessingMessage(null)
@@ -680,11 +700,15 @@ export function useCaptureFlow({
         window.setTimeout(resolve, Math.max(REWARD_ENTRY_BEAT_MS, FLASH_MIN_HOLD_MS)),
       )
       if (!mountedRef.current) return true
+      capturePipelineTrace('CAPTURE', 'reward mount', { figureId: figureSnapshot.id })
       if (import.meta.env.DEV) {
         captureLog.info('before reward mount', { figureId: figureSnapshot.id })
       }
       safeSetPhase(CAPTURE_PHASES.REWARD)
       camera.stop()
+      capturePipelineTrace('CAPTURE', 'cleanup camera after save', {
+        figureId: figureSnapshot.id,
+      })
       captureLog.unlockSuccess({ figureId: figureSnapshot.id })
       rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
       return true
@@ -757,6 +781,10 @@ export function useCaptureFlow({
         bytes: compressed.sizeBytes,
         width: compressed.width,
         height: compressed.height,
+      })
+      capturePipelineTrace('CAPTURE', 'compression end', {
+        figureId: figureSnapshot.id,
+        bytes: compressed.sizeBytes,
       })
 
       setCompressedPhoto(compressed.dataUrl)
@@ -839,6 +867,7 @@ export function useCaptureFlow({
       setPhase(CAPTURE_PHASES.COMPRESSING)
 
       captureLog.compressStart({ figureId: figureSnapshot.id })
+      capturePipelineTrace('CAPTURE', 'compression start', { figureId: figureSnapshot.id })
 
       let compressed
       try {
@@ -1044,6 +1073,10 @@ export function useCaptureFlow({
       captureLog.info('before capture', { figureId: figureSnapshot?.id, source: 'video' })
     }
     safeSetPhase(CAPTURE_PHASES.CAPTURING)
+    capturePipelineTrace('CAPTURE', 'shutter pressed', {
+      figureId: figureSnapshot?.id,
+      source: 'video',
+    })
     captureLog.processingStart({ figureId: figureSnapshot.id, source: 'video' })
     vibrateCapture()
 
@@ -1136,6 +1169,16 @@ export function useCaptureFlow({
 
       lastProcessedFileKeyRef.current = fileKey
       setPhase(CAPTURE_PHASES.CAPTURING)
+      capturePipelineTrace('CAPTURE', 'shutter pressed', {
+        figureId: figureSnapshot.id,
+        source: 'native',
+        fileName: file.name,
+      })
+      capturePipelineTrace('CAPTURE', 'photo received', {
+        figureId: figureSnapshot.id,
+        size: file.size,
+        type: file.type,
+      })
       captureLog.fileSelected({
         name: file.name,
         type: file.type,
@@ -1208,6 +1251,7 @@ export function useCaptureFlow({
 
   const showRewardComplete = useCallback(() => {
     rewardLog.info('reward complete → unlock')
+    capturePipelineTrace('CAPTURE', 'unlock start', { from: 'reward-complete' })
     if (import.meta.env.DEV) {
       captureLog.info('before unlock phase')
     }
@@ -1253,6 +1297,7 @@ export function useCaptureFlow({
     compressedPhoto,
     captureError,
     rewardFigure,
+    isUnlockSubmitted,
     capture,
     captureFromFile,
     openNativeCapture,
