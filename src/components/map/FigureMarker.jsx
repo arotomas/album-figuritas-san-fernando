@@ -3,24 +3,33 @@ import { getRarity } from '../../theme/rarity'
 import { RarityBadge } from '../ui/RarityBadge'
 import { prefersReducedMotion } from '../../utils/performance'
 
-function FigureMarkerInner({ figure, isNear, isPulsing }) {
+function FigureMarkerInner({ figure, isNear, isPulsing, isActiveTarget = false, isDimmed = false }) {
   const isQaTest = Boolean(figure.isQaTest)
   const rarity = getRarity(figure.rareza)
   const obtained = figure.obtenida
   const reduced = prefersReducedMotion()
   const isLegendary = figure.rareza === 'legendaria' || figure.bonus_type === 'legendary'
   const isBonus = Boolean(figure.is_bonus)
-  const floatClass = !reduced ? `figure-float-r${rarity.tier}` : ''
-  const pulseClass = isPulsing && !reduced ? 'figure-pulse-premium' : ''
-  const specialClass = !reduced && (isLegendary || isBonus) ? 'figure-special-aura' : ''
+  const floatClass =
+    !reduced && !isActiveTarget ? `figure-float-r${rarity.tier}` : ''
+  const pulseClass =
+    isPulsing && !isActiveTarget && !reduced ? 'figure-pulse-premium' : ''
+  const specialClass =
+    !reduced && !isActiveTarget && (isLegendary || isBonus) ? 'figure-special-aura' : ''
+  const activeClass = isActiveTarget && !obtained && !reduced ? 'figure-active-target' : ''
+  const dimClass = isDimmed && !obtained ? 'figure-dimmed-marker' : ''
 
   const cardClass = isQaTest
     ? `relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b from-cyan-900 to-cyan-950 border-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.45)] ${
         obtained ? 'opacity-65 saturate-[0.45]' : ''
-      } ${isNear && !obtained ? 'ring-2 ring-cyan-300/80' : ''}`
-    : `relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b ${rarity.tailwind.gradient} ${rarity.tailwind.border} ${!obtained ? rarity.tailwind.glow : ''} ${
+      } ${isNear && !obtained && !isActiveTarget ? 'ring-2 ring-cyan-300/80' : ''} ${
+        isActiveTarget && !obtained ? 'ring-2 ring-progress/70' : ''
+      }`
+    : `relative w-[76px] overflow-hidden rounded-xl border-2 bg-gradient-to-b ${rarity.tailwind.gradient} ${rarity.tailwind.border} ${!obtained && !isActiveTarget ? rarity.tailwind.glow : ''} ${
         obtained ? 'opacity-65 saturate-[0.45]' : ''
-      } ${isNear && !obtained ? `ring-2 ${rarity.tailwind.ring}` : ''}`
+      } ${isNear && !obtained && !isActiveTarget ? `ring-2 ${rarity.tailwind.ring}` : ''} ${
+        isActiveTarget && !obtained ? 'ring-2 ring-progress/70' : ''
+      }`
 
   const glowColor = isQaTest ? 'rgba(34,211,238,0.55)' : rarity.colors.glow
   const accentClass = isQaTest ? 'bg-cyan-400' : rarity.tailwind.accent
@@ -28,22 +37,29 @@ function FigureMarkerInner({ figure, isNear, isPulsing }) {
   const iconSize = Number(figure.marker_icon_size) || 48
 
   return (
-    <div className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass}`}>
-      {isPulsing && !reduced && (
+    <div
+      className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass} ${activeClass} ${dimClass}`}
+    >
+      {isActiveTarget && !obtained && !reduced && (
+        <span
+          className="figure-active-halo absolute top-1/2 h-[4.5rem] w-[4.5rem] -translate-y-1/2 rounded-full"
+          style={{ background: glowColor }}
+        />
+      )}
+      {isPulsing && !isActiveTarget && !reduced && (
         <span
           className="figure-pulse-ring absolute top-1/2 h-16 w-16 -translate-y-1/2 rounded-full"
           style={{ background: glowColor }}
         />
       )}
-      {isLegendary && !obtained && !reduced && (
+      {isLegendary && !obtained && !reduced && !isActiveTarget && (
         <span
           className="figure-legendary-spark absolute -top-2 left-1/2 h-20 w-20 -translate-x-1/2 rounded-full"
           aria-hidden
         />
       )}
 
-      {/* Soft glow under card */}
-      {!obtained && (
+      {!obtained && !isActiveTarget && (
         <div
           className="absolute -bottom-1 h-3 w-12 rounded-full blur-md"
           style={{ background: glowColor, opacity: 0.6 }}

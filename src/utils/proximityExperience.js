@@ -38,11 +38,13 @@ export function computeRawRingProgress(distanceMeters, detectionMeters, captureM
   return Math.min(1, Math.max(0, raw))
 }
 
-/** Curva suave: detección lejana apenas perceptible, cierre más rápido. */
+/** Curva analógica: casi imperceptible lejos, tira suave cerca, aterriza sin snap. */
 export function easeRingProgress(raw) {
   if (raw <= 0) return 0
   if (raw >= 1) return 1
-  return 1 - (1 - raw) ** 2.35
+  const approach = 1 - (1 - raw) ** 1.72
+  const pull = raw ** 2.15
+  return approach * 0.62 + pull * 0.38
 }
 
 export function isWithinDetectionRange(distanceMeters, detectionMeters) {
@@ -51,6 +53,18 @@ export function isWithinDetectionRange(distanceMeters, detectionMeters) {
 
 export function isWithinCaptureRange(distanceMeters, captureMeters) {
   return distanceMeters != null && distanceMeters <= captureMeters
+}
+
+/** Histéresis de salida para evitar parpadeo en el borde de captura. */
+export function isWithinCaptureRangeHysteresis(
+  distanceMeters,
+  captureMeters,
+  wasInRange,
+  exitScale = 1.15,
+) {
+  if (distanceMeters == null || captureMeters == null) return false
+  if (wasInRange) return distanceMeters <= captureMeters * exitScale
+  return distanceMeters <= captureMeters
 }
 
 export function getProximityPhase(
@@ -62,11 +76,11 @@ export function getProximityPhase(
   const progress = Math.min(1, Math.max(0, easedProgress ?? 0))
 
   if (visualMode) {
-    if (progress >= 0.94 || (inCaptureRange && progress >= 0.82)) {
+    if (progress >= 0.9 || (inCaptureRange && progress >= 0.76)) {
       return PROXIMITY_PHASES.CAPTURE
     }
-    if (progress >= 0.7) return PROXIMITY_PHASES.CLOSE
-    if (progress >= 0.2) return PROXIMITY_PHASES.MEDIUM
+    if (progress >= 0.62) return PROXIMITY_PHASES.CLOSE
+    if (progress >= 0.14) return PROXIMITY_PHASES.MEDIUM
     return PROXIMITY_PHASES.FAR
   }
 
@@ -86,6 +100,48 @@ export function compareFigureProximityPriority(a, b) {
 export function pickPriorityFigure(figures) {
   if (!figures?.length) return null
   return [...figures].sort(compareFigureProximityPriority)[0]
+}
+
+/** Active target wins; otherwise nearest-by-priority (legacy behavior). */
+export function resolveProximityFocus({
+  figuresWithDistance,
+  nearFigures,
+  activeTargetFigureId,
+}) {
+  const priorityNearFigure = pickPriorityFigure(nearFigures)
+
+  if (!activeTargetFigureId) {
+    return {
+      focusFigure: priorityNearFigure,
+      secondaryNearFigure: null,
+      isFocusNear: Boolean(priorityNearFigure),
+    }
+  }
+
+  const active = figuresWithDistance.find(
+    (figure) => String(figure.id) === String(activeTargetFigureId),
+  )
+
+  if (!active || active.obtenida) {
+    return {
+      focusFigure: priorityNearFigure,
+      secondaryNearFigure: null,
+      isFocusNear: Boolean(priorityNearFigure),
+      activeTargetStale: true,
+    }
+  }
+
+  const othersNear = nearFigures.filter(
+    (figure) => String(figure.id) !== String(activeTargetFigureId),
+  )
+
+  return {
+    focusFigure: active,
+    secondaryNearFigure: pickPriorityFigure(othersNear),
+    isFocusNear: nearFigures.some(
+      (figure) => String(figure.id) === String(activeTargetFigureId),
+    ),
+  }
 }
 
 export function buildProximitySnapshot(figure, distanceMeters) {
@@ -114,10 +170,10 @@ export function buildProximitySnapshot(figure, distanceMeters) {
 }
 
 const MAP_HINTS = {
-  [PROXIMITY_PHASES.FAR]: 'Hay algo cerca… seguí explorando.',
-  [PROXIMITY_PHASES.MEDIUM]: 'La señal se intensifica.',
-  [PROXIMITY_PHASES.CLOSE]: 'Estás muy cerca.',
-  [PROXIMITY_PHASES.CAPTURE]: '¡Listo para capturar!',
+  [PROXIMITY_PHASES.FAR]: 'Algo te llama desde acá…',
+  [PROXIMITY_PHASES.MEDIUM]: 'Cada paso cuenta.',
+  [PROXIMITY_PHASES.CLOSE]: 'Ya casi estás.',
+  [PROXIMITY_PHASES.CAPTURE]: 'Este es el momento.',
 }
 
 const BONUS_MAP_HINTS = {
@@ -187,12 +243,12 @@ export const RING_PROGRESS_COLOR = '#8cc63f'
 export const RING_BASE_COLOR = 'rgba(255,255,255,0.18)'
 
 const RING_PROGRESS_FEEDBACK_TIERS = [
-  { min: 0.97, id: 'detected', message: 'Punto detectado' },
-  { min: 0.82, id: 'near', message: 'Estás extremadamente cerca' },
-  { min: 0.62, id: 'strong', message: 'La energía es muy fuerte en esta zona' },
-  { min: 0.37, id: 'approaching', message: 'Te estás acercando al punto correcto' },
-  { min: 0.18, id: 'intensifying', message: 'La señal comienza a intensificarse' },
-  { min: 0.08, id: 'weak', message: 'Se detecta una señal débil…' },
+  { min: 0.97, id: 'detected', message: 'El lugar te reconoce' },
+  { min: 0.82, id: 'near', message: 'Estás en el umbral' },
+  { min: 0.62, id: 'strong', message: 'Se siente cerca' },
+  { min: 0.37, id: 'approaching', message: 'Vas bien' },
+  { min: 0.18, id: 'intensifying', message: 'Algo despierta' },
+  { min: 0.08, id: 'weak', message: 'Una señal lejana…' },
 ]
 
 /** Frase inmersiva según el mismo progreso que alimenta el aro (0–1). */

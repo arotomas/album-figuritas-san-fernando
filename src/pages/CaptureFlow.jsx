@@ -35,7 +35,7 @@ const PhotoUpdatedAnimation = lazy(() =>
 
 function RewardSkeleton() {
   return (
-    <div className="safe-top safe-bottom flex h-full items-center justify-center bg-zinc-950">
+    <div className="safe-top safe-bottom flex h-full items-center justify-center bg-black">
       <div className="map-skeleton-pulse h-64 w-48 rounded-2xl bg-zinc-800" />
     </div>
   )
@@ -48,6 +48,7 @@ export function CaptureFlow() {
   const captureSession = useAppStore((state) => state.captureSession)
   const figures = useAppStore((state) => state.figures)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
+  const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const clearCaptureSession = useAppStore((state) => state.clearCaptureSession)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
@@ -254,16 +255,26 @@ export function CaptureFlow() {
     clearCaptureSession()
     clearQaTestFigure()
     setNearFigure(null)
+    clearActiveTargetFigure()
     captureSyncLog.info('navigating to my-figures')
     navigate(withQa('/my-figures'), { replace: true })
-  }, [clearCaptureSession, clearQaTestFigure, complete, navigate, setNearFigure, withQa])
+  }, [
+    clearActiveTargetFigure,
+    clearCaptureSession,
+    clearQaTestFigure,
+    complete,
+    navigate,
+    setNearFigure,
+    withQa,
+  ])
 
   const handlePhotoUpdatedComplete = useCallback(() => {
     complete()
     clearCaptureSession()
     setNearFigure(null)
+    clearActiveTargetFigure()
     navigate(withQa('/my-figures'), { replace: true })
-  }, [clearCaptureSession, complete, navigate, setNearFigure, withQa])
+  }, [clearActiveTargetFigure, clearCaptureSession, complete, navigate, setNearFigure, withQa])
 
   const handleRetryGeo = useCallback(async () => {
     requestPermission()

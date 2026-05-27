@@ -14,11 +14,24 @@ import {
 import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
+import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
-import { FIGURE_ALERT_COOLDOWN_MS, MAP_PROXIMITY_DEBOUNCE_MS } from '../../config/proximity'
+import {
+  FIGURE_ALERT_COOLDOWN_MS,
+  MAP_FOLLOW_MIN_INTERVAL_MS,
+  MAP_FOLLOW_MIN_MOVE_METERS,
+  MAP_FOLLOW_MOVE_THRESHOLD,
+  MAP_NEAR_SYNC_DISTANCE_BUCKET_M,
+  MAP_PROXIMITY_DEBOUNCE_MS,
+  MISSION_FOLLOW_RESUME_MS,
+  TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
+  TARGET_LOCK_FOCUS_NEAR_HOLD_MS,
+  TARGET_LOCK_SECONDARY_HINT_HOLD_MS,
+} from '../../config/proximity'
 import { vibrateFigureProximityAlert } from '../../utils/vibration'
 import { prefersReducedMotion } from '../../utils/performance'
+import { useStableBoolean } from '../../hooks/useStableBoolean'
 import { FigureMarker } from './FigureMarker'
 import { UserLocationDot } from './UserLocationDot'
 import { NearFigureOverlay } from './NearFigureOverlay'
@@ -26,6 +39,9 @@ import { MapGpsStatus } from './MapGpsStatus'
 import { GeoPolicyBanner } from './GeoPolicyBanner'
 import { MapQaOverlay } from '../qa/MapQaOverlay'
 import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
+import { useAppStore } from '../../store/useAppStore'
+import { ActiveTargetPill } from './ActiveTargetPill'
+import { FigureTargetPrompt } from './FigureTargetPrompt'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -65,11 +81,30 @@ function MapInstanceBridge({ mapRef }) {
   return null
 }
 
-function MapFlyController({ position, zoom, reducedMotion, recenterTick = 0 }) {
+function MapFlyController({
+  position,
+  zoom,
+  reducedMotion,
+  recenterTick = 0,
+  missionFollow = false,
+  followPaused = false,
+}) {
   const map = useMap()
   const lastCenteredRef = useRef(null)
   const lastAccuracyRef = useRef(null)
   const prevRecenterTickRef = useRef(0)
+  const panningRef = useRef(false)
+  const moveThreshold = missionFollow ? MAP_FOLLOW_MOVE_THRESHOLD : 0.00004
+
+  useEffect(() => {
+    const onMoveEnd = () => {
+      panningRef.current = false
+    }
+    map.on('moveend', onMoveEnd)
+    return () => {
+      map.off('moveend', onMoveEnd)
+    }
+  }, [map])
 
   useEffect(() => {
     if (!position) return
@@ -77,23 +112,32 @@ function MapFlyController({ position, zoom, reducedMotion, recenterTick = 0 }) {
     const { lat, lng, accuracy } = position
     const prev = lastCenteredRef.current
     const isFirst = !prev
-    const moved =
-      prev &&
-      (Math.abs(prev.lat - lat) > 0.00004 || Math.abs(prev.lng - lng) > 0.00004)
-    const accuracyImproved =
-      accuracy != null &&
-      lastAccuracyRef.current != null &&
-      accuracy < lastAccuracyRef.current - 5
     const manualRecenter = recenterTick > prevRecenterTickRef.current
 
     if (manualRecenter) prevRecenterTickRef.current = recenterTick
 
+    if (followPaused && !manualRecenter) return
+
+    const moved =
+      prev &&
+      (Math.abs(prev.lat - lat) > moveThreshold ||
+        Math.abs(prev.lng - lng) > moveThreshold)
+    const accuracyImproved =
+      accuracy != null &&
+      lastAccuracyRef.current != null &&
+      accuracy < lastAccuracyRef.current - 8
+
     if (!isFirst && !moved && !accuracyImproved && !manualRecenter) return
+
+    if (panningRef.current && missionFollow && !manualRecenter && !isFirst) {
+      return
+    }
 
     lastCenteredRef.current = { lat, lng }
     if (accuracy != null) lastAccuracyRef.current = accuracy
 
     if (isFirst || manualRecenter) {
+      panningRef.current = true
       map.flyTo([lat, lng], zoom, {
         animate: !reducedMotion,
         duration: reducedMotion ? 0 : 1.1,
@@ -101,11 +145,48 @@ function MapFlyController({ position, zoom, reducedMotion, recenterTick = 0 }) {
       return
     }
 
+    panningRef.current = true
     map.panTo([lat, lng], {
       animate: !reducedMotion,
-      duration: reducedMotion ? 0 : 0.55,
+      duration: reducedMotion ? 0 : missionFollow ? 1.05 : 0.55,
     })
-  }, [map, position, reducedMotion, zoom, recenterTick])
+  }, [followPaused, map, missionFollow, moveThreshold, position, reducedMotion, zoom, recenterTick])
+
+  return null
+}
+
+function MapFollowPauseBridge({ enabled, onPausedChange }) {
+  const map = useMap()
+  const resumeTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (!enabled) return undefined
+
+    const scheduleResume = () => {
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
+      resumeTimerRef.current = setTimeout(() => {
+        onPausedChange(false)
+      }, MISSION_FOLLOW_RESUME_MS)
+    }
+
+    const pauseFollow = () => {
+      onPausedChange(true)
+      scheduleResume()
+    }
+
+    const onZoomStart = (event) => {
+      if (event?.originalEvent) pauseFollow()
+    }
+
+    map.on('dragstart', pauseFollow)
+    map.on('zoomstart', onZoomStart)
+
+    return () => {
+      map.off('dragstart', pauseFollow)
+      map.off('zoomstart', onZoomStart)
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
+    }
+  }, [enabled, map, onPausedChange])
 
   return null
 }
@@ -114,6 +195,7 @@ function UserLocationMarker({ position, isCoarse = false }) {
   const map = useMap()
   const markerRef = useRef(null)
   const rootRef = useRef(null)
+  const renderKeyRef = useRef('')
 
   useEffect(() => {
     const el = document.createElement('div')
@@ -134,26 +216,57 @@ function UserLocationMarker({ position, isCoarse = false }) {
       rootRef.current?.unmount()
       marker.remove()
       markerRef.current = null
+      renderKeyRef.current = ''
     }
   }, [map])
 
   useEffect(() => {
-    if (!position || !markerRef.current || !rootRef.current) return
-
+    if (!position?.lat || !position?.lng || !markerRef.current) return
     markerRef.current.setLatLng([position.lat, position.lng])
+  }, [position?.lat, position?.lng])
+
+  useEffect(() => {
+    if (!position || !rootRef.current) return
+
+    const accuracyBucket =
+      position.accuracy != null ? Math.round(position.accuracy / 8) * 8 : 0
+    const renderKey = `${accuracyBucket}:${isCoarse ? 1 : 0}`
+    if (renderKeyRef.current === renderKey) return
+    renderKeyRef.current = renderKey
+
     rootRef.current.render(
       <UserLocationDot accuracy={position.accuracy} isCoarse={isCoarse} />,
     )
-  }, [position, isCoarse])
+  }, [isCoarse, position, position?.accuracy])
 
   return null
 }
 
-function FigureMarkersLayer({ figures, nearFigureIds }) {
+function buildFiguresLayerSignature(figures) {
+  return figures
+    .map((figure) =>
+      `${figure.id}:${figure.obtenida ? 1 : 0}:${figure.lat}:${figure.lng}`,
+    )
+    .join('|')
+}
+
+function FigureMarkersLayer({
+  figures,
+  figuresSignature,
+  nearFigureIdsKey = '',
+  activeTargetFigureId = null,
+  onFigureClick,
+}) {
   const map = useMap()
   const markersRef = useRef([])
   const rootsRef = useRef([])
   const cacheRef = useRef({})
+  const onFigureClickRef = useRef(onFigureClick)
+  onFigureClickRef.current = onFigureClick
+  const nearIds = useMemo(
+    () => new Set(nearFigureIdsKey.split(',').filter(Boolean)),
+    [nearFigureIdsKey],
+  )
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -181,6 +294,14 @@ function FigureMarkersLayer({ figures, nearFigureIds }) {
       })
 
       const marker = L.marker([figure.lat, figure.lng], { icon })
+
+      if (!figure.obtenida) {
+        marker.on('click', (event) => {
+          L.DomEvent.stopPropagation(event)
+          onFigureClickRef.current?.(figure)
+        })
+      }
+
       marker.addTo(map)
 
       rootsRef.current.push(root)
@@ -193,24 +314,35 @@ function FigureMarkersLayer({ figures, nearFigureIds }) {
       markersRef.current = []
       rootsRef.current = []
     }
-  }, [figures, map])
+  }, [figures, figuresSignature, map])
 
   useEffect(() => {
     figures.forEach((figure, index) => {
       const root = rootsRef.current[index]
       if (!root) return
 
-      const isNear = nearFigureIds.has(String(figure.id))
-      const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}`
+      const isActiveTarget =
+        Boolean(activeTargetFigureId) &&
+        String(figure.id) === String(activeTargetFigureId)
+      const isDimmed = Boolean(activeTargetFigureId) && !isActiveTarget && !figure.obtenida
+      const isNear = nearIds.has(String(figure.id)) || isActiveTarget
+      const isPulsing = isNear && !isActiveTarget
+      const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}-${isActiveTarget}-${isDimmed}`
 
       if (cacheRef.current[figure.id] === cacheKey) return
       cacheRef.current[figure.id] = cacheKey
 
       root.render(
-        <FigureMarker figure={figure} isNear={isNear} isPulsing={isNear} />,
+        <FigureMarker
+          figure={figure}
+          isNear={isNear}
+          isPulsing={isPulsing}
+          isActiveTarget={isActiveTarget}
+          isDimmed={isDimmed}
+        />,
       )
     })
-  }, [figures, nearFigureIds])
+  }, [activeTargetFigureId, figures, nearIds, nearFigureIdsKey])
 
   return null
 }
@@ -225,6 +357,12 @@ function LeafletMapViewInner({
 }) {
   const mapRef = useRef(null)
   const [recenterTick, setRecenterTick] = useState(0)
+  const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
+  const [missionFollowPaused, setMissionFollowPaused] = useState(false)
+  const reducedMotion = prefersReducedMotion()
+  const activeTargetFigureId = useAppStore((state) => state.activeTargetFigureId)
+  const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
+  const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const {
     mapPosition,
     position,
@@ -252,13 +390,75 @@ function LeafletMapViewInner({
   } = useGeolocation()
 
   const debouncedProximity = useDebouncedLocation(proximityPosition, MAP_PROXIMITY_DEBOUNCE_MS)
+  const followCenter = useThrottledMapCenter(mapPosition, {
+    minIntervalMs: MAP_FOLLOW_MIN_INTERVAL_MS,
+    minMoveMeters: MAP_FOLLOW_MIN_MOVE_METERS,
+  })
   const {
     nearFigure,
     isNearFigure,
     nearFigures,
     nearestFigure,
     nearestDistance,
-  } = useFigureProximity(debouncedProximity, proximityFigures)
+    secondaryNearFigure,
+    isFocusNear,
+    activeTargetStale,
+  } = useFigureProximity(debouncedProximity, proximityFigures, { activeTargetFigureId })
+
+  const activeTargetFigure = useMemo(() => {
+    if (!activeTargetFigureId) return null
+    return (
+      figures.find((figure) => String(figure.id) === String(activeTargetFigureId)) ??
+      proximityFigures.find((figure) => String(figure.id) === String(activeTargetFigureId)) ??
+      null
+    )
+  }, [activeTargetFigureId, figures, proximityFigures])
+
+  useEffect(() => {
+    if (activeTargetStale) clearActiveTargetFigure()
+  }, [activeTargetStale, clearActiveTargetFigure])
+
+  const handleFigureClick = useCallback((figure) => {
+    if (figure?.obtenida) return
+    setPendingTargetFigure(figure)
+  }, [])
+
+  const handleConfirmTarget = useCallback(() => {
+    if (!pendingTargetFigure) return
+
+    setActiveTargetFigureId(pendingTargetFigure.id)
+    setPendingTargetFigure(null)
+
+    if (mapRef.current && mapPosition) {
+      const bounds = L.latLngBounds([
+        [mapPosition.lat, mapPosition.lng],
+        [pendingTargetFigure.lat, pendingTargetFigure.lng],
+      ])
+      mapRef.current.fitBounds(bounds, {
+        padding: [72, 72],
+        maxZoom: 16,
+        animate: !reducedMotion,
+      })
+    }
+  }, [mapPosition, pendingTargetFigure, reducedMotion, setActiveTargetFigureId])
+
+  const handleCancelTracking = useCallback(() => {
+    clearActiveTargetFigure()
+    setPendingTargetFigure(null)
+  }, [clearActiveTargetFigure])
+
+  const handleFollowPausedChange = useCallback((paused) => {
+    setMissionFollowPaused(paused)
+  }, [])
+
+  const showFocusOverlay = useStableBoolean(isFocusNear, {
+    enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
+    holdOffMs: TARGET_LOCK_FOCUS_NEAR_HOLD_MS,
+  })
+
+  const showSecondaryHint = useStableBoolean(Boolean(secondaryNearFigure), {
+    holdOffMs: TARGET_LOCK_SECONDARY_HINT_HOLD_MS,
+  })
 
   const rawNearest = useMemo(
     () => findNearestPendingFigure(mapPosition, figures),
@@ -273,16 +473,15 @@ function LeafletMapViewInner({
     }
   }, [nearestFigure, nearestDistance])
 
-  const nearFigureIdsRef = useRef(new Set())
-  nearFigureIdsRef.current = new Set(nearFigures.map((f) => String(f.id)))
-
-  const lastVibratedFigureIdRef = useRef(null)
-  const bonusVibratedIdsRef = useRef(new Set())
-  const reducedMotion = prefersReducedMotion()
-  const visibleFigureIds = useMemo(
-    () => new Set(figures.map((figure) => String(figure.id))),
-    [figures],
+  const nearFigureIdsKey = useMemo(
+    () =>
+      nearFigures
+        .map((figure) => String(figure.id))
+        .sort()
+        .join(','),
+    [nearFigures],
   )
+
   const markerFigures = useMemo(() => {
     const byId = new Map(figures.map((figure) => [String(figure.id), figure]))
     nearFigures.forEach((figure) => {
@@ -291,14 +490,27 @@ function LeafletMapViewInner({
       }
     })
     return [...byId.values()]
-  }, [figures, nearFigures])
+  }, [figures, nearFigureIdsKey, nearFigures])
+
+  const markerFiguresSignature = useMemo(
+    () => buildFiguresLayerSignature(markerFigures),
+    [markerFigures],
+  )
+
+  const lastNearSyncRef = useRef(null)
+  const lastVibratedFigureIdRef = useRef(null)
+  const bonusVibratedIdsRef = useRef(new Set())
+  const visibleFigureIds = useMemo(
+    () => new Set(figures.map((figure) => String(figure.id))),
+    [figures],
+  )
 
   const handleOpenCamera = useCallback(() => {
     const capturePosition = proximityPosition ?? mapPosition ?? position
     onOpenCamera?.({
       figure: nearFigure,
       position: capturePosition,
-      distanceToFigure: nearestDistance,
+      distanceToFigure: nearFigure?.distanceMeters ?? nearestDistance,
     })
   }, [
     mapPosition,
@@ -312,6 +524,7 @@ function LeafletMapViewInner({
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return
 
+    setMissionFollowPaused(false)
     mapRef.current.flyTo([mapPosition.lat, mapPosition.lng], USER_ZOOM, {
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : 0.7,
@@ -320,30 +533,64 @@ function LeafletMapViewInner({
   }, [mapPosition, reducedMotion])
 
   useEffect(() => {
-    onNearFigureChange?.(nearFigure ?? null)
-
-    if (nearFigure) {
-      if (nearFigure.is_bonus && !visibleFigureIds.has(String(nearFigure.id))) {
-        onBonusDiscovered?.(nearFigure)
+    if (!nearFigure) {
+      if (lastNearSyncRef.current !== null) {
+        lastNearSyncRef.current = null
+        onNearFigureChange?.(null)
       }
-
-      const phase = nearFigure.proximity?.phase ?? 'medium'
-      if (lastVibratedFigureIdRef.current !== nearFigure.id) {
-        if (vibrateFigureProximityAlert(nearFigure, phase, FIGURE_ALERT_COOLDOWN_MS)) {
-          lastVibratedFigureIdRef.current = nearFigure.id
-        }
-      }
-
-      if (nearFigure.is_bonus && !bonusVibratedIdsRef.current.has(String(nearFigure.id))) {
-        vibrateFigureProximityAlert(nearFigure, 'close', FIGURE_ALERT_COOLDOWN_MS)
-        bonusVibratedIdsRef.current.add(String(nearFigure.id))
-      }
-    } else {
       lastVibratedFigureIdRef.current = null
+      return
     }
-  }, [nearFigure, onBonusDiscovered, onNearFigureChange, visibleFigureIds])
+
+    const distBucket =
+      nearFigure.distanceMeters != null
+        ? Math.floor(nearFigure.distanceMeters / MAP_NEAR_SYNC_DISTANCE_BUCKET_M)
+        : null
+    const syncKey = `${nearFigure.id}:${nearFigure.proximity?.phase ?? 'none'}:${distBucket}`
+
+    if (lastNearSyncRef.current !== syncKey) {
+      lastNearSyncRef.current = syncKey
+      onNearFigureChange?.(nearFigure)
+    }
+  }, [nearFigure, onNearFigureChange])
 
   useEffect(() => {
+    if (!nearFigure) return
+
+    const isLockedTarget = Boolean(activeTargetFigureId)
+    const shouldDiscoverBonus =
+      nearFigure.is_bonus &&
+      !visibleFigureIds.has(String(nearFigure.id)) &&
+      (!isLockedTarget || String(nearFigure.id) === String(activeTargetFigureId))
+
+    if (shouldDiscoverBonus) {
+      onBonusDiscovered?.(nearFigure)
+    }
+
+    const phase = nearFigure.proximity?.phase ?? 'medium'
+    if (lastVibratedFigureIdRef.current !== nearFigure.id) {
+      if (vibrateFigureProximityAlert(nearFigure, phase, FIGURE_ALERT_COOLDOWN_MS)) {
+        lastVibratedFigureIdRef.current = nearFigure.id
+      }
+    }
+
+    if (
+      nearFigure.is_bonus &&
+      !bonusVibratedIdsRef.current.has(String(nearFigure.id)) &&
+      (!isLockedTarget || String(nearFigure.id) === String(activeTargetFigureId))
+    ) {
+      vibrateFigureProximityAlert(nearFigure, 'close', FIGURE_ALERT_COOLDOWN_MS)
+      bonusVibratedIdsRef.current.add(String(nearFigure.id))
+    }
+  }, [
+    activeTargetFigureId,
+    nearFigure,
+    onBonusDiscovered,
+    visibleFigureIds,
+  ])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
     logGpsSnapshot({
       geolocationAvailable,
       isWatching,
@@ -358,12 +605,13 @@ function LeafletMapViewInner({
   }, [
     geolocationAvailable,
     gpsPhase,
-    gpsStatusLabel,
     isWatching,
-    mapPosition,
-    nearFigure,
+    mapPosition?.lat,
+    mapPosition?.lng,
+    nearFigure?.id,
     proximityFigures?.length,
-    proximityPosition,
+    proximityPosition?.lat,
+    proximityPosition?.lng,
     qualityState,
   ])
 
@@ -391,10 +639,10 @@ function LeafletMapViewInner({
     ? acquisitionMessage
     : showSoftWarning
       ? 'Señal débil — seguimos buscando…'
-      : acquisitionStatus === 'ready' && mapPosition
-        ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
-        : mapPosition?.accuracy
-          ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy)}m)`
+      : acquisitionStatus === 'ready' && mapPosition?.accuracy != null
+        ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy / 10) * 10}m)`
+        : mapPosition?.accuracy != null
+          ? `${gpsStatusLabel} (~${Math.round(mapPosition.accuracy / 10) * 10}m)`
           : gpsStatusLabel
 
   const showApproximateBanner = Boolean(approximateMessage) && errorType !== 'denied'
@@ -422,14 +670,23 @@ function LeafletMapViewInner({
           <MapInstanceBridge mapRef={mapRef} />
           <MapResizeHandler />
           <MapFlyController
-            position={mapPosition}
+            position={followCenter ?? mapPosition}
             zoom={USER_ZOOM}
             reducedMotion={reducedMotion}
             recenterTick={recenterTick}
+            missionFollow={Boolean(activeTargetFigureId)}
+            followPaused={missionFollowPaused}
+          />
+          <MapFollowPauseBridge
+            enabled={Boolean(activeTargetFigureId)}
+            onPausedChange={handleFollowPausedChange}
           />
           <FigureMarkersLayer
             figures={markerFigures}
-            nearFigureIds={nearFigureIdsRef.current}
+            figuresSignature={markerFiguresSignature}
+            nearFigureIdsKey={nearFigureIdsKey}
+            activeTargetFigureId={activeTargetFigureId}
+            onFigureClick={handleFigureClick}
           />
           {mapPosition && (
             <UserLocationMarker
@@ -562,8 +819,26 @@ function LeafletMapViewInner({
         figures={figures}
       />
 
+      {activeTargetFigure && (
+        <ActiveTargetPill
+          figureName={activeTargetFigure.nombre}
+          onCancel={handleCancelTracking}
+        />
+      )}
+
+      <FigureTargetPrompt
+        figure={pendingTargetFigure}
+        onConfirm={handleConfirmTarget}
+        onDismiss={() => setPendingTargetFigure(null)}
+      />
+
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">
-        {isNearFigure && (
+        {activeTargetFigureId && showSecondaryHint && (
+          <p className="pointer-events-none mb-2 px-4 text-center text-xs font-medium text-white/45">
+            Hay otra figurita cerca…
+          </p>
+        )}
+        {showFocusOverlay && nearFigure && (
           <NearFigureOverlay
             nearFigure={nearFigure}
             onOpenCamera={handleOpenCamera}

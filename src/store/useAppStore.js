@@ -77,6 +77,7 @@ function buildLocalProgressResetPatch(state) {
     nearFigure: null,
     qaTestFigure: null,
     captureSession: null,
+    activeTargetFigureId: null,
     lastSupabaseSyncWarning: null,
   }
 }
@@ -130,6 +131,7 @@ function resetStoreToDefaults() {
     nearFigure: null,
     qaTestFigure: null,
     captureSession: null,
+    activeTargetFigureId: null,
     _hasHydrated: true,
     supabaseUserId: null,
     supabaseReady: false,
@@ -177,6 +179,7 @@ function buildPersistedSnapshot(state) {
     acknowledgedDiscoveryCollectionIds: Array.isArray(state.acknowledgedDiscoveryCollectionIds)
       ? state.acknowledgedDiscoveryCollectionIds
       : [],
+    activeTargetFigureId: state.activeTargetFigureId ?? null,
   }
 }
 
@@ -234,6 +237,7 @@ export const useAppStore = create(
     nearFigure: null,
     qaTestFigure: null,
       captureSession: null,
+      activeTargetFigureId: null,
       authBootstrapped: false,
       albumStatus: ALBUM_STATUS.EN_PROGRESO,
       lastObtenidaFigureId: null,
@@ -768,6 +772,13 @@ export const useAppStore = create(
 
       setNearFigure: (figure) => set({ nearFigure: figure }),
 
+      setActiveTargetFigureId: (figureId) =>
+        set({
+          activeTargetFigureId: figureId != null ? String(figureId) : null,
+        }),
+
+      clearActiveTargetFigure: () => set({ activeTargetFigureId: null }),
+
       startCaptureSession: ({ figure, position = null, distanceToFigure = null }) => {
         if (!figure) return
 
@@ -1003,6 +1014,7 @@ export const useAppStore = create(
           user: null,
           nearFigure: null,
           qaTestFigure: null,
+          activeTargetFigureId: null,
           supabaseUserId: null,
           supabaseReady: false,
           isSupabaseAdmin: false,

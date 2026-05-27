@@ -123,9 +123,10 @@ export function CameraView({
         )}
       </div>
 
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {isCapturing && (
           <motion.div
+            key="capture-flash"
             initial={{ opacity: 1 }}
             animate={{ opacity: [1, 1, 0] }}
             exit={{ opacity: 0 }}

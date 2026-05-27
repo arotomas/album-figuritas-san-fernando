@@ -21,4 +21,5 @@ export const PERSISTED_FIELDS = [
   'celebratedCollectionIds',
   'discoveredCollectionIds',
   'acknowledgedDiscoveryCollectionIds',
+  'activeTargetFigureId',
 ]

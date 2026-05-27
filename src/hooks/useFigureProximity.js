@@ -5,6 +5,7 @@ import {
   compareFigureProximityPriority,
   getProximityRadii,
   pickPriorityFigure,
+  resolveProximityFocus,
 } from '../utils/proximityExperience'
 
 /**
@@ -12,7 +13,7 @@ import {
  * - detección: avisa dentro del radio de detección (por rareza)
  * - captura: solo dentro del radio de captura (otro hook/flujo)
  */
-export function useFigureProximity(userPosition, figures) {
+export function useFigureProximity(userPosition, figures, { activeTargetFigureId = null } = {}) {
   const nearStateRef = useRef({})
   const [tick, setTick] = useState(0)
 
@@ -86,6 +87,9 @@ export function useFigureProximity(userPosition, figures) {
         nearFigure: null,
         nearFigures: [],
         priorityNearFigure: null,
+        secondaryNearFigure: null,
+        isFocusNear: false,
+        activeTargetFigureId,
       }
     }
 
@@ -95,15 +99,25 @@ export function useFigureProximity(userPosition, figures) {
 
     const priorityNearFigure = pickPriorityFigure(nearFigures)
     const nearestFigure = figuresWithDistance[0] ?? null
+    const focus = resolveProximityFocus({
+      figuresWithDistance,
+      nearFigures,
+      activeTargetFigureId,
+    })
 
     return {
       figuresWithDistance,
       nearestFigure,
       nearestDistance: nearestFigure?.distanceMeters ?? null,
       isNearFigure: nearFigures.length > 0,
-      nearFigure: priorityNearFigure,
+      nearFigure: focus.focusFigure,
       nearFigures,
       priorityNearFigure,
+      secondaryNearFigure: focus.secondaryNearFigure,
+      isFocusNear: focus.isFocusNear,
+      activeTargetStale: focus.activeTargetStale ?? false,
+      activeTargetFigureId,
     }
-  }, [figures, figuresWithDistance, tick, userPosition])
+    // tick + debounced position
+  }, [activeTargetFigureId, figures, figuresWithDistance, tick, userPosition])
 }

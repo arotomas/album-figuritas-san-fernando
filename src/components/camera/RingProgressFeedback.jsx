@@ -1,21 +1,54 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   getRingProgressFeedback,
   getRingProgressFeedbackStyle,
 } from '../../utils/proximityExperience'
 
-const PEAK_DISMISS_MS = 3800
+const PEAK_DISMISS_MS = 4200
+
+/** Agrupa progreso para que el copy respire — menos saltos entre frases. */
+function bucketProgress(progress) {
+  return Math.round(Math.min(1, Math.max(0, progress ?? 0)) * 18) / 18
+}
 
 export function RingProgressFeedback({
   progress = 0,
   isReady = false,
   isCapturing = false,
 }) {
-  const feedback = useMemo(() => getRingProgressFeedback(progress), [progress])
-  const style = useMemo(() => getRingProgressFeedbackStyle(progress), [progress])
-  const isPeakProgress = progress >= 0.97
+  const displayProgress = bucketProgress(progress)
+  const feedback = useMemo(
+    () => getRingProgressFeedback(displayProgress),
+    [displayProgress],
+  )
+  const style = useMemo(
+    () => getRingProgressFeedbackStyle(displayProgress),
+    [displayProgress],
+  )
+  const isPeakProgress = displayProgress >= 0.97
   const [peakDismissed, setPeakDismissed] = useState(false)
+  const lastTierRef = useRef(null)
+  const [settledFeedback, setSettledFeedback] = useState(null)
+
+  useEffect(() => {
+    if (!feedback) {
+      lastTierRef.current = null
+      setSettledFeedback(null)
+      return undefined
+    }
+
+    if (!lastTierRef.current || feedback.id !== lastTierRef.current) {
+      const timer = window.setTimeout(() => {
+        lastTierRef.current = feedback.id
+        setSettledFeedback(feedback)
+      }, lastTierRef.current ? 280 : 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    setSettledFeedback(feedback)
+    return undefined
+  }, [feedback])
 
   useEffect(() => {
     if (!isPeakProgress) {
@@ -28,38 +61,29 @@ export function RingProgressFeedback({
     return () => window.clearTimeout(timer)
   }, [isPeakProgress])
 
-  const hidePeakMessage = feedback?.id === 'detected' && peakDismissed
-  const visible = Boolean(feedback) && !isCapturing && !isReady && !hidePeakMessage
+  const hidePeakMessage = settledFeedback?.id === 'detected' && peakDismissed
+  const visible =
+    Boolean(settledFeedback) && !isCapturing && !isReady && !hidePeakMessage
 
   return (
     <AnimatePresence mode="wait">
       {visible && (
         <motion.p
-          key={feedback.id}
-          initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
-          animate={
-            style.isPeak
-              ? {
-                  opacity: style.opacity,
-                  y: 0,
-                  filter: 'blur(0px)',
-                  textShadow: style.textShadow,
-                }
-              : {
-                  opacity: style.opacity,
-                  y: 0,
-                  filter: 'blur(0px)',
-                  textShadow: style.textShadow,
-                }
-          }
-          exit={{ opacity: 0, y: -6, filter: 'blur(2px)' }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          key={settledFeedback.id}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{
+            opacity: style.opacity,
+            y: 0,
+            textShadow: style.textShadow,
+          }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
           className={`mt-5 max-w-[17rem] px-5 text-center text-[13px] leading-relaxed tracking-wide ${
             style.isPeak ? 'font-semibold uppercase' : 'font-normal'
           }`}
           style={{ color: style.color }}
         >
-          {feedback.message}
+          {settledFeedback.message}
         </motion.p>
       )}
     </AnimatePresence>

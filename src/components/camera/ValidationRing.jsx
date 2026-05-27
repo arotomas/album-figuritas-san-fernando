@@ -14,9 +14,9 @@ const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 function RingParticles({ intensity, color }) {
-  if (intensity <= 0) return null
+  if (intensity <= 0.25) return null
 
-  const count = Math.max(2, Math.min(5, Math.round(intensity * 6)))
+  const count = Math.max(2, Math.min(4, Math.round(intensity * 5)))
   return (
     <div className="pointer-events-none absolute inset-0">
       {Array.from({ length: count }).map((_, index) => (
@@ -34,10 +34,10 @@ function RingParticles({ intensity, color }) {
             opacity: [0.18, 0.45 + intensity * 0.25, 0.18],
           }}
           transition={{
-            duration: 2.8 + index * 0.12,
+            duration: 3.2 + index * 0.18,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: index * 0.15,
+            delay: index * 0.22,
           }}
         />
       ))}
@@ -105,8 +105,8 @@ export function ValidationRing({
       }}
       transition={
         readyBurst
-          ? { duration: 0.12, ease: [0.22, 1, 0.36, 1] }
-          : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
+          ? { duration: 0.16, ease: [0.22, 1, 0.36, 1] }
+          : { duration: 0.62, ease: [0.22, 1, 0.36, 1] }
       }
     >
       <motion.div
@@ -119,7 +119,7 @@ export function ValidationRing({
           scale: readyBurst ? 1.14 : isReady ? [1, 1.07, 1] : 0.94 + ringColors.glowIntensity * 0.06,
         }}
         transition={{
-          duration: readyBurst ? 0.12 : isReady ? 2.2 : 0.45,
+          duration: readyBurst ? 0.16 : isReady ? 2.8 : 0.55,
           repeat: readyBurst ? 0 : isReady ? Infinity : 0,
           ease: 'easeInOut',
         }}
@@ -162,7 +162,7 @@ export function ValidationRing({
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
           animate={{ strokeDashoffset: dashOffset, opacity: haloOpacity }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
         />
 
         <motion.circle
@@ -176,7 +176,7 @@ export function ValidationRing({
           strokeDasharray={CIRCUMFERENCE}
           filter="url(#ring-progress-glow)"
           animate={{ strokeDashoffset: dashOffset, opacity: progressOpacity }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
         />
       </svg>
 

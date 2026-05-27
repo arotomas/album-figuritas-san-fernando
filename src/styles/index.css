@@ -702,6 +702,44 @@
     filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.28));
   }
 
+  .figure-active-target {
+    z-index: 2;
+    animation: figure-active-breathe 2.8s ease-in-out infinite;
+    filter: drop-shadow(0 0 14px rgba(190, 242, 100, 0.38));
+  }
+
+  .figure-active-halo {
+    animation: figure-active-halo 2.8s ease-in-out infinite;
+    opacity: 0.42;
+  }
+
+  .figure-dimmed-marker {
+    opacity: 0.62;
+    filter: saturate(0.76);
+  }
+
+  @keyframes figure-active-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.035);
+    }
+  }
+
+  @keyframes figure-active-halo {
+    0%,
+    100% {
+      transform: translateY(-50%) scale(0.94);
+      opacity: 0.32;
+    }
+    50% {
+      transform: translateY(-50%) scale(1.04);
+      opacity: 0.52;
+    }
+  }
+
   .figure-legendary-spark {
     background:
       radial-gradient(circle, rgba(251, 191, 36, 0.35), transparent 58%),
@@ -736,6 +774,8 @@
     .figure-pulse,
     .figure-pulse-premium,
     .figure-pulse-ring,
+    .figure-active-halo,
+    .figure-active-target,
     .figure-legendary-spark,
     .user-dot-pulse,
     .animate-slide-up,

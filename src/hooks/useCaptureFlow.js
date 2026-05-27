@@ -10,16 +10,22 @@ import { withTimeout } from '../utils/withTimeout'
 import { vibrateCapture, vibrateReady, vibrateProximityPulse } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
 import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
-import { REWARD_ENTRY_BEAT_MS } from '../config/captureFeel'
+import { REWARD_ENTRY_BEAT_MS, FLASH_MIN_HOLD_MS } from '../config/captureFeel'
 import {
   buildProximitySnapshot,
   getProximityPhase,
   getProximityRadii,
   isWithinCaptureRange,
+  isWithinCaptureRangeHysteresis,
   isWithinDetectionRange,
 } from '../utils/proximityExperience'
 import { useSmoothedProximityVisual } from './useSmoothedProximity'
 import { VIBRATION_PROXIMITY_PULSE_COOLDOWN_MS } from '../config/ux'
+import {
+  CAPTURE_RANGE_EXIT_SCALE,
+  READY_RING_ENTER_THRESHOLD,
+  READY_RING_EXIT_THRESHOLD,
+} from '../config/proximity'
 import {
   buildCaptureRecord,
   processCaptureForUnlock,
@@ -228,10 +234,20 @@ export function useCaptureFlow({
   const detectionRadiusMeters =
     proximitySnapshot?.detectionMeters ?? getProximityRadii(resolvedFigure).detectionMeters
 
+  const inCaptureRangeRef = useRef(false)
+
   const inCaptureRange = useMemo(() => {
     if (isRetake) return true
     if (ringDistanceMeters == null) return false
-    return isWithinCaptureRange(ringDistanceMeters, captureRadiusMeters)
+    const wasInRange = inCaptureRangeRef.current
+    const next = isWithinCaptureRangeHysteresis(
+      ringDistanceMeters,
+      captureRadiusMeters,
+      wasInRange,
+      CAPTURE_RANGE_EXIT_SCALE,
+    )
+    inCaptureRangeRef.current = next
+    return next
   }, [captureRadiusMeters, isRetake, ringDistanceMeters])
 
   const inDetectionRange = useMemo(() => {
@@ -305,8 +321,18 @@ export function useCaptureFlow({
     !isProcessing &&
     Boolean(resolvedFigure)
 
+  const readyHoldRef = useRef(false)
+  const candidateReady =
+    captureReady && ringProgress >= READY_RING_ENTER_THRESHOLD
+
+  if (candidateReady) {
+    readyHoldRef.current = true
+  } else if (ringProgress < READY_RING_EXIT_THRESHOLD || !inCaptureRange) {
+    readyHoldRef.current = false
+  }
+
   /** Visual alineado con el aro — el shutter espera a que el progreso visual confirme. */
-  const isReady = captureReady && ringProgress >= 0.88
+  const isReady = candidateReady || readyHoldRef.current
 
   const lastPulsePhaseRef = useRef(null)
 
@@ -607,7 +633,9 @@ export function useCaptureFlow({
       }
 
       setCapturedFigure(figureSnapshot)
-      await new Promise((resolve) => window.setTimeout(resolve, REWARD_ENTRY_BEAT_MS))
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, Math.max(REWARD_ENTRY_BEAT_MS, FLASH_MIN_HOLD_MS)),
+      )
       setPhase(CAPTURE_PHASES.REWARD)
       phaseRef.current = CAPTURE_PHASES.REWARD
       camera.stop()

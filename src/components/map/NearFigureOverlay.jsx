@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import { m } from 'framer-motion'
 import { PremiumButton } from '../ui/PremiumButton'
 import { GlowCard } from '../ui/GlowCard'
 import { typeClasses } from '../../theme/typography'
@@ -25,15 +24,11 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
         isBonus ? 'border-amber-300/30 shadow-[0_0_36px_rgba(251,191,36,0.18)]' : 'border-white/10'
       }`}>
         {isBonus && (
-          <m.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="border-b border-amber-200/10 bg-gradient-to-r from-amber-300/10 via-white/5 to-violet-400/10 px-4 py-2 text-center"
-          >
+          <div className="border-b border-amber-200/10 bg-gradient-to-r from-amber-300/10 via-white/5 to-violet-400/10 px-4 py-2 text-center">
             <span className={`${typeClasses.micro} text-amber-100`}>
               ✦ Bonus {bonusKind} detectada ✦
             </span>
-          </m.div>
+          </div>
         )}
         <div className="border-b border-white/8 px-4 py-3.5">
           <p className={`${typeClasses.label} text-center ${isBonus ? 'text-amber-100' : 'text-progress'}`}>
@@ -46,7 +41,7 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
 
         <div className="p-4">
           <PremiumButton variant="lime" size="md" onClick={onOpenCamera}>
-            {isBonus ? 'Intentar agregarla' : 'Abrir cámara'}
+            {isBonus ? 'Intentar agregarla' : 'Estoy acá'}
           </PremiumButton>
         </div>
       </div>
@@ -54,4 +49,11 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
   )
 }
 
-export const NearFigureOverlay = memo(NearFigureOverlayInner)
+export const NearFigureOverlay = memo(NearFigureOverlayInner, (prev, next) => {
+  const prevFigure = prev.nearFigure
+  const nextFigure = next.nearFigure
+  if (prevFigure?.id !== nextFigure?.id) return false
+  if (prevFigure?.proximity?.phase !== nextFigure?.proximity?.phase) return false
+  if (prevFigure?.nombre !== nextFigure?.nombre) return false
+  return prev.onOpenCamera === next.onOpenCamera
+})
