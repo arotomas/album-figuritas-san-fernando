@@ -107,6 +107,13 @@ export function useCamera() {
     startingRef.current = false
   }, [clearBlackPreviewTimer])
 
+  /** Solo hardware — seguro en unmount / browser back (sin setState). */
+  const stopMediaTracks = useCallback(() => {
+    clearBlackPreviewTimer()
+    cleanupMediaStream(streamRef, videoRef)
+    startingRef.current = false
+  }, [clearBlackPreviewTimer])
+
   const scheduleBlackPreviewCheck = useCallback(() => {
     clearBlackPreviewTimer()
 
@@ -333,6 +340,7 @@ export function useCamera() {
     useNativeCamera,
     start: startStream,
     stop,
+    stopMediaTracks,
     openNativePicker,
   }
 }

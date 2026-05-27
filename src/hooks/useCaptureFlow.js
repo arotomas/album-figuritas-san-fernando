@@ -447,6 +447,7 @@ export function useCaptureFlow({
       processingTimeoutRef.current = null
     }
     processingRef.current = false
+    if (!mountedRef.current) return
     setIsProcessing(false)
     setProcessingMessage(null)
     lastProcessedFileKeyRef.current = null
@@ -492,7 +493,7 @@ export function useCaptureFlow({
 
   const handleRecoverableError = useCallback(
     (error, context = {}) => {
-      if (unlockSubmittedRef.current) return
+      if (unlockSubmittedRef.current || !mountedRef.current) return
 
       captureLog.processingError({
         message: error?.message ?? String(error),
@@ -1200,8 +1201,9 @@ export function useCaptureFlow({
     pendingLockedRef.current = false
     pendingFigureRef.current = null
     pendingLocationSnapshotRef.current = null
-    setPendingFigure(null)
     lastProcessedFileKeyRef.current = null
+    if (!mountedRef.current) return
+    setPendingFigure(null)
   }, [])
 
   const showRewardComplete = useCallback(() => {

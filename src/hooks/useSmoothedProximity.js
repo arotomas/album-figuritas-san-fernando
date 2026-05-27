@@ -26,6 +26,14 @@ export function useSmoothedProximityVisual(
   const snapRef = useRef(snap)
   const frameRef = useRef(0)
   const frameCounterRef = useRef(0)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     enabledRef.current = enabled
@@ -34,7 +42,7 @@ export function useSmoothedProximityVisual(
 
     if (!enabled) {
       currentRef.current = 0
-      setVisualProgress(0)
+      if (mountedRef.current) setVisualProgress(0)
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current)
         frameRef.current = 0
@@ -59,7 +67,7 @@ export function useSmoothedProximityVisual(
         frameCounterRef.current += 1
         if (frameCounterRef.current >= PROXIMITY_VISUAL_UPDATE_EVERY_N_FRAMES) {
           frameCounterRef.current = 0
-          setVisualProgress(next)
+          if (mountedRef.current) setVisualProgress(next)
         }
         frameRef.current = requestAnimationFrame(step)
         return
@@ -67,7 +75,7 @@ export function useSmoothedProximityVisual(
 
       if (current !== target) {
         currentRef.current = target
-        setVisualProgress(target)
+        if (mountedRef.current) setVisualProgress(target)
       }
 
       frameRef.current = 0

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { lazy, Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { CameraView } from '../components/camera'
 import { CameraAccessGate } from '../components/camera/CameraAccessGate'
 import { PermissionFallback } from '../components/qa/PermissionFallback'
@@ -14,6 +14,7 @@ import { PERMISSION_RETRY_DELAY_MS } from '../config/ux'
 import { delay } from '../utils/recovery'
 import { useQaMode } from '../utils/qaMode'
 import { captureSyncLog } from '../utils/captureSyncLog'
+import { captureFlowLog } from '../utils/captureFlowLog'
 
 const RewardAnimation = lazy(() =>
   import('../components/reward/RewardAnimation').then((m) => ({
@@ -43,6 +44,7 @@ function RewardSkeleton() {
 
 export function CaptureFlow() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { withQa } = useQaMode()
   const nearFigure = useAppStore((state) => state.nearFigure)
   const captureSession = useAppStore((state) => state.captureSession)
@@ -152,14 +154,72 @@ export function CaptureFlow() {
 
   const displayFigure = pendingFigure ?? captureSession?.figure ?? nearFigure
   const isExitingRef = useRef(false)
+  const isPostCaptureRef = useRef(false)
+
+  useEffect(() => {
+    isPostCaptureRef.current = isPostCapturePhase
+  }, [isPostCapturePhase])
+
+  const abortCaptureFlow = useCallback(
+    ({ reason = 'unknown', navigateAway = false, clearNear = false } = {}) => {
+      if (import.meta.env.DEV) {
+        captureFlowLog('CAPTURE', 'abort', {
+          reason,
+          navigateAway,
+          phase: isPostCaptureRef.current ? 'post-capture' : 'active',
+          pathname: location.pathname,
+        })
+      }
+
+      isExitingRef.current = true
+      stopVibration()
+      camera.stopMediaTracks?.()
+      clearPendingCapture()
+
+      if (!isPostCaptureRef.current) {
+        clearCaptureSession()
+      }
+
+      if (clearNear) {
+        setNearFigure(null)
+      }
+
+      if (navigateAway) {
+        const target = isRetake ? withQa('/my-figures') : withQa('/map')
+        if (import.meta.env.DEV) {
+          captureFlowLog('ROUTER', 'abort navigate', { target, reason })
+        }
+        navigate(target, { replace: true })
+      }
+    },
+    [
+      camera,
+      clearCaptureSession,
+      clearPendingCapture,
+      isRetake,
+      location.pathname,
+      navigate,
+      setNearFigure,
+      withQa,
+    ],
+  )
+
+  const abortCaptureFlowRef = useRef(abortCaptureFlow)
+  abortCaptureFlowRef.current = abortCaptureFlow
 
   useEffect(() => {
     isExitingRef.current = false
+    if (import.meta.env.DEV) {
+      captureFlowLog('CAPTURE', 'mount', { pathname: location.pathname })
+    }
+
     return () => {
-      isExitingRef.current = true
-      stopVibration()
-      camera.stop()
-      clearPendingCapture()
+      if (import.meta.env.DEV) {
+        captureFlowLog('UNMOUNT', 'capture flow teardown', {
+          postCapture: isPostCaptureRef.current,
+        })
+      }
+      abortCaptureFlowRef.current({ reason: 'browser-back-or-unmount' })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -181,6 +241,7 @@ export function CaptureFlow() {
 
   useEffect(() => {
     if (isRetake || isExitingRef.current || isPostCapturePhase) return
+    if (location.pathname !== '/capture') return
     if (!nearFigure || isCaptureSessionActive) return
 
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
@@ -188,19 +249,16 @@ export function CaptureFlow() {
       (f) => String(f.id) === String(targetId) || String(f.id) === String(nearFigure.id),
     )
     if (stored?.obtenida) {
-      setNearFigure(null)
-      clearCaptureSession()
-      navigate('/map', { replace: true })
+      abortCaptureFlow({ reason: 'already-obtained', navigateAway: true, clearNear: true })
     }
   }, [
-    isPostCapturePhase,
-    isRetake,
-    nearFigure,
+    abortCaptureFlow,
     figures,
     isCaptureSessionActive,
-    clearCaptureSession,
-    navigate,
-    setNearFigure,
+    isPostCapturePhase,
+    isRetake,
+    location.pathname,
+    nearFigure,
   ])
 
   useAppLifecycle({
@@ -220,16 +278,37 @@ export function CaptureFlow() {
     },
     onHidden: () => {
       stopVibration()
-      camera.stop()
+      camera.stopMediaTracks?.()
     },
   })
 
   useEffect(() => {
     if (isRetake || isExitingRef.current || isPostCapturePhase) return
-    if (!nearFigure && !isCaptureSessionActive) {
-      navigate('/map', { replace: true })
+    if (location.pathname !== '/capture') return
+    if (nearFigure || isCaptureSessionActive) return
+
+    if (import.meta.env.DEV) {
+      captureFlowLog('ROUTER', 'redirect — no active capture session')
     }
-  }, [isPostCapturePhase, isRetake, nearFigure, isCaptureSessionActive, navigate])
+    navigate(withQa('/map'), { replace: true })
+  }, [
+    isCaptureSessionActive,
+    isPostCapturePhase,
+    isRetake,
+    location.pathname,
+    nearFigure,
+    navigate,
+    withQa,
+  ])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined
+    const onPopState = () => {
+      captureFlowLog('BACK', 'popstate', { pathname: window.location.pathname })
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   useEffect(() => {
     const lockPortrait = async () => {
@@ -252,14 +331,12 @@ export function CaptureFlow() {
   }, [])
 
   const handleClose = useCallback(() => {
-    isExitingRef.current = true
-    stopVibration()
-    camera.stop()
-    clearPendingCapture()
-    clearCaptureSession()
-    setNearFigure(null)
-    navigate(isRetake ? withQa('/my-figures') : '/map', { replace: true })
-  }, [camera, clearCaptureSession, clearPendingCapture, isRetake, navigate, setNearFigure, withQa])
+    abortCaptureFlow({
+      reason: 'user-close',
+      navigateAway: true,
+      clearNear: true,
+    })
+  }, [abortCaptureFlow])
 
   const handleComplete = useCallback(() => {
     isExitingRef.current = true
