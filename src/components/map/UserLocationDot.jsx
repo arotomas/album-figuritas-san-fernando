@@ -33,7 +33,7 @@ function UserLocationDotInner({
       <span className={`user-dot-pulse absolute h-7 w-7 rounded-full ${haloClass}`} />
 
       <div
-        className="relative flex items-center justify-center transition-transform duration-[720ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="relative flex items-center justify-center transition-transform duration-[640ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={
           showHeading && rotationDeg != null
             ? { transform: `rotate(${rotationDeg}deg)` }

@@ -19,6 +19,7 @@ import { useCinematicMapBearing } from '../../hooks/useCinematicMapBearing'
 import { useSmoothedHeading } from '../../hooks/useSmoothedHeading'
 import { MapInteractionBridge } from './MapInteractionBridge'
 import { MapRotationController } from './MapRotationController'
+import { MapRotationDebugOverlay } from './MapRotationDebugOverlay'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
 import {
@@ -445,10 +446,13 @@ function LeafletMapViewInner({
   }, [])
 
   const cinematicRotationEnabled = !reducedMotion
-  const { bearing: cinematicBearing } = useCinematicMapBearing(mapPosition, {
-    enabled: cinematicRotationEnabled,
-    paused: mapRotationPaused,
-  })
+  const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
+    mapPosition,
+    {
+      enabled: cinematicRotationEnabled,
+      paused: mapRotationPaused,
+    },
+  )
 
   const cinematicModeActive =
     cinematicRotationEnabled && cinematicBearing != null && !mapRotationPaused
@@ -810,6 +814,12 @@ function LeafletMapViewInner({
           <FaLocationCrosshairs size={18} />
         </button>
       )}
+
+      <MapRotationDebugOverlay
+        debug={rotationDebug}
+        paused={mapRotationPaused}
+        cinematicActive={cinematicModeActive}
+      />
 
       <MapQaOverlay
         geolocationAvailable={geolocationAvailable}
