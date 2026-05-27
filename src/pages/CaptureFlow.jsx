@@ -22,6 +22,7 @@ import {
   traceMounted,
   traceNavigate,
   traceRender,
+  unlockTrace,
   updateCapturePipelineSnapshot,
 } from '../utils/capturePipelineTrace'
 
@@ -151,7 +152,7 @@ export function CaptureFlow() {
     retryCapture,
     clearPendingCapture,
     showRewardComplete,
-    complete,
+    finalizeCapturePending,
     isUnlockSubmitted,
   } = useCaptureFlow({
     figure: captureFigure,
@@ -199,6 +200,7 @@ export function CaptureFlow() {
   const displayFigure = pendingFigure ?? captureSession?.figure ?? nearFigure
   const isExitingRef = useRef(false)
   const isPostCaptureRef = useRef(false)
+  const finalizeUnlockOnceRef = useRef(false)
 
   useEffect(() => {
     isPostCaptureRef.current = isRewardPhase || isUnlockSubmitted
@@ -261,11 +263,20 @@ export function CaptureFlow() {
 
     return () => {
       traceMounted('CaptureFlow', false)
+      if (isExitingRef.current || finalizeUnlockOnceRef.current) {
+        unlockTrace('capture flow unmount — skip abort (intentional finalize)', {
+          finalize: finalizeUnlockOnceRef.current,
+        })
+        stopVibration()
+        camera.stopMediaTracks?.()
+        return
+      }
       if (import.meta.env.DEV) {
         captureFlowLog('UNMOUNT', 'capture flow teardown', {
           postCapture: isPostCaptureRef.current,
         })
       }
+      unlockTrace('capture flow unmount — abort teardown')
       abortCaptureFlowRef.current({ reason: 'browser-back-or-unmount' })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -392,34 +403,87 @@ export function CaptureFlow() {
     })
   }, [abortCaptureFlow])
 
-  const handleComplete = useCallback(() => {
-    isExitingRef.current = true
-    traceNavigate(withQa('/my-figures'), 'unlock-complete')
-    complete()
-    clearCaptureSession()
-    clearQaTestFigure()
-    setNearFigure(null)
-    clearActiveTargetFigure()
-    captureSyncLog.info('navigating to my-figures')
-    navigate(withQa('/my-figures'), { replace: true })
+  const runPostUnlockCleanup = useCallback(() => {
+    unlockTrace('cleanup start')
+    try {
+      finalizeCapturePending()
+      unlockTrace('captureSession clear')
+      clearCaptureSession()
+      clearQaTestFigure()
+      setNearFigure(null)
+      clearActiveTargetFigure()
+      unlockTrace('cleanup end')
+    } catch (error) {
+      unlockTrace('cleanup error', { message: error?.message })
+    }
   }, [
     clearActiveTargetFigure,
     clearCaptureSession,
     clearQaTestFigure,
-    complete,
-    navigate,
+    finalizeCapturePending,
     setNearFigure,
+  ])
+
+  const safeNavigateToAlbum = useCallback(() => {
+    const target = withQa('/my-figures')
+    unlockTrace('navigate start', { target })
+    try {
+      navigate(target, { replace: true })
+      unlockTrace('navigate end', { target })
+    } catch (error) {
+      unlockTrace('navigate failed — hard redirect', { message: error?.message })
+      window.location.href = target
+    }
+  }, [navigate, withQa])
+
+  const handleComplete = useCallback(() => {
+    if (finalizeUnlockOnceRef.current) {
+      unlockTrace('complete callback ignored — duplicate')
+      return
+    }
+    finalizeUnlockOnceRef.current = true
+    isExitingRef.current = true
+    isPostCaptureRef.current = true
+    updateCapturePipelineSnapshot({ finalizeStarted: true })
+
+    unlockTrace('complete callback start', {
+      pathname: location.pathname,
+      phase,
+    })
+
+    try {
+      captureSyncLog.info('navigating to my-figures')
+      safeNavigateToAlbum()
+      queueMicrotask(() => {
+        runPostUnlockCleanup()
+      })
+      unlockTrace('complete callback end')
+    } catch (error) {
+      unlockTrace('complete callback failed — hard redirect', {
+        message: error?.message,
+      })
+      runPostUnlockCleanup()
+      window.location.href = withQa('/my-figures')
+    }
+  }, [
+    location.pathname,
+    phase,
+    runPostUnlockCleanup,
+    safeNavigateToAlbum,
     withQa,
   ])
 
   const handlePhotoUpdatedComplete = useCallback(() => {
+    if (finalizeUnlockOnceRef.current) return
+    finalizeUnlockOnceRef.current = true
     isExitingRef.current = true
-    complete()
-    clearCaptureSession()
-    setNearFigure(null)
-    clearActiveTargetFigure()
-    navigate(withQa('/my-figures'), { replace: true })
-  }, [clearActiveTargetFigure, clearCaptureSession, complete, navigate, setNearFigure, withQa])
+    isPostCaptureRef.current = true
+    unlockTrace('photo-updated complete callback start')
+    safeNavigateToAlbum()
+    queueMicrotask(() => {
+      runPostUnlockCleanup()
+    })
+  }, [runPostUnlockCleanup, safeNavigateToAlbum])
 
   const handleRetryGeo = useCallback(async () => {
     requestPermission()
@@ -451,16 +515,6 @@ export function CaptureFlow() {
     !hasTrustedSessionGeo &&
     (geoPermissionDenied || (geoSignalIssue && !mapPosition && !geoLoading))
 
-  if (phase === CAPTURE_PHASES.CHALLENGE && displayFigure) {
-    return (
-      <CaptureChallengeInterstitial
-        figure={displayFigure}
-        onContinue={acknowledgeChallenge}
-        onClose={handleClose}
-      />
-    )
-  }
-
   const handleRewardDegrade = useCallback(() => {
     capturePipelineTrace('CAPTURE', 'reward degrade → my-figures', {
       figureId: rewardFigure?.id ?? null,
@@ -479,6 +533,26 @@ export function CaptureFlow() {
       traceRender('UnlockAnimation')
     }
   }, [phase, rewardFigure?.id])
+
+  if (isExitingRef.current && location.pathname === '/capture') {
+    return (
+      <div
+        className="safe-top safe-bottom screen-full bg-[#0a0a0b]"
+        aria-busy="true"
+        aria-label="Yendo a tu álbum"
+      />
+    )
+  }
+
+  if (phase === CAPTURE_PHASES.CHALLENGE && displayFigure) {
+    return (
+      <CaptureChallengeInterstitial
+        figure={displayFigure}
+        onContinue={acknowledgeChallenge}
+        onClose={handleClose}
+      />
+    )
+  }
 
   if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
     if (import.meta.env.DEV) {

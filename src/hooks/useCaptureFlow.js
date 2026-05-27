@@ -1258,10 +1258,10 @@ export function useCaptureFlow({
     safeSetPhase(CAPTURE_PHASES.UNLOCK)
   }, [safeSetPhase])
 
-  const complete = useCallback(() => {
-    rewardLog.info('unlock complete → map')
+  /** Solo limpia refs pendientes — no cambia phase (evita return null en /capture mid-finalize). */
+  const finalizeCapturePending = useCallback(() => {
+    rewardLog.info('capture pending cleared after unlock')
     clearPendingCapture()
-    setPhase(CAPTURE_PHASES.DONE)
   }, [clearPendingCapture])
 
   useEffect(() => {
@@ -1305,7 +1305,7 @@ export function useCaptureFlow({
     retryCapture,
     clearPendingCapture,
     showRewardComplete,
-    complete,
+    finalizeCapturePending,
     figure: activeFigure,
   }
 }

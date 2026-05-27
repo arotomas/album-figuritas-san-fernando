@@ -17,6 +17,8 @@ let snapshot = {
   lastNavigate: null,
   lastSetState: null,
   lastAsync: null,
+  lastUnlock: null,
+  finalizeStarted: false,
 }
 
 function nowIso() {
@@ -155,6 +157,14 @@ export function traceNavigate(target, reason) {
 export function traceAsync(label, detail) {
   updateCapturePipelineSnapshot({ lastAsync: { label, at: nowIso(), ...detail } })
   capturePipelineTrace('CAPTURE', `async ${label}`, detail)
+}
+
+/** Traza fase final: unlock complete → cleanup → navigate → unmount */
+export function unlockTrace(message, detail) {
+  updateCapturePipelineSnapshot({
+    lastUnlock: { message, at: nowIso(), ...(detail ?? {}) },
+  })
+  capturePipelineTrace('UNLOCK', message, detail)
 }
 
 /** Prefetch lazy reward chunks tras save exitoso (reduce fallo de chunk en mobile). */

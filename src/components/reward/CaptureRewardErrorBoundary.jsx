@@ -1,5 +1,9 @@
 import { Component } from 'react'
-import { capturePipelineError, capturePipelineTrace } from '../../utils/capturePipelineTrace'
+import {
+  capturePipelineError,
+  capturePipelineTrace,
+  unlockTrace,
+} from '../../utils/capturePipelineTrace'
 
 /**
  * Fail-safe local: figurita ya guardada → degradar reward sin tumbar la app.
@@ -20,10 +24,19 @@ export class CaptureRewardErrorBoundary extends Component {
       boundary: 'CaptureRewardErrorBoundary',
       degradeReason: this.props.degradeReason ?? 'reward-render',
     })
+    unlockTrace('reward boundary degrade', {
+      reason: this.props.degradeReason ?? 'reward-render',
+    })
     capturePipelineTrace('CAPTURE', 'reward degrade triggered', {
       reason: this.props.degradeReason ?? 'reward-render',
     })
-    this.props.onDegrade?.(error)
+    try {
+      this.props.onDegrade?.(error)
+    } catch (degradeError) {
+      unlockTrace('onDegrade threw', { message: degradeError?.message })
+      const target = '/my-figures'
+      window.location.href = target
+    }
   }
 
   render() {

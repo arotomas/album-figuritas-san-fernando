@@ -8,6 +8,7 @@ import { typeClasses } from '../../theme/typography'
 import { ParticleLayer } from '../ui/ParticleLayer'
 import { vibrateUnlock } from '../../utils/vibration'
 import { rewardLog } from '../../utils/devLog'
+import { unlockTrace, traceMounted } from '../../utils/capturePipelineTrace'
 
 export function UnlockAnimation({ onComplete }) {
   const figures = useAppStore((state) => state.figures)
@@ -15,24 +16,40 @@ export function UnlockAnimation({ onComplete }) {
   const progress = mainProgress.obtained
   const totalFigures = mainProgress.visibleTotal
   const onCompleteRef = useRef(onComplete)
+  const completedRef = useRef(false)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     onCompleteRef.current = onComplete
   }, [onComplete])
 
   useEffect(() => {
+    mountedRef.current = true
+    completedRef.current = false
+    traceMounted('UnlockAnimation', true)
+    unlockTrace('unlock mounted', { progress, totalFigures })
+
     rewardLog.info('unlock animation started')
     const hapticTimer = window.setTimeout(() => vibrateUnlock(), 90)
     const timer = window.setTimeout(() => {
+      if (!mountedRef.current || completedRef.current) return
+      completedRef.current = true
       rewardLog.info('unlock animation finished')
+      unlockTrace('unlock complete — firing onComplete')
       onCompleteRef.current?.()
+      unlockTrace('onComplete returned')
     }, UNLOCK_SEQUENCE_MS)
 
     return () => {
+      mountedRef.current = false
+      traceMounted('UnlockAnimation', false)
+      unlockTrace('unlock unmount — clearing timers', {
+        completed: completedRef.current,
+      })
       window.clearTimeout(hapticTimer)
       window.clearTimeout(timer)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- timer único por montaje; progress en render
 
   return (
     <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8 text-center">
