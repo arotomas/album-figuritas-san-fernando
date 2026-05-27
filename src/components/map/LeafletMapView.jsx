@@ -14,6 +14,7 @@ import {
 import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
+import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
 import { useSmoothedHeading } from '../../hooks/useSmoothedHeading'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
