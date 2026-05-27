@@ -216,6 +216,11 @@
     min-height: var(--bottom-nav-height);
   }
 
+  .map-container .leaflet-map-pane {
+    /* Rotación cinematográfica — transform aplicado por MapRotationController */
+    backface-visibility: hidden;
+  }
+
   .map-container .leaflet-container {
     outline: none;
     background: #141416;

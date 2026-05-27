@@ -1,21 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { isValidHeading, lerpAngle, shortestAngleDelta } from '../utils/mapBearing'
 
 const MIN_WALK_SPEED_MPS = 1.05
 const MIN_HEADING_DELTA_DEG = 16
 const SMOOTHING = 0.09
-
-function isValidHeading(heading) {
-  return Number.isFinite(heading) && heading >= 0 && heading <= 360
-}
-
-function shortestAngleDelta(from, to) {
-  return ((to - from + 540) % 360) - 180
-}
-
-function lerpAngle(from, to, alpha) {
-  const delta = shortestAngleDelta(from, to)
-  return (from + delta * alpha + 360) % 360
-}
 
 /** Heading suavizado — solo caminando, inercia alta, sin jitter. */
 export function useSmoothedHeading(position) {

@@ -15,7 +15,10 @@ import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
+import { useCinematicMapBearing } from '../../hooks/useCinematicMapBearing'
 import { useSmoothedHeading } from '../../hooks/useSmoothedHeading'
+import { MapInteractionBridge } from './MapInteractionBridge'
+import { MapRotationController } from './MapRotationController'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
 import {
@@ -25,7 +28,6 @@ import {
   MAP_FOLLOW_MOVE_THRESHOLD,
   MAP_NEAR_SYNC_DISTANCE_BUCKET_M,
   MAP_PROXIMITY_DEBOUNCE_MS,
-  MISSION_FOLLOW_RESUME_MS,
   TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
   TARGET_LOCK_FOCUS_NEAR_HOLD_MS,
   TARGET_LOCK_SECONDARY_HINT_HOLD_MS,
@@ -156,48 +158,18 @@ function MapFlyController({
   return null
 }
 
-function MapFollowPauseBridge({ enabled, onPausedChange }) {
-  const map = useMap()
-  const resumeTimerRef = useRef(null)
-
-  useEffect(() => {
-    if (!enabled) return undefined
-
-    const scheduleResume = () => {
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
-      resumeTimerRef.current = setTimeout(() => {
-        onPausedChange(false)
-      }, MISSION_FOLLOW_RESUME_MS)
-    }
-
-    const pauseFollow = () => {
-      onPausedChange(true)
-      scheduleResume()
-    }
-
-    const onZoomStart = (event) => {
-      if (event?.originalEvent) pauseFollow()
-    }
-
-    map.on('dragstart', pauseFollow)
-    map.on('zoomstart', onZoomStart)
-
-    return () => {
-      map.off('dragstart', pauseFollow)
-      map.off('zoomstart', onZoomStart)
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
-    }
-  }, [enabled, map, onPausedChange])
-
-  return null
-}
-
-function UserLocationMarker({ position, isCoarse = false }) {
+function UserLocationMarker({
+  position,
+  isCoarse = false,
+  cinematicBearing = null,
+  cinematicActive = false,
+}) {
   const map = useMap()
   const markerRef = useRef(null)
   const rootRef = useRef(null)
   const renderKeyRef = useRef('')
-  const heading = useSmoothedHeading(position)
+  const smoothedCompassHeading = useSmoothedHeading(position)
+  const compassHeading = cinematicActive ? null : smoothedCompassHeading
 
   useEffect(() => {
     const el = document.createElement('div')
@@ -233,7 +205,7 @@ function UserLocationMarker({ position, isCoarse = false }) {
 
     const accuracyBucket =
       position.accuracy != null ? Math.round(position.accuracy / 8) * 8 : 0
-    const renderKey = `${accuracyBucket}:${isCoarse ? 1 : 0}:${heading ?? 'na'}`
+    const renderKey = `${accuracyBucket}:${isCoarse ? 1 : 0}:${cinematicActive ? `c${cinematicBearing ?? 'na'}` : (compassHeading ?? 'na')}`
     if (renderKeyRef.current === renderKey) return
     renderKeyRef.current = renderKey
 
@@ -242,7 +214,9 @@ function UserLocationMarker({ position, isCoarse = false }) {
         <UserLocationDot
           accuracy={position.accuracy}
           isCoarse={isCoarse}
-          heading={heading}
+          heading={compassHeading}
+          lockHeadingUp={cinematicActive}
+          counterBearing={cinematicActive ? cinematicBearing : null}
         />,
       )
     } catch (error) {
@@ -250,7 +224,7 @@ function UserLocationMarker({ position, isCoarse = false }) {
         console.warn('[map] user dot render skipped after unmount', error?.message)
       }
     }
-  }, [heading, isCoarse, position, position?.accuracy])
+  }, [cinematicActive, cinematicBearing, compassHeading, isCoarse, position, position?.accuracy])
 
   return null
 }
@@ -373,6 +347,7 @@ function LeafletMapViewInner({
   const [recenterTick, setRecenterTick] = useState(0)
   const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
   const [missionFollowPaused, setMissionFollowPaused] = useState(false)
+  const [mapRotationPaused, setMapRotationPaused] = useState(false)
   const reducedMotion = prefersReducedMotion()
   const activeTargetFigureId = useAppStore((state) => state.activeTargetFigureId)
   const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
@@ -464,6 +439,19 @@ function LeafletMapViewInner({
   const handleFollowPausedChange = useCallback((paused) => {
     setMissionFollowPaused(paused)
   }, [])
+
+  const handleRotationPausedChange = useCallback((paused) => {
+    setMapRotationPaused(paused)
+  }, [])
+
+  const cinematicRotationEnabled = !reducedMotion
+  const { bearing: cinematicBearing } = useCinematicMapBearing(mapPosition, {
+    enabled: cinematicRotationEnabled,
+    paused: mapRotationPaused,
+  })
+
+  const cinematicModeActive =
+    cinematicRotationEnabled && cinematicBearing != null && !mapRotationPaused
 
   const showFocusOverlay = useStableBoolean(isFocusNear, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
@@ -692,9 +680,15 @@ function LeafletMapViewInner({
             missionFollow={Boolean(activeTargetFigureId)}
             followPaused={missionFollowPaused}
           />
-          <MapFollowPauseBridge
-            enabled={Boolean(activeTargetFigureId)}
-            onPausedChange={handleFollowPausedChange}
+          <MapInteractionBridge
+            followPauseEnabled={Boolean(activeTargetFigureId)}
+            onFollowPausedChange={handleFollowPausedChange}
+            onRotationPausedChange={handleRotationPausedChange}
+          />
+          <MapRotationController
+            position={mapPosition}
+            bearing={cinematicBearing}
+            enabled={cinematicModeActive}
           />
           <FigureMarkersLayer
             figures={markerFigures}
@@ -707,6 +701,8 @@ function LeafletMapViewInner({
             <UserLocationMarker
               position={mapPosition}
               isCoarse={!trustedPosition || !hasUsablePosition}
+              cinematicBearing={cinematicBearing}
+              cinematicActive={cinematicModeActive}
             />
           )}
         </MapContainer>
