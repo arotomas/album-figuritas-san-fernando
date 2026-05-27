@@ -221,7 +221,7 @@ export function CaptureFlow() {
 
       isExitingRef.current = true
       stopVibration()
-      camera.stopMediaTracks?.()
+      camera.stopMediaTracks?.('abort-capture-flow')
       clearPendingCapture()
 
       if (!isPostCaptureRef.current) {
@@ -270,7 +270,7 @@ export function CaptureFlow() {
           finalize: finalizeUnlockOnceRef.current,
         })
         stopVibration()
-        camera.stopMediaTracks?.()
+        camera.stopMediaTracks?.('unlock-unmount')
         return
       }
       if (import.meta.env.DEV) {
@@ -344,7 +344,7 @@ export function CaptureFlow() {
     },
     onHidden: () => {
       stopVibration()
-      camera.stopMediaTracks?.()
+      camera.stopMediaTracks?.('visibility-hidden')
     },
   })
 

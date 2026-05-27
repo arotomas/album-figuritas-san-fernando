@@ -1,4 +1,5 @@
 import { cameraLog } from './cameraLog'
+import { isMediaStream, mediaTrace } from './mediaTrace'
 import { withTimeout } from './withTimeout'
 
 export const CAMERA_CONSTRAINTS = {
@@ -54,9 +55,42 @@ export async function getRearCameraStream() {
   return navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS)
 }
 
-export function stopMediaStream(stream) {
-  if (!stream) return
-  stream.getTracks().forEach((track) => track.stop())
+/**
+ * Detiene tracks de un MediaStream válido. Ignora null y objetos inválidos (p. ej. ref).
+ */
+export function stopMediaStream(stream, { source = 'unknown' } = {}) {
+  mediaTrace('stopMediaStream called', {
+    source,
+    typeof: typeof stream,
+    constructorName: stream?.constructor?.name ?? null,
+    hasGetTracks: typeof stream?.getTracks === 'function',
+    stream,
+  })
+
+  if (stream == null) return
+
+  if (!isMediaStream(stream)) {
+    mediaTrace('stopMediaStream skipped — not a MediaStream', {
+      source,
+      typeof: typeof stream,
+      constructorName: stream?.constructor?.name ?? null,
+      hasGetTracks: typeof stream?.getTracks === 'function',
+      keys: typeof stream === 'object' ? Object.keys(stream).slice(0, 8) : null,
+    })
+    return
+  }
+
+  stream.getTracks().forEach((track) => {
+    try {
+      track.stop()
+    } catch (error) {
+      mediaTrace('track.stop failed', {
+        source,
+        kind: track?.kind,
+        message: error?.message,
+      })
+    }
+  })
 }
 
 export function captureFrameFromVideo(video) {

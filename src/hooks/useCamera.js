@@ -20,6 +20,7 @@ import { cameraLog } from '../utils/cameraLog'
 import { getQaState } from '../utils/diagnostics'
 import { useAppLifecycle } from './useAppLifecycle'
 import { cleanupMediaStream } from '../utils/cleanup'
+import { mediaTrace } from '../utils/mediaTrace'
 import { withTimeout } from '../utils/withTimeout'
 
 function hasLiveVideoStream(stream) {
@@ -36,6 +37,7 @@ export function useCamera() {
 
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const mountedRef = useRef(false)
   const startingRef = useRef(false)
   const blackPreviewTimerRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -86,7 +88,7 @@ export function useCamera() {
       }
       setStatus('native')
       setError(null)
-      cleanupMediaStream(streamRef, videoRef)
+      cleanupMediaStream(streamRef, videoRef, { source: 'enableNativeFallback' })
       startingRef.current = false
       cameraLog.warn('embedded camera fallback', { reason })
       return true
@@ -94,9 +96,9 @@ export function useCamera() {
     [clearBlackPreviewTimer],
   )
 
-  const stop = useCallback(() => {
+  const stop = useCallback((source = 'stop') => {
     clearBlackPreviewTimer()
-    cleanupMediaStream(streamRef, videoRef)
+    cleanupMediaStream(streamRef, videoRef, { source })
     setShowBlackPreviewFallback(false)
     setStatus((current) => {
       if (useNativeFallbackRef.current) return 'native'
@@ -108,9 +110,15 @@ export function useCamera() {
   }, [clearBlackPreviewTimer])
 
   /** Solo hardware — seguro en unmount / browser back (sin setState). */
-  const stopMediaTracks = useCallback(() => {
+  const stopMediaTracks = useCallback((source = 'stopMediaTracks') => {
+    mediaTrace('stopMediaTracks called', {
+      source,
+      mounted: mountedRef.current,
+      streamRef,
+      videoRef,
+    })
     clearBlackPreviewTimer()
-    cleanupMediaStream(streamRef, videoRef)
+    cleanupMediaStream(streamRef, videoRef, { source })
     startingRef.current = false
   }, [clearBlackPreviewTimer])
 
@@ -290,7 +298,7 @@ export function useCamera() {
       wasActiveRef.current =
         statusRef.current === 'active' || statusRef.current === 'loading'
       if (!useNativeFallbackRef.current) {
-        stop()
+        stop('visibility-hidden')
       }
     },
     onVisible: () => {
@@ -305,9 +313,13 @@ export function useCamera() {
   })
 
   useEffect(() => {
+    mountedRef.current = true
+    mediaTrace('useCamera mount', { streamRef, videoRef })
     return () => {
+      mountedRef.current = false
+      mediaTrace('useCamera unmount', { streamRef, videoRef })
       clearBlackPreviewTimer()
-      cleanupMediaStream(streamRef, videoRef)
+      cleanupMediaStream(streamRef, videoRef, { source: 'useCamera-unmount' })
       startingRef.current = false
     }
   }, [clearBlackPreviewTimer])
