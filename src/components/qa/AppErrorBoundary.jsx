@@ -30,17 +30,24 @@ export class AppErrorBoundary extends Component {
       stack: error?.stack,
       componentStack: info?.componentStack,
     })
-    console.error('[error-boundary]', error?.message, error?.stack, info?.componentStack)
+    if (import.meta.env.DEV) {
+      console.error('[ERROR-BOUNDARY]', error?.message, error?.stack, info?.componentStack)
+    } else {
+      console.error('[error-boundary]', error?.message)
+    }
+  }
+
+  /** Hard navigation — no setState before leave (evita re-montar el árbol roto). */
+  navigateAway = (path) => {
+    window.location.href = path
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null })
-    window.location.assign(mapPathWithQa())
+    this.navigateAway(mapPathWithQa())
   }
 
   handleGoToMap = () => {
-    this.setState({ hasError: false, error: null })
-    window.location.assign(mapPathWithQa())
+    this.navigateAway(mapPathWithQa())
   }
 
   handleReload = () => {

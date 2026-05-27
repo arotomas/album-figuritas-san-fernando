@@ -6,9 +6,15 @@ import { AppErrorBoundary } from './components/qa/AppErrorBoundary.jsx'
 import { syncQaFromUrl } from './qa/qaCore'
 import './lib/supabase.js'
 import './styles/index.css'
+import { bootLog, bootWarn } from './utils/bootLog.js'
 import { initPwaInstallCapture } from './utils/pwaInstallController.js'
 
-initPwaInstallCapture()
+bootLog('main entry')
+try {
+  initPwaInstallCapture()
+} catch (error) {
+  bootWarn('initPwaInstallCapture threw — continuing boot', error?.message)
+}
 syncQaFromUrl()
 
 createRoot(document.getElementById('root')).render(

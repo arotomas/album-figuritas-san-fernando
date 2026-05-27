@@ -1,47 +1,85 @@
+import { bootLog, bootWarn } from './bootLog'
 import { pwaLog, pwaWarn } from './pwaLog'
 
 let deferredPrompt = null
 let installedFlag = false
 let initialized = false
+let initFailed = false
 const listeners = new Set()
+
+let cachedSnapshot = null
+
+function safeMatchMedia(query) {
+  try {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return null
+    }
+    return window.matchMedia(query)
+  } catch {
+    return null
+  }
+}
 
 export function isStandaloneMode() {
   if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.matchMedia('(display-mode: fullscreen)').matches ||
-    window.navigator.standalone === true
-  )
+  try {
+    const standaloneMedia = safeMatchMedia('(display-mode: standalone)')
+    const fullscreenMedia = safeMatchMedia('(display-mode: fullscreen)')
+    return (
+      standaloneMedia?.matches === true ||
+      fullscreenMedia?.matches === true ||
+      window.navigator?.standalone === true
+    )
+  } catch {
+    return false
+  }
 }
 
 /** iPhone/iPad — incluye iPadOS con UA de Mac. */
 export function isIosDevice() {
   if (typeof navigator === 'undefined') return false
-  const ua = navigator.userAgent
-  const isClassicIos = /iPad|iPhone|iPod/.test(ua)
-  const isIpadOs =
-    navigator.platform === 'MacIntel' && Number(navigator.maxTouchPoints) > 1
-  return isClassicIos || isIpadOs
+  try {
+    const ua = navigator.userAgent
+    const isClassicIos = /iPad|iPhone|iPod/.test(ua)
+    const isIpadOs =
+      navigator.platform === 'MacIntel' && Number(navigator.maxTouchPoints) > 1
+    return isClassicIos || isIpadOs
+  } catch {
+    return false
+  }
 }
 
 export function isIosSafari() {
   if (!isIosDevice()) return false
-  const ua = navigator.userAgent
-  return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
+  try {
+    const ua = navigator.userAgent
+    return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
+  } catch {
+    return false
+  }
 }
 
 /** Chromium/Android/desktop donde puede existir beforeinstallprompt. */
 export function isNativeInstallPlatform() {
   if (typeof navigator === 'undefined') return false
-  const ua = navigator.userAgent
-  if (isIosDevice()) return false
-  if (/Android/i.test(ua)) {
-    return /Chrome|EdgA|SamsungBrowser/i.test(ua)
+  try {
+    const ua = navigator.userAgent
+    if (isIosDevice()) return false
+    if (/Android/i.test(ua)) {
+      return /Chrome|EdgA|SamsungBrowser/i.test(ua)
+    }
+    return /Chrome|Edg\//i.test(ua) && !/Mobile/i.test(ua)
+  } catch {
+    return false
   }
-  return /Chrome|Edg\//i.test(ua) && !/Mobile/i.test(ua)
+}
+
+function invalidateSnapshot() {
+  cachedSnapshot = null
 }
 
 function notify() {
+  invalidateSnapshot()
   listeners.forEach((listener) => listener())
 }
 
@@ -49,15 +87,7 @@ function readInstalled() {
   return installedFlag || isStandaloneMode()
 }
 
-export function getPwaInstallBlockedReason() {
-  if (readInstalled()) return 'standalone'
-  if (isIosDevice()) return null
-  if (deferredPrompt) return null
-  if (isNativeInstallPlatform()) return 'prompt-not-captured-yet'
-  return 'platform-no-native-prompt'
-}
-
-export function getPwaInstallSnapshot() {
+function buildSnapshot() {
   const isInstalled = readInstalled()
   const canPromptInstall = Boolean(deferredPrompt) && !isInstalled
   const isIos = isIosDevice()
@@ -65,7 +95,7 @@ export function getPwaInstallSnapshot() {
   const nativePlatform = isNativeInstallPlatform()
 
   const showInstallCta =
-    !isInstalled && (isIos || canPromptInstall || nativePlatform)
+    !initFailed && !isInstalled && (isIos || canPromptInstall || nativePlatform)
 
   return {
     isInstalled,
@@ -76,7 +106,23 @@ export function getPwaInstallSnapshot() {
     showInstallCta,
     hasDeferredPrompt: Boolean(deferredPrompt),
     blockedReason: showInstallCta ? null : getPwaInstallBlockedReason(),
+    initFailed,
   }
+}
+
+export function getPwaInstallBlockedReason() {
+  if (initFailed) return 'init-failed'
+  if (readInstalled()) return 'standalone'
+  if (isIosDevice()) return null
+  if (deferredPrompt) return null
+  if (isNativeInstallPlatform()) return 'prompt-not-captured-yet'
+  return 'platform-no-native-prompt'
+}
+
+export function getPwaInstallSnapshot() {
+  if (cachedSnapshot) return cachedSnapshot
+  cachedSnapshot = buildSnapshot()
+  return cachedSnapshot
 }
 
 export function subscribePwaInstall(listener) {
@@ -88,50 +134,73 @@ export function initPwaInstallCapture() {
   if (typeof window === 'undefined' || initialized) return
   initialized = true
 
-  installedFlag = isStandaloneMode()
-  pwaLog('bootstrap', {
-    standalone: installedFlag,
-    ios: isIosDevice(),
-    iosSafari: isIosSafari(),
-    nativePlatform: isNativeInstallPlatform(),
-  })
+  try {
+    installedFlag = isStandaloneMode()
+    invalidateSnapshot()
 
-  if (installedFlag) {
-    pwaLog('standalone detected')
-  }
+    pwaLog('bootstrap', {
+      standalone: installedFlag,
+      ios: isIosDevice(),
+      iosSafari: isIosSafari(),
+      nativePlatform: isNativeInstallPlatform(),
+    })
 
-  window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault()
-    deferredPrompt = event
-    pwaLog('beforeinstallprompt received')
-    pwaLog('install available')
-    notify()
-  })
-
-  window.addEventListener('appinstalled', () => {
-    deferredPrompt = null
-    installedFlag = true
-    pwaLog('appinstalled — standalone assumed')
-    notify()
-  })
-
-  const media = window.matchMedia('(display-mode: standalone)')
-  const onDisplayModeChange = () => {
-    const next = isStandaloneMode()
-    if (next !== installedFlag) {
-      installedFlag = next
-      if (next) {
-        deferredPrompt = null
-        pwaLog('standalone detected')
-      }
-      notify()
+    if (installedFlag) {
+      pwaLog('standalone detected')
     }
-  }
 
-  media.addEventListener?.('change', onDisplayModeChange)
+    window.addEventListener('beforeinstallprompt', (event) => {
+      try {
+        event.preventDefault()
+        deferredPrompt = event
+        pwaLog('beforeinstallprompt received')
+        pwaLog('install available')
+        notify()
+      } catch (error) {
+        pwaWarn('beforeinstallprompt handler failed', error?.message)
+      }
+    })
 
-  if (!installedFlag && !isIosDevice() && isNativeInstallPlatform() && !deferredPrompt) {
-    pwaWarn('install blocked reason', getPwaInstallBlockedReason())
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null
+      installedFlag = true
+      pwaLog('appinstalled — standalone assumed')
+      notify()
+    })
+
+    const media = safeMatchMedia('(display-mode: standalone)')
+    const onDisplayModeChange = () => {
+      try {
+        const next = isStandaloneMode()
+        if (next !== installedFlag) {
+          installedFlag = next
+          if (next) {
+            deferredPrompt = null
+            pwaLog('standalone detected')
+          }
+          notify()
+        }
+      } catch (error) {
+        pwaWarn('display-mode change failed', error?.message)
+      }
+    }
+
+    if (media && typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onDisplayModeChange)
+    } else if (media && typeof media.addListener === 'function') {
+      media.addListener(onDisplayModeChange)
+    }
+
+    if (!installedFlag && !isIosDevice() && isNativeInstallPlatform() && !deferredPrompt) {
+      pwaWarn('install blocked reason', getPwaInstallBlockedReason())
+    }
+
+    bootLog('pwa install capture ready')
+  } catch (error) {
+    initFailed = true
+    invalidateSnapshot()
+    bootWarn('pwa install capture failed — app continues', error?.message)
+    pwaWarn('init failed — install CTA disabled', error?.message)
   }
 }
 
