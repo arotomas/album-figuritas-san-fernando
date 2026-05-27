@@ -18,6 +18,8 @@ let snapshot = {
   lastSetState: null,
   lastAsync: null,
   lastUnlock: null,
+  lastAlbum: null,
+  currentScreen: null,
   finalizeStarted: false,
 }
 
@@ -56,14 +58,13 @@ export function updateCapturePipelineSnapshot(partial) {
   snapshot = { ...snapshot, ...partial }
 }
 
-export function capturePipelineTrace(category, message, detail) {
-  if (!import.meta.env.DEV) return
-
+function pushPipelineEvent(category, message, detail, level = 'info') {
   const entry = {
     t: nowIso(),
     ts: performance.now(),
     category,
     message,
+    level,
     detail: detail !== undefined ? safeClone(detail) : undefined,
   }
 
@@ -72,52 +73,54 @@ export function capturePipelineTrace(category, message, detail) {
     events.splice(0, events.length - MAX_EVENTS)
   }
 
+  if (!import.meta.env.DEV) return
+
   const prefix = `[${category}]`
-  if (detail !== undefined) {
+  if (level === 'warn') {
+    if (detail !== undefined) console.warn(prefix, message, detail)
+    else console.warn(prefix, message)
+  } else if (detail !== undefined) {
     console.info(prefix, message, detail)
   } else {
     console.info(prefix, message)
   }
 }
 
+export function capturePipelineTrace(category, message, detail) {
+  pushPipelineEvent(category, message, detail, 'info')
+}
+
 export function capturePipelineWarn(category, message, detail) {
-  if (!import.meta.env.DEV) return
-
-  const entry = {
-    t: nowIso(),
-    ts: performance.now(),
-    category,
-    message,
-    level: 'warn',
-    detail: detail !== undefined ? safeClone(detail) : undefined,
-  }
-
-  events.push(entry)
-  if (events.length > MAX_EVENTS) {
-    events.splice(0, events.length - MAX_EVENTS)
-  }
-
-  const prefix = `[${category}]`
-  if (detail !== undefined) {
-    console.warn(prefix, message, detail)
-  } else {
-    console.warn(prefix, message)
-  }
+  pushPipelineEvent(category, message, detail, 'warn')
 }
 
 export function capturePipelineError(error, info = {}, extra = {}) {
+  const route =
+    typeof window !== 'undefined' ? window.location.pathname + window.location.search : null
+
   const payload = {
     message: error?.message ?? String(error),
     stack: error?.stack ?? null,
     componentStack: info?.componentStack ?? null,
+    currentRoute: route,
+    currentScreen: snapshot.currentScreen ?? null,
+    lastUnlock: snapshot.lastUnlock ?? null,
+    lastAlbum: snapshot.lastAlbum ?? null,
     ...getCapturePipelineSnapshot(),
     ...extra,
   }
 
+  pushPipelineEvent('ERROR', error?.message ?? 'unknown', payload, 'warn')
+
   if (import.meta.env.DEV) {
     console.error('[ERROR]', payload)
   } else {
-    console.error('[capture-pipeline-error]', payload.message)
+    console.error('[capture-pipeline-error]', payload.message, {
+      route: payload.currentRoute,
+      screen: payload.currentScreen,
+      lastUnlock: payload.lastUnlock,
+      lastAlbum: payload.lastAlbum,
+    })
   }
 
   return payload
@@ -165,6 +168,22 @@ export function unlockTrace(message, detail) {
     lastUnlock: { message, at: nowIso(), ...(detail ?? {}) },
   })
   capturePipelineTrace('UNLOCK', message, detail)
+}
+
+export function albumTrace(message, detail) {
+  updateCapturePipelineSnapshot({
+    currentScreen: 'MyFiguresScreen',
+    lastAlbum: { message, at: nowIso(), ...(detail ?? {}) },
+  })
+  capturePipelineTrace('ALBUM', message, detail)
+}
+
+export function albumTraceWarn(message, detail) {
+  updateCapturePipelineSnapshot({
+    currentScreen: 'MyFiguresScreen',
+    lastAlbum: { message, at: nowIso(), level: 'warn', ...(detail ?? {}) },
+  })
+  capturePipelineWarn('ALBUM', message, detail)
 }
 
 /** Prefetch lazy reward chunks tras save exitoso (reduce fallo de chunk en mobile). */

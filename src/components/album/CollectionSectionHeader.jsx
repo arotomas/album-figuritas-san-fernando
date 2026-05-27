@@ -15,6 +15,8 @@ function CollectionSectionHeaderInner({
   eventBadge = null,
   archived = false,
 }) {
+  if (!progress?.collection) return null
+
   const { collection, obtained, total, percent, status } = progress
   const isBonus = variant === 'bonus'
   const isEvent = variant === 'event'

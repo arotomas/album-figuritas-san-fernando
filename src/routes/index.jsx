@@ -34,7 +34,14 @@ const NearFigureScreen = lazy(() =>
   import('../pages/NearFigureScreen').then((m) => ({ default: m.NearFigureScreen })),
 )
 const MyFiguresScreen = lazy(() =>
-  import('../pages/MyFiguresScreen').then((m) => ({ default: m.MyFiguresScreen })),
+  import('../pages/MyFiguresScreen')
+    .then((m) => ({ default: m.MyFiguresScreen }))
+    .catch((error) => {
+      if (import.meta.env.DEV) {
+        console.error('[ALBUM] lazy chunk failed — MyFiguresScreen', error?.message)
+      }
+      throw error
+    }),
 )
 const OptionsScreen = lazy(() =>
   import('../pages/OptionsScreen').then((m) => ({ default: m.OptionsScreen })),

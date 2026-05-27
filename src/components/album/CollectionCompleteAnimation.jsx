@@ -21,9 +21,11 @@ export function CollectionCompleteAnimation({ progress, open, onComplete }) {
 
   const { collection, obtained, total } = progress ?? {}
 
+  if (open && progress && !collection) return null
+
   return (
     <AnimatePresence>
-      {open && progress && (
+      {open && progress && collection && (
         <m.div
           className="fixed inset-0 z-[190] flex items-center justify-center bg-black/88 px-6 backdrop-blur-md"
           initial={{ opacity: 0 }}
@@ -32,7 +34,7 @@ export function CollectionCompleteAnimation({ progress, open, onComplete }) {
           transition={{ duration: 0.28 }}
           role="dialog"
           aria-modal="true"
-          aria-label={`Colección ${collection.label} completada`}
+          aria-label={`Colección ${collection?.label ?? 'álbum'} completada`}
         >
           <button
             type="button"
@@ -56,7 +58,7 @@ export function CollectionCompleteAnimation({ progress, open, onComplete }) {
                 className="text-5xl"
                 aria-hidden
               >
-                {collection.icon}
+                {collection?.icon ?? '✓'}
               </m.span>
             </m.div>
 

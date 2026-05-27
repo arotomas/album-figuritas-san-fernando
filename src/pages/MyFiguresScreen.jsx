@@ -22,19 +22,13 @@ import {
   sanitizeAlbumFigures,
 } from '../utils/myFiguresLog'
 import {
-  getMainProgressState,
-  getRevealedNormalFigures,
-} from '../utils/figureGameRules'
-import {
-  enrichFigureWithCollection,
-  getAlbumGlobalProgress,
-  getBonusCollectionGroups,
-  getLiveEventCollectionGroups,
-  getArchivedEventCollectionGroups,
-  getMainAlbumCollectionGroups,
   detectCollectionCompletionTransition,
   detectCollectionDiscoveryTransition,
+  enrichFigureWithCollection,
 } from '../utils/collectionModel'
+import { buildAlbumViewModel } from '../utils/albumViewModel'
+import { albumTrace, albumTraceWarn, traceMounted } from '../utils/capturePipelineTrace'
+import { AlbumScreenErrorBoundary } from '../components/album/AlbumScreenErrorBoundary'
 import { useAlbumCollectionsBootstrap } from '../hooks/useAlbumCollectionsBootstrap'
 import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailability'
 import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
@@ -86,7 +80,15 @@ function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
 }
 
 function AlbumSlotCard({ figure, isNew, onSelect }) {
-  const rarity = getRarity(figure.rareza)
+  if (!figure?.id || !figure?.nombre) {
+    albumTraceWarn('figure render skipped — invalid slot', {
+      figureId: figure?.id ?? null,
+      hasNombre: Boolean(figure?.nombre),
+    })
+    return null
+  }
+
+  const rarity = getRarity(figure?.rareza)
   const obtained = Boolean(figure.obtenida)
   const isBonus = Boolean(figure.is_bonus)
   const photo = figure.foto
@@ -174,7 +176,7 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
   )
 }
 
-export function MyFiguresScreen() {
+function MyFiguresScreenInner() {
   useAlbumCollectionsBootstrap(true)
   const navigate = useNavigate()
   const { withQa } = useQaMode()
@@ -207,28 +209,82 @@ export function MyFiguresScreen() {
   const discoveryCheckedForRef = useRef(null)
 
   const sanitizedFigures = useMemo(() => sanitizeAlbumFigures(rawFigures), [rawFigures])
-  const mainProgress = useMemo(() => getMainProgressState(sanitizedFigures), [sanitizedFigures])
-  const mainFigures = useMemo(() => getRevealedNormalFigures(sanitizedFigures), [sanitizedFigures])
-  const mainCollectionGroups = useMemo(
-    () => getMainAlbumCollectionGroups(sanitizedFigures, availabilityOptions),
+
+  const {
+    mainProgress,
+    mainFigures,
+    mainCollectionGroups,
+    bonusCollectionGroups,
+    liveEventCollectionGroups,
+    archivedEventCollectionGroups,
+    globalProgress,
+  } = useMemo(
+    () => buildAlbumViewModel(sanitizedFigures, availabilityOptions),
     [sanitizedFigures, availabilityOptions],
   )
-  const bonusCollectionGroups = useMemo(
-    () => getBonusCollectionGroups(sanitizedFigures, availabilityOptions),
-    [sanitizedFigures, availabilityOptions],
-  )
-  const liveEventCollectionGroups = useMemo(
-    () => getLiveEventCollectionGroups(sanitizedFigures, availabilityOptions),
-    [sanitizedFigures, availabilityOptions],
-  )
-  const archivedEventCollectionGroups = useMemo(
-    () => getArchivedEventCollectionGroups(sanitizedFigures, availabilityOptions),
-    [sanitizedFigures, availabilityOptions],
-  )
-  const globalProgress = useMemo(
-    () => getAlbumGlobalProgress(sanitizedFigures, availabilityOptions),
-    [sanitizedFigures, availabilityOptions],
-  )
+
+  useEffect(() => {
+    traceMounted('MyFiguresScreen', true)
+    albumTrace('MyFiguresScreen mount', {
+      hasHydrated,
+      rawCount: rawFigures?.length ?? 0,
+      lastObtenidaFigureId,
+    })
+    return () => {
+      traceMounted('MyFiguresScreen', false)
+      albumTrace('MyFiguresScreen unmount')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!hasHydrated) {
+      albumTrace('hydration start', { hasHydrated: false })
+      return
+    }
+    albumTrace('hydration end', {
+      sanitizedCount: sanitizedFigures.length,
+      lastObtenidaFigureId,
+    })
+  }, [hasHydrated, lastObtenidaFigureId, sanitizedFigures.length])
+
+  useEffect(() => {
+    if (!hasHydrated || sanitizedFigures.length === 0) return
+    albumTrace('album selectors', {
+      mainGroups: mainCollectionGroups.length,
+      bonusGroups: bonusCollectionGroups.length,
+      liveEventGroups: liveEventCollectionGroups.length,
+      mainObtained: mainProgress.obtained,
+      mainTotal: mainProgress.total,
+      globalPercent: globalProgress?.percentComplete ?? null,
+    })
+  }, [
+    bonusCollectionGroups.length,
+    globalProgress?.percentComplete,
+    hasHydrated,
+    liveEventCollectionGroups.length,
+    mainCollectionGroups.length,
+    mainProgress.obtained,
+    mainProgress.total,
+    sanitizedFigures.length,
+  ])
+
+  useEffect(() => {
+    if (!hasHydrated || sanitizedFigures.length === 0) return
+    const slotCount = mainCollectionGroups.reduce((sum, group) => sum + group.figures.length, 0)
+    albumTrace('slots render', {
+      slotCount,
+      lastObtenidaFigureId,
+      celebrating: Boolean(celebratingProgress),
+      discovering: Boolean(discoveringCollection),
+    })
+  }, [
+    celebratingProgress,
+    discoveringCollection,
+    hasHydrated,
+    lastObtenidaFigureId,
+    mainCollectionGroups,
+    sanitizedFigures.length,
+  ])
 
   useEffect(() => {
     logAlbumAvailabilitySnapshot(sanitizedFigures, availabilityOptions)
@@ -353,14 +409,25 @@ export function MyFiguresScreen() {
     if (celebrationCheckedForRef.current === checkKey) return
     celebrationCheckedForRef.current = checkKey
 
-    const transition = detectCollectionCompletionTransition(
-      sanitizedFigures,
-      lastObtenidaFigureId,
-    )
-    if (!transition) return
-    if (celebratedCollectionIds?.includes(transition.collectionId)) return
+    try {
+      const transition = detectCollectionCompletionTransition(
+        sanitizedFigures,
+        lastObtenidaFigureId,
+      )
+      if (!transition?.collection) return
+      if (celebratedCollectionIds?.includes(transition.collectionId)) return
 
-    setCelebratingProgress(transition)
+      albumTrace('collection complete transition', {
+        collectionId: transition.collectionId,
+        figureId: lastObtenidaFigureId,
+      })
+      setCelebratingProgress(transition)
+    } catch (error) {
+      albumTraceWarn('collection complete check failed', {
+        message: error?.message,
+        figureId: lastObtenidaFigureId,
+      })
+    }
   }, [hasHydrated, lastObtenidaFigureId, sanitizedFigures, celebratedCollectionIds])
 
   useEffect(() => {
@@ -370,15 +437,26 @@ export function MyFiguresScreen() {
     if (discoveryCheckedForRef.current === checkKey) return
     discoveryCheckedForRef.current = checkKey
 
-    const transition = detectCollectionDiscoveryTransition(
-      sanitizedFigures,
-      lastObtenidaFigureId,
-      discoveredCollectionIds,
-    )
-    if (!transition) return
-    if (acknowledgedDiscoveryCollectionIds?.includes(transition.collectionId)) return
+    try {
+      const transition = detectCollectionDiscoveryTransition(
+        sanitizedFigures,
+        lastObtenidaFigureId,
+        discoveredCollectionIds,
+      )
+      if (!transition?.collection) return
+      if (acknowledgedDiscoveryCollectionIds?.includes(transition.collectionId)) return
 
-    setDiscoveringCollection(transition.collection)
+      albumTrace('collection discovery transition', {
+        collectionId: transition.collectionId,
+        figureId: lastObtenidaFigureId,
+      })
+      setDiscoveringCollection(transition.collection)
+    } catch (error) {
+      albumTraceWarn('collection discovery check failed', {
+        message: error?.message,
+        figureId: lastObtenidaFigureId,
+      })
+    }
   }, [
     hasHydrated,
     lastObtenidaFigureId,
@@ -437,9 +515,11 @@ export function MyFiguresScreen() {
       />
 
       <div className="my-figures-scroll safe-x relative z-10 min-h-0 flex-1 scroll-y-app px-4 pt-3">
-        <div className="album-page-shell mx-auto mb-3 w-full max-w-[720px] px-1 sm:px-2">
-          <AlbumGlobalDashboard globalProgress={globalProgress} />
-        </div>
+        {globalProgress && (
+          <div className="album-page-shell mx-auto mb-3 w-full max-w-[720px] px-1 sm:px-2">
+            <AlbumGlobalDashboard globalProgress={globalProgress} />
+          </div>
+        )}
 
         <section className="album-page-shell mx-auto w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
           <div className="mb-3 flex items-center justify-between px-1">
@@ -467,7 +547,7 @@ export function MyFiguresScreen() {
                 <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {figures.map((figure) => (
                     <AlbumSlotCard
-                      key={figure.id}
+                      key={`${collection.id}-${String(figure.id)}`}
                       figure={figure}
                       isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
                       onSelect={handleSelect}
@@ -506,7 +586,7 @@ export function MyFiguresScreen() {
                     <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                       {figures.map((figure) => (
                         <AlbumSlotCard
-                          key={figure.id}
+                          key={`${collection.id}-${String(figure.id)}`}
                           figure={figure}
                           isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
                           onSelect={handleSelect}
@@ -548,7 +628,7 @@ export function MyFiguresScreen() {
                     <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                       {figures.map((figure) => (
                         <AlbumSlotCard
-                          key={figure.id}
+                          key={`${collection.id}-${String(figure.id)}`}
                           figure={figure}
                           isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
                           onSelect={handleSelect}
@@ -592,7 +672,7 @@ export function MyFiguresScreen() {
                   <div className="album-slot-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                     {figures.map((figure) => (
                       <AlbumSlotCard
-                        key={figure.id}
+                        key={`${collection.id}-${String(figure.id)}`}
                         figure={figure}
                         isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
                         onSelect={handleSelect}
@@ -662,5 +742,15 @@ export function MyFiguresScreen() {
         onDeletePhoto={handleDeletePhoto}
       />
     </div>
+  )
+}
+
+export function MyFiguresScreen() {
+  const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
+
+  return (
+    <AlbumScreenErrorBoundary lastObtenidaFigureId={lastObtenidaFigureId}>
+      <MyFiguresScreenInner />
+    </AlbumScreenErrorBoundary>
   )
 }
