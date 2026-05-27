@@ -20,6 +20,7 @@ export function CameraView({
   inCaptureRange = false,
   proximityPhase = 'none',
   figureRarity = 'común',
+  distanceMeters = null,
   onCapture,
   onFileSelected,
   onUseNativeCamera,
@@ -96,6 +97,7 @@ export function CameraView({
           progress={gpsProgress}
           isReady={isReady}
           proximityPhase={proximityPhase}
+          distanceMeters={distanceMeters}
         />
 
         <RingProgressFeedback

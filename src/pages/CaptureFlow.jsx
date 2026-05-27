@@ -5,7 +5,7 @@ import { CameraView } from '../components/camera'
 import { CameraAccessGate } from '../components/camera/CameraAccessGate'
 import { PermissionFallback } from '../components/qa/PermissionFallback'
 import { useGeolocation } from '../hooks/useGeolocation'
-import { useCaptureFlow, CAPTURE_PHASES } from '../hooks/useCaptureFlow'
+import { useCaptureFlow, CAPTURE_PHASES, isPostCaptureFlowPhase } from '../hooks/useCaptureFlow'
 import { CaptureChallengeInterstitial } from '../components/camera/CaptureChallengeInterstitial'
 import { useAppLifecycle } from '../hooks/useAppLifecycle'
 import { useAppStore } from '../store/useAppStore'
@@ -118,6 +118,7 @@ export function CaptureFlow() {
     isApproximateGps,
     proximityPhase,
     figureRarity,
+    distanceMeters,
     retryCapture,
     clearPendingCapture,
     showRewardComplete,
@@ -159,7 +160,6 @@ export function CaptureFlow() {
       stopVibration()
       camera.stop()
       clearPendingCapture()
-      clearCaptureSession()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -180,7 +180,8 @@ export function CaptureFlow() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isRetake || !nearFigure || isCaptureSessionActive) return
+    if (isRetake || isExitingRef.current || isPostCapturePhase) return
+    if (!nearFigure || isCaptureSessionActive) return
 
     const targetId = nearFigure.targetFigureId ?? nearFigure.id
     const stored = figures.find(
@@ -192,6 +193,7 @@ export function CaptureFlow() {
       navigate('/map', { replace: true })
     }
   }, [
+    isPostCapturePhase,
     isRetake,
     nearFigure,
     figures,
@@ -223,11 +225,11 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
-    if (isRetake || isExitingRef.current) return
+    if (isRetake || isExitingRef.current || isPostCapturePhase) return
     if (!nearFigure && !isCaptureSessionActive) {
       navigate('/map', { replace: true })
     }
-  }, [isRetake, nearFigure, isCaptureSessionActive, navigate])
+  }, [isPostCapturePhase, isRetake, nearFigure, isCaptureSessionActive, navigate])
 
   useEffect(() => {
     const lockPortrait = async () => {
@@ -328,6 +330,9 @@ export function CaptureFlow() {
   }
 
   if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
+    if (import.meta.env.DEV) {
+      captureSyncLog.info('reward phase render', { figureId: rewardFigure.id })
+    }
     return (
       <Suspense fallback={<RewardSkeleton />}>
         <RewardAnimation
@@ -433,6 +438,7 @@ export function CaptureFlow() {
           inCaptureRange={inCaptureRange}
           proximityPhase={proximityPhase}
           figureRarity={figureRarity}
+          distanceMeters={distanceMeters}
           onCapture={capture}
           onFileSelected={handleFileSelected}
           onUseNativeCamera={handleUseNativeCamera}

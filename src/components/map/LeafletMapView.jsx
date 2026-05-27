@@ -14,7 +14,7 @@ import {
 import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
-import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
+import { useSmoothedHeading } from '../../hooks/useSmoothedHeading'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
 import {
@@ -196,6 +196,7 @@ function UserLocationMarker({ position, isCoarse = false }) {
   const markerRef = useRef(null)
   const rootRef = useRef(null)
   const renderKeyRef = useRef('')
+  const heading = useSmoothedHeading(position)
 
   useEffect(() => {
     const el = document.createElement('div')
@@ -231,20 +232,24 @@ function UserLocationMarker({ position, isCoarse = false }) {
 
     const accuracyBucket =
       position.accuracy != null ? Math.round(position.accuracy / 8) * 8 : 0
-    const renderKey = `${accuracyBucket}:${isCoarse ? 1 : 0}`
+    const renderKey = `${accuracyBucket}:${isCoarse ? 1 : 0}:${heading ?? 'na'}`
     if (renderKeyRef.current === renderKey) return
     renderKeyRef.current = renderKey
 
     try {
       root.render(
-        <UserLocationDot accuracy={position.accuracy} isCoarse={isCoarse} />,
+        <UserLocationDot
+          accuracy={position.accuracy}
+          isCoarse={isCoarse}
+          heading={heading}
+        />,
       )
     } catch (error) {
       if (import.meta.env.DEV) {
         console.warn('[map] user dot render skipped after unmount', error?.message)
       }
     }
-  }, [isCoarse, position, position?.accuracy])
+  }, [heading, isCoarse, position, position?.accuracy])
 
   return null
 }

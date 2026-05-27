@@ -31,3 +31,17 @@ export const REWARD_TIMINGS = {
     done: 1900,
   },
 }
+
+/** Beat previo al reveal para rarezas especiales (ms) — peso visual, no duración. */
+export const RARITY_DISCOVERY_BEAT_MS = {
+  full: {
+    rara: 1020,
+    épica: 1140,
+    legendaria: 1180,
+  },
+  reduced: {
+    rara: 540,
+    épica: 600,
+    legendaria: 620,
+  },
+}

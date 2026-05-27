@@ -7,6 +7,8 @@ import {
   RING_PROGRESS_COLOR,
 } from '../../utils/proximityExperience'
 import { PROXIMITY_PHASES } from '../../config/proximity'
+import { formatProximityDistanceLabel } from '../../utils/proximityExperience'
+import { useSmoothedRingDistance } from '../../hooks/useSmoothedRingDistance'
 
 const SIZE = 220
 const STROKE = 5
@@ -49,6 +51,7 @@ export function ValidationRing({
   progress = 0,
   isReady = false,
   proximityPhase = PROXIMITY_PHASES.NONE,
+  distanceMeters = null,
 }) {
   const clamped = Math.min(1, Math.max(0, progress))
   const dashOffset = CIRCUMFERENCE * (1 - clamped)
@@ -94,6 +97,13 @@ export function ValidationRing({
   const containerOpacity = Math.max(
     visualStyle.opacity,
     progress > 0.02 ? 0.4 : visualStyle.opacity,
+  )
+
+  const smoothedDistance = useSmoothedRingDistance(distanceMeters, { isReady })
+
+  const distanceLabel = useMemo(
+    () => formatProximityDistanceLabel(smoothedDistance, { isReady }),
+    [isReady, smoothedDistance],
   )
 
   return (
@@ -184,9 +194,34 @@ export function ValidationRing({
         <motion.div
           animate={{ boxShadow: ringColors.frameGlow }}
           transition={{ duration: 0.45, ease: 'easeOut' }}
-          className="relative h-44 w-44 rounded-3xl border-2 transition-colors duration-500"
+          className="relative flex h-44 w-44 items-center justify-center rounded-3xl border-2 transition-colors duration-500"
           style={{ borderColor: ringColors.frameBorder }}
         >
+          {distanceLabel && (
+            <motion.div
+              key={distanceLabel.mode === 'arrived' ? 'arrived' : distanceLabel.secondary}
+              initial={{ opacity: 0.72, y: 2 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none px-3 text-center"
+              aria-live="polite"
+            >
+              {distanceLabel.mode === 'arrived' ? (
+                <p className="text-[1.05rem] font-semibold tracking-[0.02em] text-white drop-shadow-[0_1px_10px_rgba(0,0,0,0.75)]">
+                  {distanceLabel.primary}
+                </p>
+              ) : (
+                <>
+                  <p className="text-[10px] font-medium uppercase leading-none tracking-[0.22em] text-white/68 drop-shadow-[0_1px_6px_rgba(0,0,0,0.6)]">
+                    {distanceLabel.primary}
+                  </p>
+                  <p className="mt-1.5 text-[1.55rem] font-semibold leading-none tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.78)]">
+                    {distanceLabel.secondary}
+                  </p>
+                </>
+              )}
+            </motion.div>
+          )}
           <span className="absolute -left-px -top-px h-6 w-6 border-l-2 border-t-2 border-white/50" />
           <span className="absolute -right-px -top-px h-6 w-6 border-r-2 border-t-2 border-white/50" />
           <span className="absolute -bottom-px -left-px h-6 w-6 border-b-2 border-l-2 border-white/50" />

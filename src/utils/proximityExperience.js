@@ -261,6 +261,24 @@ export function getRingProgressFeedback(progress) {
   )
 }
 
+/** Distancia restante para el centro del anillo — tono claro, no técnico. */
+export function formatProximityDistanceLabel(meters, { isReady = false } = {}) {
+  if (isReady || (meters != null && meters <= 8)) {
+    return { mode: 'arrived', primary: 'Estás ahí', secondary: null }
+  }
+  if (meters == null || !Number.isFinite(meters)) {
+    return null
+  }
+
+  if (meters > 999) {
+    const km = meters / 1000
+    const text = km >= 10 ? `${Math.round(km)} km` : `${km.toFixed(1).replace(/\.0$/, '')} km`
+    return { mode: 'far', primary: 'Faltan', secondary: text }
+  }
+
+  return { mode: 'meters', primary: 'Faltan', secondary: `${Math.max(1, Math.round(meters))} m` }
+}
+
 /** Color y sombra del texto bajo el anillo — legible en exteriores. */
 export function getRingProgressFeedbackStyle(progress) {
   const fill = Math.min(1, Math.max(0, progress ?? 0))

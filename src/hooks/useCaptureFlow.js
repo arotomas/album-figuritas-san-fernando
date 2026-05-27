@@ -49,6 +49,17 @@ export const CAPTURE_PHASES = {
   DONE: 'done',
 }
 
+export function isPostCaptureFlowPhase(phase) {
+  return (
+    phase === CAPTURE_PHASES.CAPTURING ||
+    phase === CAPTURE_PHASES.COMPRESSING ||
+    phase === CAPTURE_PHASES.REWARD ||
+    phase === CAPTURE_PHASES.UNLOCK ||
+    phase === CAPTURE_PHASES.PHOTO_UPDATED ||
+    phase === CAPTURE_PHASES.DONE
+  )
+}
+
 export const CAPTURE_RECOVERABLE_ERROR =
   'No pudimos procesar la foto. Probá otra vez.'
 
@@ -186,21 +197,41 @@ export function useCaptureFlow({
   const pendingFigureRef = useRef(null)
   const pendingLocationSnapshotRef = useRef(null)
   const pendingLockedRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const safeSetPhase = useCallback((nextPhase) => {
+    if (!mountedRef.current) {
+      if (import.meta.env.DEV) {
+        captureLog.warn('phase update skipped — unmounted', { nextPhase })
+      }
+      return
+    }
+    phaseRef.current = nextPhase
+    setPhase(nextPhase)
+  }, [])
 
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
 
   useEffect(() => {
+    if (!captureSession?.lockedAt) return
+    if (unlockSubmittedRef.current || isPostCaptureFlowPhase(phaseRef.current)) return
+
     if (hasCaptureChallenge(figure)) {
-      setPhase(CAPTURE_PHASES.CHALLENGE)
-      phaseRef.current = CAPTURE_PHASES.CHALLENGE
+      safeSetPhase(CAPTURE_PHASES.CHALLENGE)
       unlockSubmittedRef.current = false
       return
     }
-    setPhase(CAPTURE_PHASES.CAMERA)
-    phaseRef.current = CAPTURE_PHASES.CAMERA
-  }, [figure?.id, captureSession?.lockedAt])
+    safeSetPhase(CAPTURE_PHASES.CAMERA)
+  }, [captureSession?.lockedAt, figure?.id, safeSetPhase])
 
   const resolvedFigure = figure ?? captureSession?.figure ?? null
   const sessionSnapshot = captureSession?.locationSnapshot ?? null
@@ -427,13 +458,17 @@ export function useCaptureFlow({
       processingTimeoutRef.current = null
     }
     processingRef.current = false
+    if (!mountedRef.current) return
     setIsProcessing(false)
     setProcessingMessage(null)
-    if (!unlockSubmittedRef.current && phaseRef.current !== CAPTURE_PHASES.CAMERA) {
-      phaseRef.current = CAPTURE_PHASES.CAMERA
-      setPhase(CAPTURE_PHASES.CAMERA)
+    if (
+      !unlockSubmittedRef.current &&
+      !isPostCaptureFlowPhase(phaseRef.current) &&
+      phaseRef.current !== CAPTURE_PHASES.CAMERA
+    ) {
+      safeSetPhase(CAPTURE_PHASES.CAMERA)
     }
-  }, [])
+  }, [safeSetPhase])
 
   const startProcessingGuard = useCallback(
     (onTimeout) => {
@@ -606,8 +641,10 @@ export function useCaptureFlow({
         }
 
         setCapturedFigure(figureSnapshot)
-        setPhase(CAPTURE_PHASES.PHOTO_UPDATED)
-        phaseRef.current = CAPTURE_PHASES.PHOTO_UPDATED
+        if (import.meta.env.DEV) {
+          captureLog.info('before photo-updated phase', { figureId: figureSnapshot.id })
+        }
+        safeSetPhase(CAPTURE_PHASES.PHOTO_UPDATED)
         camera.stop()
         return true
       }
@@ -635,17 +672,23 @@ export function useCaptureFlow({
       }
 
       setCapturedFigure(figureSnapshot)
+      if (import.meta.env.DEV) {
+        captureLog.info('after photo save — reward beat', { figureId: figureSnapshot.id })
+      }
       await new Promise((resolve) =>
         window.setTimeout(resolve, Math.max(REWARD_ENTRY_BEAT_MS, FLASH_MIN_HOLD_MS)),
       )
-      setPhase(CAPTURE_PHASES.REWARD)
-      phaseRef.current = CAPTURE_PHASES.REWARD
+      if (!mountedRef.current) return true
+      if (import.meta.env.DEV) {
+        captureLog.info('before reward mount', { figureId: figureSnapshot.id })
+      }
+      safeSetPhase(CAPTURE_PHASES.REWARD)
       camera.stop()
       captureLog.unlockSuccess({ figureId: figureSnapshot.id })
       rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
       return true
     },
-    [camera, handleRecoverableError, isRetake, onObtainFigure, onReplacePhoto],
+    [camera, handleRecoverableError, isRetake, onObtainFigure, onReplacePhoto, safeSetPhase],
   )
 
   const resolveCaptureLocation = useCallback((figureSnapshot, { afterNativePhoto = false } = {}) => {
@@ -996,7 +1039,10 @@ export function useCaptureFlow({
     if (!camera.isReady || !video) return
 
     const figureSnapshot = pendingFigureRef.current ?? resolvedFigure
-    setPhase(CAPTURE_PHASES.CAPTURING)
+    if (import.meta.env.DEV) {
+      captureLog.info('before capture', { figureId: figureSnapshot?.id, source: 'video' })
+    }
+    safeSetPhase(CAPTURE_PHASES.CAPTURING)
     captureLog.processingStart({ figureId: figureSnapshot.id, source: 'video' })
     vibrateCapture()
 
@@ -1021,6 +1067,7 @@ export function useCaptureFlow({
     lockPendingWithValidation,
     openNativeCapture,
     processCanvas,
+    safeSetPhase,
     startProcessingGuard,
     stopProcessingUi,
   ])
@@ -1159,8 +1206,11 @@ export function useCaptureFlow({
 
   const showRewardComplete = useCallback(() => {
     rewardLog.info('reward complete → unlock')
-    setPhase(CAPTURE_PHASES.UNLOCK)
-  }, [])
+    if (import.meta.env.DEV) {
+      captureLog.info('before unlock phase')
+    }
+    safeSetPhase(CAPTURE_PHASES.UNLOCK)
+  }, [safeSetPhase])
 
   const complete = useCallback(() => {
     rewardLog.info('unlock complete → map')

@@ -107,6 +107,22 @@ export function vibrateCollectionComplete() {
   return vibrateWithCooldown('collection', COLLECTION_COMPLETE_PATTERN, 1200)
 }
 
+const RARITY_DISCOVERY_PATTERNS = {
+  rara: [14, 22],
+  épica: [18, 26, 18],
+  legendaria: [22, 30, 22],
+}
+
+/** Pulso ceremonial al descubrir una rareza especial en el reveal. */
+export function vibrateRarityDiscovery(rareza) {
+  if (!canVibrate() || shouldSkipHaptics()) return false
+  const key = normalizeFigureRarity({ rareza })
+  const pattern = RARITY_DISCOVERY_PATTERNS[key]
+  if (!pattern) return false
+  navigator.vibrate(pattern)
+  return true
+}
+
 export function stopVibration() {
   if (canVibrate()) {
     navigator.vibrate(0)
