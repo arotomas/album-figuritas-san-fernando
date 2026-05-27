@@ -261,23 +261,17 @@ export function getRingProgressFeedback(progress) {
   )
 }
 
-/** Color y glow del texto: blanco lejos → verde institucional al completar. */
+/** Color y sombra del texto bajo el anillo — legible en exteriores. */
 export function getRingProgressFeedbackStyle(progress) {
   const fill = Math.min(1, Math.max(0, progress ?? 0))
   const isPeak = fill >= 0.97
-  const mix = isPeak ? 1 : fill ** 0.88
-
-  const r = Math.round(255 + (140 - 255) * mix)
-  const g = Math.round(255 + (198 - 255) * mix)
-  const b = Math.round(255 + (63 - 255) * mix)
+  const emphasis = isPeak ? 1 : 0.72 + fill ** 0.85 * 0.28
 
   return {
     isPeak,
-    color: isPeak ? RING_PROGRESS_COLOR : `rgb(${r}, ${g}, ${b})`,
-    textShadow: isPeak
-      ? '0 0 16px rgba(140,198,63,0.7), 0 0 32px rgba(140,198,63,0.35)'
-      : `0 0 ${6 + mix * 14}px rgba(${r}, ${g}, ${b}, ${0.12 + mix * 0.28})`,
-    opacity: 0.52 + mix * 0.48,
+    color: `rgba(255,255,255,${emphasis})`,
+    textShadow: '0 1px 10px rgba(0,0,0,0.72), 0 0 18px rgba(0,0,0,0.35)',
+    opacity: 0.82 + fill * 0.18,
   }
 }
 

@@ -226,7 +226,8 @@ function UserLocationMarker({ position, isCoarse = false }) {
   }, [position?.lat, position?.lng])
 
   useEffect(() => {
-    if (!position || !rootRef.current) return
+    const root = rootRef.current
+    if (!position || !root) return
 
     const accuracyBucket =
       position.accuracy != null ? Math.round(position.accuracy / 8) * 8 : 0
@@ -234,9 +235,15 @@ function UserLocationMarker({ position, isCoarse = false }) {
     if (renderKeyRef.current === renderKey) return
     renderKeyRef.current = renderKey
 
-    rootRef.current.render(
-      <UserLocationDot accuracy={position.accuracy} isCoarse={isCoarse} />,
-    )
+    try {
+      root.render(
+        <UserLocationDot accuracy={position.accuracy} isCoarse={isCoarse} />,
+      )
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[map] user dot render skipped after unmount', error?.message)
+      }
+    }
   }, [isCoarse, position, position?.accuracy])
 
   return null
@@ -356,6 +363,7 @@ function LeafletMapViewInner({
   onBonusDiscovered,
 }) {
   const mapRef = useRef(null)
+  const [mapInstanceKey] = useState(() => Date.now())
   const [recenterTick, setRecenterTick] = useState(0)
   const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
   const [missionFollowPaused, setMissionFollowPaused] = useState(false)
@@ -655,6 +663,7 @@ function LeafletMapViewInner({
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
       <div className="map-container gpu-layer absolute inset-0 h-full w-full">
         <MapContainer
+          key={mapInstanceKey}
           center={DEFAULT_CENTER}
           zoom={DEFAULT_ZOOM}
           zoomControl={false}

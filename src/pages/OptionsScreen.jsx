@@ -13,6 +13,7 @@ import { useQaMode, withQaParam } from '../utils/qaMode'
 import { getFullName } from '../utils/profileValidation'
 import { hasValidAddress } from '../utils/parseGooglePlace'
 import { LegalNotice } from '../components/legal/LegalNotice'
+import { InstallAppSection } from '../components/profile/InstallAppSection'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -84,6 +85,7 @@ export function OptionsScreen() {
   }
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     console.log('[QA options]', {
       search: window.location.search,
       qa: qaEnabled,
@@ -273,6 +275,8 @@ export function OptionsScreen() {
           </div>
         )}
       </div>
+
+      <InstallAppSection />
 
       {qaEnabled && (
         <div className="mt-6 space-y-3 rounded-2xl border border-cyan-400/40 bg-cyan-50 p-5">

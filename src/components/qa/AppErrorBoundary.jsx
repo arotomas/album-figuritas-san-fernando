@@ -25,8 +25,12 @@ export class AppErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    logDiagnostic('error-boundary', { error: error?.message, info })
-    console.error('[CAPTURE] fatal render error', error?.message, info)
+    logDiagnostic('error-boundary', {
+      error: error?.message,
+      stack: error?.stack,
+      componentStack: info?.componentStack,
+    })
+    console.error('[error-boundary]', error?.message, error?.stack, info?.componentStack)
   }
 
   handleRetry = () => {

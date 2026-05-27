@@ -229,10 +229,12 @@ export function useCaptureFlow({
     [ringDistanceMeters, resolvedFigure],
   )
 
-  const captureRadiusMeters =
-    proximitySnapshot?.captureMeters ?? getProximityRadii(resolvedFigure).captureMeters
-  const detectionRadiusMeters =
-    proximitySnapshot?.detectionMeters ?? getProximityRadii(resolvedFigure).detectionMeters
+  const captureRadiusMeters = resolvedFigure
+    ? proximitySnapshot?.captureMeters ?? getProximityRadii(resolvedFigure).captureMeters
+    : proximitySnapshot?.captureMeters ?? 25
+  const detectionRadiusMeters = resolvedFigure
+    ? proximitySnapshot?.detectionMeters ?? getProximityRadii(resolvedFigure).detectionMeters
+    : proximitySnapshot?.detectionMeters ?? 200
 
   const inCaptureRangeRef = useRef(false)
 

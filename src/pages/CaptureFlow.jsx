@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CameraView } from '../components/camera'
@@ -150,12 +150,16 @@ export function CaptureFlow() {
     Boolean(captureSession)
 
   const displayFigure = pendingFigure ?? captureSession?.figure ?? nearFigure
+  const isExitingRef = useRef(false)
 
   useEffect(() => {
-    camera.initPermission()
+    isExitingRef.current = false
     return () => {
+      isExitingRef.current = true
       stopVibration()
       camera.stop()
+      clearPendingCapture()
+      clearCaptureSession()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -169,6 +173,10 @@ export function CaptureFlow() {
       embeddedFirst: true,
       useNativeFallback: camera.useNativeFallback,
     })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    camera.initPermission()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -215,7 +223,7 @@ export function CaptureFlow() {
   })
 
   useEffect(() => {
-    if (isRetake) return
+    if (isRetake || isExitingRef.current) return
     if (!nearFigure && !isCaptureSessionActive) {
       navigate('/map', { replace: true })
     }
@@ -242,15 +250,17 @@ export function CaptureFlow() {
   }, [])
 
   const handleClose = useCallback(() => {
+    isExitingRef.current = true
     stopVibration()
     camera.stop()
     clearPendingCapture()
     clearCaptureSession()
     setNearFigure(null)
-    navigate(isRetake ? withQa('/my-figures') : '/map')
+    navigate(isRetake ? withQa('/my-figures') : '/map', { replace: true })
   }, [camera, clearCaptureSession, clearPendingCapture, isRetake, navigate, setNearFigure, withQa])
 
   const handleComplete = useCallback(() => {
+    isExitingRef.current = true
     complete()
     clearCaptureSession()
     clearQaTestFigure()
@@ -269,6 +279,7 @@ export function CaptureFlow() {
   ])
 
   const handlePhotoUpdatedComplete = useCallback(() => {
+    isExitingRef.current = true
     complete()
     clearCaptureSession()
     setNearFigure(null)

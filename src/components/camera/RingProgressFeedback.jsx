@@ -74,14 +74,13 @@ export function RingProgressFeedback({
           animate={{
             opacity: style.opacity,
             y: 0,
-            textShadow: style.textShadow,
           }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
-          className={`mt-5 max-w-[17rem] px-5 text-center text-[13px] leading-relaxed tracking-wide ${
-            style.isPeak ? 'font-semibold uppercase' : 'font-normal'
+          className={`mt-5 max-w-[18rem] px-5 text-center text-sm leading-relaxed tracking-wide ${
+            style.isPeak ? 'font-semibold' : 'font-normal'
           }`}
-          style={{ color: style.color }}
+          style={{ color: style.color, textShadow: style.textShadow, opacity: style.opacity }}
         >
           {settledFeedback.message}
         </motion.p>

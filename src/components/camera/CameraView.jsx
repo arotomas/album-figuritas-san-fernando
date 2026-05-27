@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FaXmark } from 'react-icons/fa6'
 import { ValidationRing } from './ValidationRing'
 import { RingProgressFeedback } from './RingProgressFeedback'
+import { RingProximityHint } from './RingProximityHint'
 import { CaptureButton } from './CaptureButton'
+import { useRingProximityHint } from '../../hooks/useRingProximityHint'
 
 export function CameraView({
   videoRef,
@@ -26,6 +28,9 @@ export function CameraView({
   const localInputRef = useRef(null)
   const inputRef = fileInputRef ?? localInputRef
   const showEmbeddedPreview = !useNativeFallback
+  const { visible: showRingHint, dismiss: dismissRingHint } = useRingProximityHint({
+    enabled: !isReady && !isCapturing,
+  })
 
   return (
     <div className="capture-screen relative flex h-full flex-col overflow-hidden bg-black">
@@ -98,6 +103,8 @@ export function CameraView({
           isReady={isReady}
           isCapturing={isCapturing}
         />
+
+        <RingProximityHint visible={showRingHint} onDismiss={dismissRingHint} />
 
         {import.meta.env.DEV && gpsAccuracy != null && (
           <p className="mt-3 text-center text-[11px] text-progress/80">
