@@ -19,11 +19,11 @@ function mapPathWithQa() {
 export class AlbumScreenErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false }
+    this.state = { hasError: false, error: null }
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
   }
 
   componentDidCatch(error, info) {
@@ -31,9 +31,13 @@ export class AlbumScreenErrorBoundary extends Component {
       boundary: 'AlbumScreenErrorBoundary',
       lastObtenidaFigureId: this.props.lastObtenidaFigureId ?? null,
     })
-    albumTrace('album boundary caught render error', {
-      message: error?.message,
-    })
+    if (import.meta.env.DEV) {
+      albumTrace('album boundary caught render error', {
+        message: error?.message,
+        stack: error?.stack ?? null,
+        componentStack: info?.componentStack ?? null,
+      })
+    }
   }
 
   handleGoMap = () => {
@@ -48,6 +52,11 @@ export class AlbumScreenErrorBoundary extends Component {
           <p className="mt-3 max-w-sm font-body text-sm leading-relaxed text-muted">
             Hubo un problema al mostrar el álbum. Podés volver al mapa y abrir Mis figuritas de nuevo.
           </p>
+          {import.meta.env.DEV && this.state.error && (
+            <pre className="mt-4 max-h-28 w-full overflow-auto rounded-xl bg-black/5 p-3 text-left text-[10px] text-red-700">
+              {this.state.error.message}
+            </pre>
+          )}
           <div className="mt-8 w-full max-w-xs">
             <PremiumButton variant="lime" onClick={this.handleGoMap}>
               Volver al mapa

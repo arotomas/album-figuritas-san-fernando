@@ -1,7 +1,10 @@
 /**
- * Traza temporal DEV del pipeline post-shutter.
- * Ring buffer + snapshot global para reconstruir secuencia en ErrorBoundary.
+ * Traza temporal del pipeline post-shutter.
+ * Consola [CAPTURE]/[UNLOCK]/[ALBUM]/[ERROR]: solo DEV (tree-shaken en prod).
+ * Ring buffer + snapshot: DEV vía window.__capturePipeline; prod vía logDiagnostic en errors.
  */
+
+import { logDiagnostic } from './diagnostics'
 
 const MAX_EVENTS = 120
 const events = []
@@ -110,17 +113,11 @@ export function capturePipelineError(error, info = {}, extra = {}) {
     ...extra,
   }
 
-  pushPipelineEvent('ERROR', error?.message ?? 'unknown', payload, 'warn')
-
   if (import.meta.env.DEV) {
+    pushPipelineEvent('ERROR', error?.message ?? 'unknown', payload, 'warn')
     console.error('[ERROR]', payload)
   } else {
-    console.error('[capture-pipeline-error]', payload.message, {
-      route: payload.currentRoute,
-      screen: payload.currentScreen,
-      lastUnlock: payload.lastUnlock,
-      lastAlbum: payload.lastAlbum,
-    })
+    logDiagnostic('capture-pipeline-error', payload)
   }
 
   return payload
