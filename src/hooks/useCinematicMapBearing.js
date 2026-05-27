@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  MAP_ROTATION_DRIFT_MAX_STEP_M,
   MAP_ROTATION_EMA_ALPHA,
   MAP_ROTATION_MAX_ACCURACY_M,
   MAP_ROTATION_MIN_COG_DISTANCE_M,
   MAP_ROTATION_MIN_DELTA_DEG,
   MAP_ROTATION_MIN_SPEED_MPS,
-  MAP_ROTATION_RETURN_NORTH_ALPHA,
-  MAP_ROTATION_STOP_HOLD_MS,
+  MAP_ROTATION_QUIET_LOCK_MS,
   MAP_ROTATION_STOP_SPEED_MPS,
   MAP_ROTATION_UPDATE_MS,
+  MAP_ROTATION_WAKE_DISTANCE_M,
+  MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
+  MAP_ROTATION_WAKE_SPEED_MPS,
 } from '../config/mapRotation'
+import { getDistanceMeters } from '../utils/geo'
 import {
   computeCourseOverGround,
   isValidHeading,
@@ -38,11 +42,45 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
   const cogAnchorRef = useRef(null)
   const prevPositionRef = useRef(null)
   const lastPublishedRef = useRef(null)
-  const stoppedAtRef = useRef(null)
-  const walkingRef = useRef(false)
   const lastCogRef = useRef(null)
   const lastSpeedRef = useRef(null)
   const pausedLoggedRef = useRef(false)
+
+  const walkingRef = useRef(false)
+  const quietLockedRef = useRef(false)
+  const quietLockAnchorRef = useRef(null)
+  const lowSpeedSinceRef = useRef(null)
+  const wakeSpeedSinceRef = useRef(null)
+
+  function enterQuietLock(anchorPosition) {
+    if (quietLockedRef.current) return
+    quietLockedRef.current = true
+    walkingRef.current = false
+    wakeSpeedSinceRef.current = null
+    quietLockAnchorRef.current = anchorPosition
+      ? { lat: anchorPosition.lat, lng: anchorPosition.lng }
+      : null
+    if (DEV) {
+      rotationTrace('enter quiet', {
+        published: lastPublishedRef.current,
+        anchor: quietLockAnchorRef.current,
+        holdMs: MAP_ROTATION_QUIET_LOCK_MS,
+      })
+    }
+  }
+
+  function exitQuietLock(reason, detail = {}) {
+    if (!quietLockedRef.current && !lowSpeedSinceRef.current) return
+    quietLockedRef.current = false
+    quietLockAnchorRef.current = null
+    lowSpeedSinceRef.current = null
+    wakeSpeedSinceRef.current = null
+    walkingRef.current = true
+    cogAnchorRef.current = null
+    if (DEV) {
+      rotationTrace('exit quiet', { reason, ...detail })
+    }
+  }
 
   useEffect(() => {
     if (!enabled || paused) {
@@ -57,8 +95,16 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       if (!enabled || paused) {
         targetRef.current = null
         walkingRef.current = false
+        quietLockedRef.current = false
+        lowSpeedSinceRef.current = null
+        wakeSpeedSinceRef.current = null
       }
-      syncDebug(setDebug, { paused: Boolean(paused), quiet: !walkingRef.current })
+      syncDebug(setDebug, {
+        paused: Boolean(paused),
+        quietLocked: quietLockedRef.current,
+        wakePending: false,
+        mode: paused ? 'paused' : 'idle',
+      })
       return
     }
 
@@ -68,56 +114,174 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
     }
 
     const previous = prevPositionRef.current
-    const speed = resolveWalkSpeedMps(position, previous)
-    lastSpeedRef.current = speed
+    let speed = resolveWalkSpeedMps(position, previous)
+    let stepDistanceM = 0
+    let impliedSpeedMps = null
+
+    if (previous?.lat != null && previous?.lng != null) {
+      stepDistanceM = getDistanceMeters(
+        previous.lat,
+        previous.lng,
+        position.lat,
+        position.lng,
+      )
+      const dtMs = Math.max(
+        (position.timestamp ?? Date.now()) - (previous.timestamp ?? Date.now()),
+        1,
+      )
+      impliedSpeedMps = stepDistanceM / (dtMs / 1000)
+    }
+
     prevPositionRef.current = {
       lat: position.lat,
       lng: position.lng,
       timestamp: position.timestamp ?? Date.now(),
     }
+    lastSpeedRef.current = speed
 
-    syncDebug(setDebug, {
+    const debugBase = {
       speed,
+      impliedSpeed: impliedSpeedMps,
+      stepDistanceM,
       paused: false,
-      quiet: false,
-    })
+      quietLocked: quietLockedRef.current,
+      wakePending: Boolean(wakeSpeedSinceRef.current),
+      mode: quietLockedRef.current
+        ? 'quiet_locked'
+        : walkingRef.current
+          ? 'walking'
+          : wakeSpeedSinceRef.current
+            ? 'wake_pending'
+            : lowSpeedSinceRef.current
+              ? 'settling'
+              : 'idle',
+    }
 
-    if (speed != null && speed < MAP_ROTATION_STOP_SPEED_MPS) {
-      if (!stoppedAtRef.current) {
-        stoppedAtRef.current = Date.now()
+    if (quietLockedRef.current) {
+      const anchor = quietLockAnchorRef.current
+      const distFromLock =
+        anchor != null
+          ? getDistanceMeters(anchor.lat, anchor.lng, position.lat, position.lng)
+          : 0
+
+      if (distFromLock >= MAP_ROTATION_WAKE_DISTANCE_M) {
+        exitQuietLock('movement confirmed — distance', {
+          distM: Math.round(distFromLock * 10) / 10,
+          speed,
+        })
+      } else if (speed != null && speed >= MAP_ROTATION_WAKE_SPEED_MPS) {
+        if (!wakeSpeedSinceRef.current) {
+          wakeSpeedSinceRef.current = Date.now()
+          if (DEV) {
+            rotationTrace('wake pending — speed high', {
+              speed,
+              threshold: MAP_ROTATION_WAKE_SPEED_MPS,
+            })
+          }
+        } else if (
+          Date.now() - wakeSpeedSinceRef.current >=
+          MAP_ROTATION_WAKE_SPEED_CONFIRM_MS
+        ) {
+          exitQuietLock('movement confirmed — speed', {
+            speed,
+            sustainMs: MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
+          })
+        }
+      } else {
+        if (wakeSpeedSinceRef.current) {
+          if (DEV && speed != null && speed > MAP_ROTATION_STOP_SPEED_MPS) {
+            rotationTrace('wake rejected', {
+              reason: 'speed not sustained long enough',
+              speed,
+              required: MAP_ROTATION_WAKE_SPEED_MPS,
+              sustainMs: MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
+            })
+          }
+          wakeSpeedSinceRef.current = null
+        }
+
+        if (
+          DEV &&
+          speed != null &&
+          speed >= MAP_ROTATION_MIN_SPEED_MPS &&
+          distFromLock < MAP_ROTATION_WAKE_DISTANCE_M
+        ) {
+          rotationTrace('drift ignored', {
+            reason: 'quiet locked — micro speed without displacement',
+            speed,
+            distFromLock: Math.round(distFromLock * 10) / 10,
+            stepDistanceM: Math.round(stepDistanceM * 10) / 10,
+          })
+        }
+      }
+
+      syncDebug(setDebug, {
+        ...debugBase,
+        quietLocked: quietLockedRef.current,
+        wakePending: Boolean(wakeSpeedSinceRef.current),
+        distFromLock,
+      })
+      return
+    }
+
+    if (
+      stepDistanceM > 0 &&
+      stepDistanceM < MAP_ROTATION_DRIFT_MAX_STEP_M &&
+      impliedSpeedMps != null &&
+      impliedSpeedMps < MAP_ROTATION_STOP_SPEED_MPS &&
+      (speed == null || speed > MAP_ROTATION_STOP_SPEED_MPS)
+    ) {
+      if (DEV) {
+        rotationTrace('drift ignored', {
+          reason: 'displacement contradicts reported speed',
+          stepDistanceM: Math.round(stepDistanceM * 10) / 10,
+          impliedSpeedMps: Math.round(impliedSpeedMps * 100) / 100,
+          reportedSpeed: speed,
+        })
+      }
+      speed = impliedSpeedMps
+    }
+
+    if (speed == null || speed < MAP_ROTATION_STOP_SPEED_MPS) {
+      if (!lowSpeedSinceRef.current) {
+        lowSpeedSinceRef.current = Date.now()
         if (DEV) {
-          rotationTrace('quiet mode — speed below stop threshold', {
+          rotationTrace('enter quiet — low speed', {
             speed,
             threshold: MAP_ROTATION_STOP_SPEED_MPS,
           })
         }
       }
       walkingRef.current = false
-      syncDebug(setDebug, { quiet: true, speed })
-      return
-    }
+      wakeSpeedSinceRef.current = null
 
-    if (speed != null && speed >= MAP_ROTATION_MIN_SPEED_MPS) {
-      if (stoppedAtRef.current && DEV) {
-        rotationTrace('quiet mode end — walking resumed', { speed })
+      if (Date.now() - lowSpeedSinceRef.current >= MAP_ROTATION_QUIET_LOCK_MS) {
+        enterQuietLock(position)
       }
-      stoppedAtRef.current = null
-      walkingRef.current = true
-    } else if (!walkingRef.current) {
+
+      syncDebug(setDebug, {
+        ...debugBase,
+        quietLocked: false,
+        mode: 'settling',
+        lowSpeedMs: Date.now() - lowSpeedSinceRef.current,
+      })
       return
     }
 
-    if (stoppedAtRef.current && Date.now() - stoppedAtRef.current > MAP_ROTATION_STOP_HOLD_MS) {
+    if (speed < MAP_ROTATION_MIN_SPEED_MPS) {
       walkingRef.current = false
-      if (DEV) {
-        rotationTrace('quiet mode — hold elapsed', {
-          holdMs: MAP_ROTATION_STOP_HOLD_MS,
-          speed,
-        })
-      }
-      syncDebug(setDebug, { quiet: true, speed })
+      wakeSpeedSinceRef.current = null
+      syncDebug(setDebug, {
+        ...debugBase,
+        mode: 'idle',
+        quietLocked: false,
+      })
       return
     }
+
+    lowSpeedSinceRef.current = null
+    wakeSpeedSinceRef.current = null
+    walkingRef.current = true
 
     const cogFrom = cogAnchorRef.current ?? previous
     const cog = computeCourseOverGround(
@@ -139,20 +303,20 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
         rotationTrace('raw COG', {
           cog: Math.round(cog * 10) / 10,
           speed,
-          minDistanceM: MAP_ROTATION_MIN_COG_DISTANCE_M,
+          stepDistanceM: Math.round(stepDistanceM * 10) / 10,
         })
       }
       syncDebug(setDebug, {
+        ...debugBase,
         rawCog: cog,
         target: cog,
-        speed,
-        quiet: false,
+        mode: 'walking',
       })
       return
     }
 
     const rawHeading = position.heading
-    if (isValidHeading(rawHeading) && speed != null && speed >= MAP_ROTATION_MIN_SPEED_MPS) {
+    if (isValidHeading(rawHeading)) {
       targetRef.current = rawHeading
       if (DEV) {
         rotationTrace('compass fallback target', {
@@ -160,7 +324,11 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
           speed,
         })
       }
-      syncDebug(setDebug, { target: rawHeading, speed, quiet: false })
+      syncDebug(setDebug, {
+        ...debugBase,
+        target: rawHeading,
+        mode: 'walking',
+      })
     }
   }, [
     enabled,
@@ -180,33 +348,55 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       cogAnchorRef.current = null
       prevPositionRef.current = null
       lastPublishedRef.current = null
-      stoppedAtRef.current = null
-      walkingRef.current = false
       lastCogRef.current = null
       lastSpeedRef.current = null
+      walkingRef.current = false
+      quietLockedRef.current = false
+      quietLockAnchorRef.current = null
+      lowSpeedSinceRef.current = null
+      wakeSpeedSinceRef.current = null
       setBearing(null)
       if (DEV) setDebug(null)
       return undefined
     }
 
     if (paused) {
-      syncDebug(setDebug, { paused: true, quiet: !walkingRef.current })
+      syncDebug(setDebug, {
+        paused: true,
+        quietLocked: quietLockedRef.current,
+        mode: 'paused',
+      })
       return undefined
     }
 
     const tick = () => {
+      const quietLocked = quietLockedRef.current
       const target = targetRef.current
-      const shouldWalk = walkingRef.current && target != null && !paused
+      const shouldWalk = walkingRef.current && target != null && !paused && !quietLocked
 
       syncDebug(setDebug, {
-        target,
+        target: quietLocked ? targetRef.current : target,
         smoothed: displayRef.current,
         published: lastPublishedRef.current,
         rawCog: lastCogRef.current,
         speed: lastSpeedRef.current,
-        quiet: !shouldWalk && displayRef.current != null,
+        quietLocked,
+        wakePending: Boolean(wakeSpeedSinceRef.current),
+        mode: quietLocked
+          ? 'quiet_locked'
+          : shouldWalk
+            ? 'walking'
+            : wakeSpeedSinceRef.current
+              ? 'wake_pending'
+              : lowSpeedSinceRef.current
+                ? 'settling'
+                : 'hold',
         paused: false,
       })
+
+      if (quietLocked) {
+        return
+      }
 
       if (shouldWalk) {
         if (displayRef.current == null) {
@@ -223,69 +413,26 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
           shortestAngleDelta(lastPublishedRef.current ?? displayRef.current, displayRef.current),
         )
 
-        if (
-          lastPublishedRef.current == null ||
-          delta >= MAP_ROTATION_MIN_DELTA_DEG
-        ) {
+        if (lastPublishedRef.current == null || delta >= MAP_ROTATION_MIN_DELTA_DEG) {
           lastPublishedRef.current = displayRef.current
           setBearing(displayRef.current)
           if (DEV) {
             rotationTrace('publish bearing', {
               published: Math.round(displayRef.current * 10) / 10,
               target: Math.round(target * 10) / 10,
-              smoothed: Math.round(displayRef.current * 10) / 10,
               delta: Math.round(delta * 10) / 10,
             })
           }
-          syncDebug(setDebug, {
-            published: displayRef.current,
-            smoothed: displayRef.current,
-            target,
-          })
         } else if (DEV && delta > 0.2) {
           rotationTrace('ignored delta', {
             delta: Math.round(delta * 10) / 10,
             minDelta: MAP_ROTATION_MIN_DELTA_DEG,
-            smoothed: Math.round(displayRef.current * 10) / 10,
-            target: Math.round(target * 10) / 10,
           })
         }
         return
       }
 
-      if (displayRef.current == null) {
-        if (lastPublishedRef.current != null) {
-          lastPublishedRef.current = null
-          setBearing(null)
-          if (DEV) {
-            rotationTrace('bearing cleared')
-            setDebug(null)
-          }
-        }
-        return
-      }
-
-      displayRef.current = lerpAngle(displayRef.current, 0, MAP_ROTATION_RETURN_NORTH_ALPHA)
-
-      if (Math.abs(displayRef.current) < 0.8 || Math.abs(displayRef.current - 360) < 0.8) {
-        displayRef.current = null
-        lastPublishedRef.current = null
-        setBearing(null)
-        if (DEV) setDebug(null)
-        return
-      }
-
-      const delta = Math.abs(shortestAngleDelta(lastPublishedRef.current ?? 0, displayRef.current))
-      if (delta >= MAP_ROTATION_MIN_DELTA_DEG) {
-        lastPublishedRef.current = displayRef.current
-        setBearing(displayRef.current)
-        if (DEV) {
-          rotationTrace('publish bearing — return north', {
-            published: Math.round(displayRef.current * 10) / 10,
-            delta: Math.round(delta * 10) / 10,
-          })
-        }
-      }
+      // Idle / settling: hold last bearing — no return-to-north (evita quiet drift).
     }
 
     const id = window.setInterval(tick, MAP_ROTATION_UPDATE_MS)
