@@ -1,6 +1,6 @@
 /**
- * Traza temporal del pipeline post-shutter.
- * Consola [CAPTURE]/[UNLOCK]/[ALBUM]/[ERROR]: solo DEV (tree-shaken en prod).
+ * Traza temporal del pipeline post-shutter y transición de rutas.
+ * Consola [CAPTURE]/[UNLOCK]/[ALBUM]/[ROUTE]/[NAV]/[ERROR]: solo DEV (tree-shaken en prod).
  * Ring buffer + snapshot: DEV vía window.__capturePipeline; prod vía logDiagnostic en errors.
  */
 
@@ -13,11 +13,14 @@ let snapshot = {
   phase: null,
   captureSession: null,
   route: null,
+  previousRoute: null,
   unlockSubmitted: false,
   rewardFigureId: null,
   mounted: true,
   lastRender: null,
   lastNavigate: null,
+  lastRouteEvent: null,
+  lastNavEvent: null,
   lastSetState: null,
   lastAsync: null,
   lastUnlock: null,
@@ -59,6 +62,16 @@ export function getCapturePipelineSnapshot() {
 
 export function updateCapturePipelineSnapshot(partial) {
   snapshot = { ...snapshot, ...partial }
+}
+
+export function setPreviousRoute(path) {
+  if (!path || path === snapshot.route) return
+  updateCapturePipelineSnapshot({ previousRoute: path })
+}
+
+export function updateCurrentRoute(path) {
+  if (!path) return
+  updateCapturePipelineSnapshot({ route: path })
 }
 
 function pushPipelineEvent(category, message, detail, level = 'info') {
@@ -106,6 +119,9 @@ export function capturePipelineError(error, info = {}, extra = {}) {
     stack: error?.stack ?? null,
     componentStack: info?.componentStack ?? null,
     currentRoute: route,
+    previousRoute: snapshot.previousRoute ?? null,
+    lastRouteEvent: snapshot.lastRouteEvent ?? null,
+    lastNavEvent: snapshot.lastNavEvent ?? null,
     currentScreen: snapshot.currentScreen ?? null,
     lastUnlock: snapshot.lastUnlock ?? null,
     lastAlbum: snapshot.lastAlbum ?? null,
@@ -152,6 +168,24 @@ export function traceRender(label, detail) {
 export function traceNavigate(target, reason) {
   updateCapturePipelineSnapshot({ lastNavigate: { target, reason, at: nowIso() } })
   capturePipelineTrace('CAPTURE', 'navigate', { target, reason })
+  routeTrace('navigate (capture)', { target, reason })
+}
+
+export function routeTrace(message, detail) {
+  const route =
+    typeof window !== 'undefined' ? window.location.pathname + window.location.search : null
+  updateCapturePipelineSnapshot({
+    route,
+    lastRouteEvent: { message, at: nowIso(), ...(detail ?? {}) },
+  })
+  capturePipelineTrace('ROUTE', message, detail)
+}
+
+export function navTrace(message, detail) {
+  updateCapturePipelineSnapshot({
+    lastNavEvent: { message, at: nowIso(), ...(detail ?? {}) },
+  })
+  capturePipelineTrace('NAV', message, detail)
 }
 
 export function traceAsync(label, detail) {
@@ -188,6 +222,28 @@ export function prefetchRewardChunks() {
   void import('../components/reward/RewardAnimation')
   void import('../components/reward/UnlockAnimation')
   void import('../components/reward/PhotoUpdatedAnimation')
+}
+
+/** Prefetch del chunk del álbum (import dinámico compartido con MyFiguresRoute). */
+let albumChunkPrefetch = null
+
+export function prefetchMyFiguresChunk() {
+  if (!albumChunkPrefetch) {
+    routeTrace('album chunk prefetch start')
+    albumChunkPrefetch = import('../pages/MyFiguresScreen')
+      .then((module) => {
+        routeTrace('album chunk prefetch end', {
+          hasInner: Boolean(module.MyFiguresScreenInner),
+        })
+        return module
+      })
+      .catch((error) => {
+        routeTrace('album chunk prefetch failed', { message: error?.message })
+        albumChunkPrefetch = null
+        throw error
+      })
+  }
+  return albumChunkPrefetch
 }
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {

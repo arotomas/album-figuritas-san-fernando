@@ -28,7 +28,6 @@ import {
 } from '../utils/collectionModel'
 import { buildAlbumViewModel } from '../utils/albumViewModel'
 import { albumTrace, albumTraceWarn, traceMounted } from '../utils/capturePipelineTrace'
-import { AlbumScreenErrorBoundary } from '../components/album/AlbumScreenErrorBoundary'
 import { useAlbumCollectionsBootstrap } from '../hooks/useAlbumCollectionsBootstrap'
 import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailability'
 import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
@@ -176,7 +175,7 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
   )
 }
 
-function MyFiguresScreenInner() {
+export function MyFiguresScreenInner() {
   useAlbumCollectionsBootstrap(true)
   const navigate = useNavigate()
   const { withQa } = useQaMode()
@@ -222,6 +221,16 @@ function MyFiguresScreenInner() {
     () => buildAlbumViewModel(sanitizedFigures, availabilityOptions),
     [sanitizedFigures, availabilityOptions],
   )
+
+  const firstRenderLoggedRef = useRef(false)
+  if (!firstRenderLoggedRef.current) {
+    firstRenderLoggedRef.current = true
+    albumTrace('MyFiguresScreen first render', {
+      hasHydrated,
+      rawCount: rawFigures?.length ?? 0,
+      lastObtenidaFigureId,
+    })
+  }
 
   useEffect(() => {
     traceMounted('MyFiguresScreen', true)
@@ -745,12 +754,7 @@ function MyFiguresScreenInner() {
   )
 }
 
+/** @deprecated Usar MyFiguresRoute — boundary vive fuera del lazy chunk. */
 export function MyFiguresScreen() {
-  const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
-
-  return (
-    <AlbumScreenErrorBoundary lastObtenidaFigureId={lastObtenidaFigureId}>
-      <MyFiguresScreenInner />
-    </AlbumScreenErrorBoundary>
-  )
+  return <MyFiguresScreenInner />
 }

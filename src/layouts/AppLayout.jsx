@@ -1,10 +1,26 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Logo } from '../components/Logo'
+import { navTrace } from '../utils/capturePipelineTrace'
 
 export function AppLayout() {
   const location = useLocation()
   const hideChromeHeader = location.pathname === '/my-figures'
+
+  useEffect(() => {
+    navTrace('AppLayout mount', { pathname: location.pathname })
+    return () => {
+      navTrace('AppLayout unmount', { pathname: location.pathname })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    navTrace('AppLayout render', {
+      pathname: location.pathname,
+      hideChromeHeader,
+    })
+  }, [hideChromeHeader, location.pathname])
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">

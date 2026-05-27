@@ -18,6 +18,8 @@ import { captureSyncLog } from '../utils/captureSyncLog'
 import { captureFlowLog } from '../utils/captureFlowLog'
 import {
   capturePipelineTrace,
+  prefetchMyFiguresChunk,
+  routeTrace,
   traceCaptureSessionChange,
   traceMounted,
   traceNavigate,
@@ -427,11 +429,18 @@ export function CaptureFlow() {
   const safeNavigateToAlbum = useCallback(() => {
     const target = withQa('/my-figures')
     unlockTrace('navigate start', { target })
+    routeTrace('navigate start', { target, source: 'CaptureFlow' })
+    void prefetchMyFiguresChunk()
     try {
       navigate(target, { replace: true })
       unlockTrace('navigate end', { target })
+      routeTrace('navigate end', { target, source: 'CaptureFlow' })
     } catch (error) {
       unlockTrace('navigate failed — hard redirect', { message: error?.message })
+      routeTrace('navigate failed — hard redirect', {
+        target,
+        message: error?.message,
+      })
       window.location.href = target
     }
   }, [navigate, withQa])

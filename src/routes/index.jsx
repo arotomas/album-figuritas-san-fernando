@@ -8,6 +8,9 @@ import { RootRedirect } from './RootRedirect'
 import { NotFoundRedirect } from './NotFoundRedirect'
 import { AdminRoute, AdminRoleGate } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
+import { MyFiguresRoute } from './MyFiguresRoute'
+import { RoutePipelineObserver } from './RoutePipelineObserver'
+import { routeTrace } from '../utils/capturePipelineTrace'
 
 const LoginScreen = lazy(() =>
   import('../pages/LoginScreen').then((m) => ({ default: m.LoginScreen })),
@@ -32,16 +35,6 @@ const CaptureScreen = lazy(() =>
 )
 const NearFigureScreen = lazy(() =>
   import('../pages/NearFigureScreen').then((m) => ({ default: m.NearFigureScreen })),
-)
-const MyFiguresScreen = lazy(() =>
-  import('../pages/MyFiguresScreen')
-    .then((m) => ({ default: m.MyFiguresScreen }))
-    .catch((error) => {
-      if (import.meta.env.DEV) {
-        console.error('[ALBUM] lazy chunk failed — MyFiguresScreen', error?.message)
-      }
-      throw error
-    }),
 )
 const OptionsScreen = lazy(() =>
   import('../pages/OptionsScreen').then((m) => ({ default: m.OptionsScreen })),
@@ -74,13 +67,21 @@ const TermsPage = lazy(() =>
   import('../pages/TermsPage').then((m) => ({ default: m.TermsPage })),
 )
 
-function LazyPage({ children }) {
-  return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+function LazyPageFallback({ label }) {
+  routeTrace('suspense fallback', { label: label ?? 'unknown' })
+  return <PageSkeleton />
+}
+
+function LazyPage({ children, label }) {
+  return (
+    <Suspense fallback={<LazyPageFallback label={label} />}>{children}</Suspense>
+  )
 }
 
 export function AppRoutes() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <RoutePipelineObserver />
       <Routes>
         <Route
           path="/"
@@ -193,14 +194,7 @@ export function AppRoutes() {
               </LazyPage>
             }
           />
-          <Route
-            path="/my-figures"
-            element={
-              <LazyPage>
-                <MyFiguresScreen />
-              </LazyPage>
-            }
-          />
+          <Route path="/my-figures" element={<MyFiguresRoute />} />
           <Route
             path="/options"
             element={

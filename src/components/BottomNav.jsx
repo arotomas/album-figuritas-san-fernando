@@ -1,7 +1,8 @@
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { FaMapMarkedAlt, FaImages, FaCog } from 'react-icons/fa'
 import { useQaMode } from '../utils/qaMode'
+import { navTrace } from '../utils/capturePipelineTrace'
 
 const tabs = [
   { to: '/my-figures', label: 'Mis figuritas', icon: FaImages },
@@ -11,6 +12,13 @@ const tabs = [
 
 function BottomNavInner() {
   const { withQa } = useQaMode()
+
+  useEffect(() => {
+    navTrace('BottomNav mount')
+    return () => {
+      navTrace('BottomNav unmount')
+    }
+  }, [])
 
   return (
     <nav className="bottom-nav safe-bottom safe-x z-20 shrink-0 border-t border-border bg-white/95 backdrop-blur-md">
