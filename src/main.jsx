@@ -6,7 +6,9 @@ import { AppErrorBoundary } from './components/qa/AppErrorBoundary.jsx'
 import { syncQaFromUrl } from './qa/qaCore'
 import './lib/supabase.js'
 import './styles/index.css'
+import { initPwaInstallCapture } from './utils/pwaInstallController.js'
 
+initPwaInstallCapture()
 syncQaFromUrl()
 
 createRoot(document.getElementById('root')).render(
