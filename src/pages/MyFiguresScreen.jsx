@@ -374,9 +374,9 @@ export function MyFiguresScreenInner() {
     (figure) => {
       if (!figure) return
       setSheetFigureId(null)
-      startFigureExploration(figure, navigate, { withQa })
+      startFigureExploration(figure, navigate, { withQa, figures: sanitizedFigures })
     },
-    [navigate, withQa],
+    [navigate, sanitizedFigures, withQa],
   )
 
   const handleSelect = useCallback(

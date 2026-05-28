@@ -1,9 +1,10 @@
-import { memo, useEffect } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { useExplorationStore } from '../../../store/explorationStore'
 import { useExplorationDistanceSync } from '../../../hooks/useExplorationMode'
-import { fitBoundsBetweenUserAndTarget } from '../../../utils/explorationMap'
+import { runExplorationCamera } from '../../../utils/explorationMap'
 import { ExplorationLineLayer } from './ExplorationLineLayer'
+import { ExplorationTargetMarker } from './ExplorationTargetMarker'
 
 function ExplorationControllerInner({
   userPosition,
@@ -13,8 +14,10 @@ function ExplorationControllerInner({
   const map = useMap()
   const active = useExplorationStore((state) => state.active)
   const targetCoordinates = useExplorationStore((state) => state.targetCoordinates)
+  const targetName = useExplorationStore((state) => state.targetName)
   const pendingCamera = useExplorationStore((state) => state.pendingCamera)
   const clearPendingCamera = useExplorationStore((state) => state.clearPendingCamera)
+  const flewWithoutGpsRef = useRef(false)
 
   useExplorationDistanceSync(userPosition)
 
@@ -25,10 +28,28 @@ function ExplorationControllerInner({
   }, [active, onPauseMapFollow])
 
   useEffect(() => {
-    if (!active || !pendingCamera || !userPosition?.lat || !targetCoordinates) return
+    if (!active) {
+      flewWithoutGpsRef.current = false
+      return undefined
+    }
 
-    fitBoundsBetweenUserAndTarget(map, userPosition, targetCoordinates, { reducedMotion })
-    clearPendingCamera()
+    if (!pendingCamera || !targetCoordinates) return undefined
+
+    const hasUser = userPosition?.lat != null && userPosition?.lng != null
+
+    if (hasUser) {
+      runExplorationCamera(map, userPosition, targetCoordinates, { reducedMotion })
+      flewWithoutGpsRef.current = false
+      clearPendingCamera()
+      return undefined
+    }
+
+    if (!flewWithoutGpsRef.current) {
+      flewWithoutGpsRef.current = true
+      runExplorationCamera(map, null, targetCoordinates, { reducedMotion })
+    }
+
+    return undefined
   }, [
     active,
     clearPendingCamera,
@@ -36,15 +57,25 @@ function ExplorationControllerInner({
     pendingCamera,
     reducedMotion,
     targetCoordinates,
-    userPosition,
+    userPosition?.lat,
+    userPosition?.lng,
   ])
 
+  if (!active) return null
+
   return (
-    <ExplorationLineLayer
-      active={active}
-      userPosition={userPosition}
-      targetCoordinates={targetCoordinates}
-    />
+    <>
+      <ExplorationTargetMarker
+        active={active}
+        targetCoordinates={targetCoordinates}
+        targetName={targetName}
+      />
+      <ExplorationLineLayer
+        active={active}
+        userPosition={userPosition}
+        targetCoordinates={targetCoordinates}
+      />
+    </>
   )
 }
 

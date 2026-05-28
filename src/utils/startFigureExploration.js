@@ -9,8 +9,20 @@ export function canExploreFigure(figure) {
 /**
  * Activa modo exploración y navega al mapa. No toca captura ni activeTarget.
  */
-export function startFigureExploration(figure, navigate, { withQa = (path) => path } = {}) {
-  const started = useExplorationStore.getState().startExploration(figure)
+export function resolveFigureCoordinates(figure, figures = []) {
+  if (canExploreFigure(figure)) return figure
+  if (!figure?.id || !Array.isArray(figures)) return figure
+
+  return figures.find((entry) => String(entry.id) === String(figure.id)) ?? figure
+}
+
+export function startFigureExploration(
+  figure,
+  navigate,
+  { withQa = (path) => path, figures = [] } = {},
+) {
+  const resolved = resolveFigureCoordinates(figure, figures)
+  const started = useExplorationStore.getState().startExploration(resolved)
   if (!started) return false
 
   navigate(withQa('/map'))

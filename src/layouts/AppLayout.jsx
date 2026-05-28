@@ -4,9 +4,11 @@ import { AuthBrandHeader } from '../components/auth'
 import { BottomNav } from '../components/BottomNav'
 import { PwaInstallBanner } from '../components/pwa/PwaInstallBanner'
 import { navTrace } from '../utils/capturePipelineTrace'
+import { useExplorationRouteCleanup } from '../hooks/useExplorationRouteCleanup'
 
 export function AppLayout() {
   const location = useLocation()
+  useExplorationRouteCleanup()
 
   useEffect(() => {
     navTrace('AppLayout mount', { pathname: location.pathname })

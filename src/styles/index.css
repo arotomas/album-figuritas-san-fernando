@@ -284,7 +284,8 @@
   }
 
   .leaflet-figure-marker,
-  .leaflet-user-marker {
+  .leaflet-user-marker,
+  .leaflet-exploration-target {
     background: transparent !important;
     border: none !important;
   }

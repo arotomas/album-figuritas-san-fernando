@@ -40,8 +40,10 @@ function ExplorationLineLayerInner({ active, userPosition, targetCoordinates }) 
         className: 'exploration-route-line',
         interactive: false,
       }).addTo(map)
+      lineRef.current.bringToFront()
     } else {
       lineRef.current.setLatLngs(latlngs)
+      lineRef.current.bringToFront()
     }
 
     return removeLine

@@ -8,7 +8,7 @@ function ExplorationDistanceBadgeInner({ visible, targetName, distanceMeters, on
     <AnimatePresence>
       {visible && (
         <m.div
-          className="safe-top pointer-events-none absolute inset-x-0 top-[4.5rem] z-[515] flex justify-center px-5"
+          className="safe-top pointer-events-none absolute inset-x-0 top-[4.5rem] z-[600] flex justify-center px-5"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

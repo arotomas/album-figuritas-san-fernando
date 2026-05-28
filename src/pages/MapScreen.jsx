@@ -11,6 +11,7 @@ import {
 } from '../utils/figureGameRules'
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 import { useExplorationStore } from '../store/explorationStore'
+import { ExplorationDistanceBadge } from '../components/map/exploration'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -44,13 +45,6 @@ export function MapScreen() {
       return next
     })
   }, [])
-
-  useEffect(
-    () => () => {
-      useExplorationStore.getState().stopExploration()
-    },
-    [],
-  )
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -95,6 +89,13 @@ export function MapScreen() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
+      <ExplorationDistanceBadge
+        visible={explorationActive}
+        targetName={explorationTargetName}
+        distanceMeters={explorationDistanceMeters}
+        onExit={stopExploration}
+      />
+
       <LazyMap
         figures={mapFigures}
         proximityFigures={proximityFigures}

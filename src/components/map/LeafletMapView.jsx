@@ -48,10 +48,7 @@ import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
 import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
-import {
-  ExplorationController,
-  ExplorationDistanceBadge,
-} from './exploration'
+import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 
 import 'leaflet/dist/leaflet.css'
@@ -416,8 +413,6 @@ function LeafletMapViewInner({
   const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const explorationActive = useExplorationStore((state) => state.active)
-  const explorationTargetName = useExplorationStore((state) => state.targetName)
-  const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
   const {
     mapPosition,
@@ -923,13 +918,6 @@ function LeafletMapViewInner({
         mapPosition={mapPosition}
         isWatching={isWatching}
         figures={figures}
-      />
-
-      <ExplorationDistanceBadge
-        visible={explorationActive}
-        targetName={explorationTargetName}
-        distanceMeters={explorationDistanceMeters}
-        onExit={stopExploration}
       />
 
       {activeTargetFigure && !explorationActive && (

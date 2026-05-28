@@ -6,7 +6,8 @@ import { RarityBadge } from '../ui/RarityBadge'
 import { PhotoLightbox } from '../ui/PhotoLightbox'
 import { FigureChallengeCard } from './FigureChallengeCard'
 import { LockedFigureCard } from './LockedFigureCard'
-import { canExploreFigure } from '../../utils/startFigureExploration'
+import { canExploreFigure, resolveFigureCoordinates } from '../../utils/startFigureExploration'
+import { useAppStore } from '../../store/useAppStore'
 
 function formatCapturedAt(value) {
   if (!value) return null
@@ -23,6 +24,7 @@ export function FigureDetailSheet({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const catalogFigures = useAppStore((state) => state.figures)
   const rarity = getRarity(figure?.rareza ?? figure?.rarity ?? 'común')
   const obtained = Boolean(figure?.obtenida)
   const hasPhoto = Boolean(figure?.foto)
@@ -128,7 +130,8 @@ export function FigureDetailSheet({
                     <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-white/65">
                       Se revela al avanzar en el álbum
                     </p>
-                    {canExploreFigure(figure) && onGoToPoint && (
+                    {canExploreFigure(resolveFigureCoordinates(figure, catalogFigures)) &&
+                      onGoToPoint && (
                       <button
                         type="button"
                         onClick={() => onGoToPoint(figure)}

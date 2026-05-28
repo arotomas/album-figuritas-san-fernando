@@ -54,3 +54,38 @@ export function fitBoundsBetweenUserAndTarget(
     easeLinearity: 0.24,
   })
 }
+
+/** Si aún no hay GPS, al menos centra el destino. */
+export function flyToExplorationTarget(map, target, { reducedMotion = false } = {}) {
+  if (!map || !target?.lat || !target?.lng) return
+
+  map.flyTo([target.lat, target.lng], EXPLORATION_MAX_ZOOM, {
+    duration: reducedMotion ? 0 : EXPLORATION_FLY_DURATION_S,
+    easeLinearity: 0.24,
+  })
+}
+
+export function runExplorationCamera(
+  map,
+  user,
+  target,
+  { reducedMotion = false } = {},
+) {
+  if (!map || !target?.lat || !target?.lng) return false
+
+  const apply = () => {
+    if (user?.lat != null && user?.lng != null) {
+      fitBoundsBetweenUserAndTarget(map, user, target, { reducedMotion })
+    } else {
+      flyToExplorationTarget(map, target, { reducedMotion })
+    }
+  }
+
+  if (map._loaded) {
+    apply()
+  } else {
+    map.whenReady(apply)
+  }
+
+  return true
+}
