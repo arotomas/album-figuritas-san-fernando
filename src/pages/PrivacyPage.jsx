@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
-import { Logo } from '../components/Logo'
+import { AuthBrandHeader } from '../components/auth'
 
 export function PrivacyPage() {
   return (
     <div className="scroll-y-app safe-top safe-x flex min-h-full flex-col bg-warm-white px-6 py-8">
-      <Logo size="sm" className="mx-auto mb-6 shrink-0" />
+      <AuthBrandHeader className="mb-6" />
 
       <article className="mx-auto w-full max-w-lg space-y-5 pb-10">
         <header>

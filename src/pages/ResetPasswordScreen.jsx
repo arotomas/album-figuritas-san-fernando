@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Logo } from '../components/Logo'
+import { AuthBrandHeader } from '../components/auth'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
@@ -28,7 +28,7 @@ export function ResetPasswordScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-8 py-10">
-      <Logo size="md" className="mx-auto mb-8" />
+      <AuthBrandHeader className="mb-8" />
       <form onSubmit={handleSubmit} className="mx-auto w-full max-w-sm space-y-4">
         <div className="text-center">
           <h1 className="font-display text-2xl font-bold text-ink">Nueva contraseña</h1>
@@ -54,7 +54,11 @@ export function ResetPasswordScreen() {
 
         {error && <p className="text-sm font-medium text-red-600">{error}</p>}
 
-        <Button type="submit" disabled={isSubmitting || !password || !confirmPassword}>
+        <Button
+          type="submit"
+          variant="progress"
+          disabled={isSubmitting || !password || !confirmPassword}
+        >
           {isSubmitting ? 'Guardando…' : 'Actualizar contraseña'}
         </Button>
       </form>

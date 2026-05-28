@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Logo } from '../components/Logo'
+import { AuthBrandHeader } from '../components/auth'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
@@ -33,7 +33,7 @@ export function ForgotPasswordScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-8 py-10">
-      <Logo size="md" className="mx-auto mb-8" />
+      <AuthBrandHeader className="mb-8" />
       <form onSubmit={handleSubmit} className="mx-auto w-full max-w-sm space-y-4">
         <div className="text-center">
           <h1 className="font-display text-2xl font-bold text-ink">Recuperar contraseña</h1>
@@ -60,7 +60,7 @@ export function ForgotPasswordScreen() {
           </p>
         )}
 
-        <Button type="submit" disabled={isSubmitting || !email.trim()}>
+        <Button type="submit" variant="progress" disabled={isSubmitting || !email.trim()}>
           {isSubmitting ? 'Enviando…' : 'Enviar link'}
         </Button>
 

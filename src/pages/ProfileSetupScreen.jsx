@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Logo } from '../components/Logo'
+import { AuthBrandHeader } from '../components/auth'
 import { Button } from '../components/Button'
 import { ProfileFormFields } from '../components/profile/ProfileFormFields'
 import { useAuth } from '../hooks/useAuth'
@@ -69,7 +69,7 @@ export function ProfileSetupScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
-      <Logo size="md" className="mx-auto mb-6 shrink-0" />
+      <AuthBrandHeader className="mb-6" />
 
       <motion.form
         variants={staggerContainer}
@@ -104,7 +104,7 @@ export function ProfileSetupScreen() {
         )}
 
         <motion.div variants={staggerItem}>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" variant="progress" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando perfil…' : 'Empezar a explorar'}
           </Button>
         </motion.div>

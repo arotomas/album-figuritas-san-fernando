@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { FaGoogle } from 'react-icons/fa6'
-import { Logo } from '../components/Logo'
+import { AuthBrandHeader } from '../components/auth'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
@@ -41,7 +41,7 @@ export function LoginScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-between px-8 py-10">
-      <Logo size="lg" className="mb-8 mt-2 shrink-0" />
+      <AuthBrandHeader className="mb-8 mt-2" />
 
       <motion.div
         variants={staggerContainer}
@@ -84,7 +84,11 @@ export function LoginScreen() {
 
           {error && <p className="text-center text-sm font-medium text-red-600">{error}</p>}
 
-          <Button type="submit" disabled={isSubmitting || !email.trim() || !password}>
+          <Button
+            type="submit"
+            variant="progress"
+            disabled={isSubmitting || !email.trim() || !password}
+          >
             {isSubmitting ? 'Ingresando…' : 'Ingresar'}
           </Button>
         </motion.form>
