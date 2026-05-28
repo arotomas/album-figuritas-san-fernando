@@ -7,9 +7,9 @@ function parseSearch(search = '') {
   return new URLSearchParams(raw)
 }
 
-function wantsPlayerApp(search = '') {
+function wantsAdminPanel(search = '') {
   const params = parseSearch(search)
-  return params.get('player') === '1' || params.get('app') === '1'
+  return params.get('admin') === '1'
 }
 
 /** Destino por defecto del panel (moderadores y admins). */
@@ -20,7 +20,7 @@ export const PLAYER_HOME_PATH = '/map'
 
 /**
  * Ruta inicial tras login, OAuth o bootstrap según rol y perfil.
- * Staff (moderador+) va al panel; jugadores al mapa o profile-setup.
+ * Todos los usuarios (incluido staff) entran al mapa; el panel admin solo con ?admin=1 o /admin.
  */
 export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
   if (typeof window !== 'undefined') {
@@ -28,7 +28,7 @@ export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
   }
   const qa = readQaModeFromSearch(search)
   const isStaff = hasMinimumRole(profile, 'moderator')
-  const openPlayerApp = wantsPlayerApp(search)
+  const openAdminPanel = wantsAdminPanel(search)
   const completed =
     profileCompleted === true ||
     (profileCompleted !== false && isProfileComplete(profile))
@@ -37,7 +37,7 @@ export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
     return withQaParam('/profile-setup', qa)
   }
 
-  if (isStaff && !openPlayerApp) {
+  if (isStaff && openAdminPanel) {
     return withQaParam(ADMIN_HOME_PATH, qa)
   }
 

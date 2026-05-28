@@ -87,7 +87,7 @@ export function AdminLayout() {
                 <h2 className="mt-1 text-2xl font-black">{pageTitle}</h2>
               </div>
               <Link
-                to={withQaParam('/map?player=1')}
+                to={withQaParam('/map')}
                 className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-ink shadow-sm transition-colors hover:bg-slate-50"
               >
                 Abrir app jugador
