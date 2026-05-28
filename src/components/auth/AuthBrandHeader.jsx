@@ -17,7 +17,7 @@ const VARIANT_CLASSES = {
     album:
       'h-16 min-w-0 w-auto max-w-[58%] object-contain object-left sm:h-[4.25rem] sm:max-w-[60%]',
     municipio:
-      'h-14 w-auto max-w-[40%] shrink-0 object-contain object-right sm:h-16 sm:max-w-[38%]',
+      'mr-2 h-14 w-auto max-w-[40%] shrink-0 object-contain object-right sm:mr-3 sm:h-16 sm:max-w-[38%]',
   },
 }
 

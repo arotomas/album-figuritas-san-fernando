@@ -8,6 +8,7 @@ import {
 import { typeClasses } from '../../theme/typography'
 import { RarityBadge } from '../ui/RarityBadge'
 import { getRarity } from '../../theme/rarity'
+import { LockedFigurePlaceholder } from './LockedFigurePlaceholder'
 
 function CollectionFigureTile({ figure, isNew, onSelect }) {
   const rarity = getRarity(figure.rareza)
@@ -33,7 +34,7 @@ function CollectionFigureTile({ figure, isNew, onSelect }) {
             </span>
           )}
         </div>
-        <div className="aspect-[3/4] overflow-hidden rounded-xl border border-white/10 bg-black/30">
+        <div className="aspect-[3/4] overflow-hidden rounded-xl border border-white/10 bg-[#6a6a6a]">
           {obtained && figure.foto ? (
             <img
               src={figure.foto}
@@ -42,9 +43,11 @@ function CollectionFigureTile({ figure, isNew, onSelect }) {
               decoding="async"
               className="h-full w-full object-cover"
             />
+          ) : !obtained ? (
+            <LockedFigurePlaceholder />
           ) : (
-            <div className="flex h-full items-center justify-center text-4xl opacity-80">
-              {obtained ? figure.emoji ?? '📍' : '?'}
+            <div className="flex h-full items-center justify-center bg-charcoal text-4xl opacity-80">
+              {figure.emoji ?? '📍'}
             </div>
           )}
         </div>

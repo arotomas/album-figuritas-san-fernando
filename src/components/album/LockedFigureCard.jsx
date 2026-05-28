@@ -4,6 +4,7 @@ import { albumClasses } from '../../theme/album'
 import { RarityBadge } from '../ui/RarityBadge'
 import { typeClasses } from '../../theme/typography'
 import { prefersReducedMotion } from '../../utils/performance'
+import { LockedFigurePlaceholder } from './LockedFigurePlaceholder'
 
 function LockedFigureCardInner({
   figure,
@@ -19,67 +20,37 @@ function LockedFigureCardInner({
     <div
       className={`album-locked relative overflow-hidden ${isBonus ? 'album-locked-bonus' : ''} ${isFeatured ? 'aspect-[4/5]' : 'aspect-[3/4]'} ${className}`}
     >
-      {/* Partial rarity frame — teasing what's hidden */}
+      <LockedFigurePlaceholder className="absolute inset-0" />
+
       <div
-        className={`absolute inset-0 ${isBonus ? 'opacity-45' : 'opacity-30'} ${rarity.tailwind.frame}`}
+        className={`absolute inset-0 ${isBonus ? 'opacity-35' : 'opacity-25'} ${rarity.tailwind.frame}`}
         aria-hidden
       />
-      <div className={`absolute inset-x-0 top-0 h-1 ${rarity.tailwind.accent} opacity-40`} />
+      <div className={`absolute inset-x-0 top-0 h-1 ${rarity.tailwind.accent} opacity-50`} />
 
-      {/* Silhouette / emoji ghost */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span
-          className={`select-none grayscale ${isBonus ? 'opacity-[0.12]' : 'opacity-[0.18]'} ${isFeatured ? 'text-[7rem]' : 'text-5xl'}`}
+      {isFeatured && (
+        <div
+          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#141416]/88 via-[#141416]/45 to-transparent px-4 pb-5 pt-16 text-center"
           aria-hidden
         >
-          {isBonus ? '✦' : figure.emoji}
-        </span>
-      </div>
-
-      {/* Holographic broken overlay */}
-      <div
-        className={`album-holographic pointer-events-none absolute inset-0 ${reduced ? 'opacity-30' : ''}`}
-        aria-hidden
-      />
-
-      {/* Premium blur veil */}
-      <div className="album-locked-veil absolute inset-0 backdrop-blur-[6px]" />
-
-      {/* Mystery mark */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-        <div
-          className={`flex items-center justify-center rounded-full border border-white/25 bg-black/20 backdrop-blur-sm ${
-            isFeatured ? 'h-16 w-16' : 'h-10 w-10'
-          }`}
-        >
-          <span
-            className={`font-display font-bold text-white/70 ${isFeatured ? 'text-3xl' : 'text-xl'}`}
-          >
-            ?
-          </span>
+          <p className={`${typeClasses.micro} ${isBonus ? 'text-amber-100/80' : 'text-white/65'}`}>
+            {isBonus ? 'Bonus oculto' : 'Por descubrir'}
+          </p>
+          <p className={`${albumClasses.featuredDescription} mx-auto mt-2 max-w-[220px] text-white/55`}>
+            {isBonus
+              ? 'Una figurita especial puede aparecer cuando estés cerca.'
+              : 'Desbloqueá más figuritas explorando San Fernando.'}
+          </p>
         </div>
+      )}
 
-        {isFeatured && (
-          <>
-            <p className={`${typeClasses.micro} mt-2 ${isBonus ? 'text-amber-100/70' : 'text-white/50'}`}>
-              {isBonus ? 'Bonus oculto' : 'Por descubrir'}
-            </p>
-            <p className={`${albumClasses.featuredDescription} max-w-[220px] text-white/45`}>
-              {isBonus
-                ? 'Una figurita especial puede aparecer cuando estés cerca.'
-                : 'Desbloqueá más figuritas explorando San Fernando.'}
-            </p>
-          </>
-        )}
-      </div>
-
-      {/* Partial rarity badge — visible through the veil */}
-      <div className={`absolute ${isFeatured ? 'left-4 top-4' : 'left-2 top-2'} opacity-60`}>
+      <div className={`absolute ${isFeatured ? 'left-4 top-4' : 'left-2 top-2'} z-10 opacity-80`}>
         <RarityBadge rareza={figure.rareza} size={isFeatured ? 'md' : 'sm'} />
       </div>
 
-      {/* Slow shimmer */}
-      {!reduced && <div className="album-locked-shimmer pointer-events-none absolute inset-0" aria-hidden />}
+      {!reduced && isBonus && (
+        <div className="album-locked-shimmer pointer-events-none absolute inset-0 opacity-40" aria-hidden />
+      )}
     </div>
   )
 }
