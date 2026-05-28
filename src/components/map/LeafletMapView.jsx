@@ -303,16 +303,20 @@ function FigureMarkersLayer({
   const cacheRef = useRef({})
   const onFigureClickRef = useRef(onFigureClick)
   onFigureClickRef.current = onFigureClick
+  const figuresRef = useRef(figures)
+  figuresRef.current = figures
   const nearIds = useMemo(
     () => new Set(nearFigureIdsKey.split(',').filter(Boolean)),
     [nearFigureIdsKey],
   )
 
   useEffect(() => {
+    const layerFigures = figuresRef.current
+
     if (import.meta.env.DEV) {
       console.info('[map-figures]', 'markers render', JSON.stringify({
-        count: figures.length,
-        ids: figures.map((figure) => String(figure.id)),
+        count: layerFigures.length,
+        ids: layerFigures.map((figure) => String(figure.id)),
       }))
     }
 
@@ -322,7 +326,7 @@ function FigureMarkersLayer({
     rootsRef.current = []
     cacheRef.current = {}
 
-    figures.forEach((figure) => {
+    layerFigures.forEach((figure) => {
       const el = document.createElement('div')
       const root = createRoot(el)
 
@@ -354,10 +358,10 @@ function FigureMarkersLayer({
       markersRef.current = []
       rootsRef.current = []
     }
-  }, [figures, figuresSignature, map])
+  }, [figuresSignature, map])
 
   useEffect(() => {
-    figures.forEach((figure, index) => {
+    figuresRef.current.forEach((figure, index) => {
       const root = rootsRef.current[index]
       if (!root) return
 
@@ -388,7 +392,7 @@ function FigureMarkersLayer({
         />,
       )
     })
-  }, [activeTargetFigureId, cinematicActive, cinematicBearing, figures, nearIds, nearFigureIdsKey])
+  }, [activeTargetFigureId, cinematicActive, cinematicBearing, figuresSignature, nearIds, nearFigureIdsKey])
 
   return null
 }
@@ -781,8 +785,8 @@ function LeafletMapViewInner({
             figuresSignature={markerFiguresSignature}
             nearFigureIdsKey={nearFigureIdsKey}
             activeTargetFigureId={activeTargetFigureId}
-            cinematicBearing={cinematicBearing}
-            cinematicActive={cinematicModeActive}
+            cinematicBearing={explorationActive ? null : cinematicBearing}
+            cinematicActive={cinematicModeActive && !explorationActive}
             onFigureClick={handleFigureClick}
           />
           {mapPosition && (

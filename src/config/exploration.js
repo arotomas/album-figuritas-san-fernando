@@ -14,3 +14,6 @@ export const EXPLORATION_DISTANCE_NEAR_M = 120
 export const EXPLORATION_DISTANCE_UPDATE_MIN_M = 4
 
 export const EXPLORATION_DISTANCE_UPDATE_MIN_MS = 650
+
+/** Mínimo movimiento antes de redibujar la polyline (evita parpadeo del markerPane). */
+export const EXPLORATION_LINE_UPDATE_MIN_M = 3

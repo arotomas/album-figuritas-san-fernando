@@ -41,10 +41,12 @@ function ExplorationTargetMarkerInner({ active, targetCoordinates, targetName })
       markerRef.current.setLatLng([targetCoordinates.lat, targetCoordinates.lng])
     }
 
-    markerRef.current.setZIndexOffset(800)
+    if (markerRef.current) {
+      markerRef.current.setZIndexOffset(800)
+    }
 
     return removeMarker
-  }, [active, map, targetCoordinates?.lat, targetCoordinates?.lng, targetName])
+  }, [active, map, targetCoordinates?.lat, targetCoordinates?.lng])
 
   return null
 }

@@ -295,7 +295,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .exploration-route-line {
+    .exploration-route-line:not(.exploration-route-line--static) {
       animation: exploration-route-dash 1.2s linear infinite;
     }
   }
