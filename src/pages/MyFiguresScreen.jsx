@@ -32,6 +32,7 @@ import { useAlbumCollectionsBootstrap } from '../hooks/useAlbumCollectionsBootst
 import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailability'
 import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
 import { getMapProximityHint } from '../utils/proximityExperience'
+import { startFigureExploration } from '../utils/startFigureExploration'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -367,6 +368,15 @@ export function MyFiguresScreenInner() {
         ? sanitizedFigures.find((figure) => String(figure.id) === String(sheetFigureId))
         : null,
     [sanitizedFigures, sheetFigureId],
+  )
+
+  const handleGoToPoint = useCallback(
+    (figure) => {
+      if (!figure) return
+      setSheetFigureId(null)
+      startFigureExploration(figure, navigate, { withQa })
+    },
+    [navigate, withQa],
   )
 
   const handleSelect = useCallback(
@@ -753,6 +763,7 @@ export function MyFiguresScreenInner() {
         onClose={() => setSheetFigureId(null)}
         onRetakePhoto={handleRetakePhoto}
         onDeletePhoto={handleDeletePhoto}
+        onGoToPoint={handleGoToPoint}
       />
     </div>
   )

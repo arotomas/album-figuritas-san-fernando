@@ -6,6 +6,7 @@ import { RarityBadge } from '../ui/RarityBadge'
 import { PhotoLightbox } from '../ui/PhotoLightbox'
 import { FigureChallengeCard } from './FigureChallengeCard'
 import { LockedFigureCard } from './LockedFigureCard'
+import { canExploreFigure } from '../../utils/startFigureExploration'
 
 function formatCapturedAt(value) {
   if (!value) return null
@@ -18,6 +19,7 @@ export function FigureDetailSheet({
   onClose,
   onRetakePhoto,
   onDeletePhoto,
+  onGoToPoint,
 }) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -122,9 +124,21 @@ export function FigureDetailSheet({
                 )}
 
                 {!obtained && (
-                  <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-white/65">
-                    Se revela al avanzar en el álbum
-                  </p>
+                  <>
+                    <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-white/65">
+                      Se revela al avanzar en el álbum
+                    </p>
+                    {canExploreFigure(figure) && onGoToPoint && (
+                      <button
+                        type="button"
+                        onClick={() => onGoToPoint(figure)}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-progress/35 bg-progress/12 px-4 py-3.5 text-sm font-black text-progress shadow-[0_0_24px_rgba(140,198,63,0.12)]"
+                      >
+                        <span aria-hidden>📍</span>
+                        Ir al punto
+                      </button>
+                    )}
+                  </>
                 )}
 
                 {obtained && <FigureChallengeCard figure={figure} />}

@@ -48,6 +48,11 @@ import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
 import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
+import {
+  ExplorationController,
+  ExplorationDistanceBadge,
+} from './exploration'
+import { useExplorationStore } from '../../store/explorationStore'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -125,6 +130,7 @@ function MapFlyController({
   missionFollow = false,
   followPaused = false,
   followPausedRef,
+  explorationActive = false,
 }) {
   const map = useMap()
   const lastCenteredRef = useRef(null)
@@ -153,7 +159,8 @@ function MapFlyController({
 
     if (manualRecenter) prevRecenterTickRef.current = recenterTick
 
-    const followLocked = followPaused || followPausedRef?.current
+    const followLocked =
+      explorationActive || followPaused || followPausedRef?.current
     if (followLocked && !manualRecenter) return
 
     const moved =
@@ -188,7 +195,18 @@ function MapFlyController({
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : missionFollow ? 1.05 : 0.55,
     })
-  }, [followPaused, followPausedRef, map, missionFollow, moveThreshold, position, reducedMotion, zoom, recenterTick])
+  }, [
+    explorationActive,
+    followPaused,
+    followPausedRef,
+    map,
+    missionFollow,
+    moveThreshold,
+    position,
+    reducedMotion,
+    zoom,
+    recenterTick,
+  ])
 
   return null
 }
@@ -397,6 +415,10 @@ function LeafletMapViewInner({
   const activeTargetFigureId = useAppStore((state) => state.activeTargetFigureId)
   const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
+  const explorationActive = useExplorationStore((state) => state.active)
+  const explorationTargetName = useExplorationStore((state) => state.targetName)
+  const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
+  const stopExploration = useExplorationStore((state) => state.stopExploration)
   const {
     mapPosition,
     position,
@@ -484,6 +506,11 @@ function LeafletMapViewInner({
   const handleFollowPausedChange = useCallback((paused) => {
     mapFollowPausedRef.current = paused
     setMissionFollowPaused(paused)
+  }, [])
+
+  const handlePauseMapFollowForExploration = useCallback((paused) => {
+    mapFollowPausedRef.current = paused
+    if (paused) setMissionFollowPaused(true)
   }, [])
 
   const handleRotationPausedChange = useCallback((paused) => {
@@ -575,6 +602,7 @@ function LeafletMapViewInner({
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return
 
+    stopExploration()
     mapFollowPausedRef.current = false
     setMissionFollowPaused(false)
     setMapRotationPaused(false)
@@ -583,7 +611,7 @@ function LeafletMapViewInner({
       duration: reducedMotion ? 0 : 0.7,
     })
     setRecenterTick((tick) => tick + 1)
-  }, [mapPosition, reducedMotion])
+  }, [mapPosition, reducedMotion, stopExploration])
 
   useEffect(() => {
     if (!nearFigure) {
@@ -734,6 +762,12 @@ function LeafletMapViewInner({
             missionFollow={Boolean(activeTargetFigureId)}
             followPaused={missionFollowPaused}
             followPausedRef={mapFollowPausedRef}
+            explorationActive={explorationActive}
+          />
+          <ExplorationController
+            userPosition={mapPosition}
+            reducedMotion={reducedMotion}
+            onPauseMapFollow={handlePauseMapFollowForExploration}
           />
           <MapInteractionBridge
             autoResumeFollow={Boolean(activeTargetFigureId)}
@@ -891,7 +925,14 @@ function LeafletMapViewInner({
         figures={figures}
       />
 
-      {activeTargetFigure && (
+      <ExplorationDistanceBadge
+        visible={explorationActive}
+        targetName={explorationTargetName}
+        distanceMeters={explorationDistanceMeters}
+        onExit={stopExploration}
+      />
+
+      {activeTargetFigure && !explorationActive && (
         <ActiveTargetPill
           figureName={activeTargetFigure.nombre}
           onCancel={handleCancelTracking}

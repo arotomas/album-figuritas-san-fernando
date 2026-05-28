@@ -10,6 +10,7 @@ import {
   getPlayerMapFigures,
 } from '../utils/figureGameRules'
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
+import { useExplorationStore } from '../store/explorationStore'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -43,6 +44,13 @@ export function MapScreen() {
       return next
     })
   }, [])
+
+  useEffect(
+    () => () => {
+      useExplorationStore.getState().stopExploration()
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
