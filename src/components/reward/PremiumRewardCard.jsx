@@ -19,7 +19,7 @@ function PremiumRewardCardInner({ figure, photoUrl, revealed = true }) {
       />
 
       <div
-        className={`card-texture relative overflow-hidden rounded-[1.25rem] border-2 bg-gradient-to-b ${rarity.tailwind.gradient} ${rarity.tailwind.border} ${rarity.tailwind.glow}`}
+        className={`card-texture relative overflow-hidden rounded-[1.25rem] border-2 bg-[#f3f3f1] ${rarity.tailwind.border} ${rarity.tailwind.glow}`}
       >
         <ShineEffect active={revealed} rarityShine={rarity.tailwind.shine} />
 
@@ -38,7 +38,7 @@ function PremiumRewardCardInner({ figure, photoUrl, revealed = true }) {
         {/* Photo frame — FIFA style */}
         <div className="relative mx-5 mt-4">
           <div
-            className={`overflow-hidden rounded-xl border-2 ${rarity.tailwind.border} bg-black/40 p-1`}
+            className={`overflow-hidden rounded-xl border-2 ${rarity.tailwind.border} bg-neutral-200/60 p-1`}
           >
             <div
               className={`photo-reveal overflow-hidden rounded-lg ${revealed ? 'photo-revealed' : 'photo-hidden'}`}
@@ -48,6 +48,7 @@ function PremiumRewardCardInner({ figure, photoUrl, revealed = true }) {
                   src={photoUrl}
                   alt={figure.nombre}
                   decoding="async"
+                  loading="eager"
                   className="aspect-[4/5] w-full object-cover"
                 />
               ) : (
@@ -62,17 +63,16 @@ function PremiumRewardCardInner({ figure, photoUrl, revealed = true }) {
           <div className="pointer-events-none absolute inset-x-3 top-2 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
         </div>
 
-        {/* Info */}
+        {/* Info — solo en la tarjeta (sin repetir debajo) */}
         <div className="relative px-5 py-5 text-center">
-          <p className={`${typeClasses.micro} mb-2 text-white/50`}>
-            San Fernando
-          </p>
-          <h2 className={`${typeClasses.display} text-xl text-warm-white`}>
+          <h2 className={`${typeClasses.display} text-xl text-ink`}>
             {figure.nombre}
           </h2>
-          <p className="mt-2 font-body text-xs leading-relaxed text-white/55">
-            {figure.description}
-          </p>
+          {figure.description?.trim() ? (
+            <p className="mt-2 line-clamp-3 font-body text-xs leading-relaxed text-muted">
+              {figure.description.trim()}
+            </p>
+          ) : null}
         </div>
 
         {/* Bottom accent bar */}

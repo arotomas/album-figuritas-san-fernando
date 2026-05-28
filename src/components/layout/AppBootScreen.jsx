@@ -10,7 +10,7 @@ export function AppBootScreen({ phase = 'album' }) {
   const message = PHASE_COPY[phase] ?? PHASE_COPY.album
 
   return (
-    <div className="screen-full safe-top safe-bottom safe-x relative flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8">
+    <div className="bg-app screen-full safe-top safe-bottom safe-x relative flex flex-col items-center justify-center overflow-hidden px-8">
       <div
         className="pointer-events-none absolute inset-0"
         style={{

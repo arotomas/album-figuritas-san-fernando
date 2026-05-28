@@ -150,8 +150,8 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
 
   if (!figure) {
     return (
-      <div className="safe-top safe-bottom flex h-full items-center justify-center bg-[#0a0a0b] px-6 text-center">
-        <p className="font-body text-sm text-white/70">Cargando recompensa…</p>
+      <div className="safe-top safe-bottom flex h-full items-center justify-center bg-warm-white px-6 text-center">
+        <p className="font-body text-sm text-muted">Cargando recompensa…</p>
       </div>
     )
   }
@@ -164,25 +164,15 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
 
   return (
     <div
-      className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-6"
+      className="bg-app safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden px-6"
       style={
         isSpecial
           ? {
-              background: `radial-gradient(ellipse at 50% 32%, ${rarity.colors.glow} 0%, #0a0a0b 68%)`,
-              opacity: 0.92,
+              background: `radial-gradient(ellipse at 50% 28%, ${rarity.colors.glow} 0%, var(--app-bg) 62%)`,
             }
           : undefined
       }
     >
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 40%, transparent 30%, rgba(0,0,0,0.7) 100%)',
-        }}
-        aria-hidden
-      />
-
       {showDiscovery && (
         <RarityDiscoveryBeat figure={figure} visible={visible} />
       )}
@@ -291,32 +281,10 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
               initial={{ opacity: 0.85 }}
               animate={{ opacity: 0 }}
               transition={{ duration: 0.55, ease: 'easeOut' }}
-              className="pointer-events-none absolute inset-0 z-20 bg-white"
+              className="bg-app pointer-events-none absolute inset-0 z-20"
               aria-hidden
             />
           )}
-
-          <m.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={
-              phase === PHASES.INFO || phase === PHASES.DONE
-                ? { opacity: 1, y: 0 }
-                : { opacity: 0, y: 20 }
-            }
-            transition={{ duration: 0.48, ease: motionTokens.ease.out }}
-            className="relative z-10 mt-10 max-w-xs text-center"
-          >
-            <h2 className={`${typeClasses.headline} text-xl text-warm-white`}>
-              {figure.nombre}
-            </h2>
-            <p
-              className="mt-2 inline-flex rounded-full border border-white/10 px-4 py-1.5 font-body text-sm font-bold leading-relaxed"
-              style={{ color: rarity.colors.primary }}
-            >
-              Rareza {rarity.label}
-            </p>
-            <p className="mt-3 font-body text-xs text-white/40">Colección San Fernando</p>
-          </m.div>
         </>
       )}
     </div>

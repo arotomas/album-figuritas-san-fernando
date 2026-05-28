@@ -52,7 +52,7 @@ export function UnlockAnimation({ onComplete }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- timer único por montaje; progress en render
 
   return (
-    <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0b] px-8 text-center">
+    <div className="bg-app safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden px-8 text-center">
       <ParticleLayer rareza="épica" intensity={0.45} />
 
       <m.div
@@ -85,7 +85,7 @@ export function UnlockAnimation({ onComplete }) {
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18, duration: 0.5, ease: motionTokens.ease.premium }}
-        className={`${typeClasses.display} relative z-10 text-2xl text-warm-white`}
+        className={`${typeClasses.display} text-app relative z-10 text-2xl`}
       >
         ¡Nueva figurita!
       </m.h1>
@@ -115,7 +115,7 @@ export function UnlockAnimation({ onComplete }) {
                 animate={{ scaleY: 1 }}
                 transition={{ delay: 0.52 + index * 0.06, ease: motionTokens.ease.snap }}
                 className={`h-3 flex-1 rounded-sm ${
-                  index < progress ? 'bg-progress' : 'bg-white/10'
+                  index < progress ? 'bg-progress' : 'bg-border/80 dark:bg-white/10'
                 }`}
               />
             ))}
@@ -130,7 +130,7 @@ export function UnlockAnimation({ onComplete }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.95 }}
-        className="relative z-10 mt-8 font-body text-xs text-white/35"
+        className="text-app-muted relative z-10 mt-8 font-body text-xs"
       >
         Yendo a tu álbum…
       </m.p>

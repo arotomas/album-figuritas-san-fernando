@@ -47,7 +47,7 @@ function App() {
   if (isBooting) {
     return (
       <ViewportProvider>
-        <div className="app-shell h-app overflow-hidden bg-[#0a0a0b] text-ink">
+        <div className="app-shell bg-app h-app overflow-hidden text-ink">
           <AppBootScreen phase={bootPhase} />
         </div>
       </ViewportProvider>

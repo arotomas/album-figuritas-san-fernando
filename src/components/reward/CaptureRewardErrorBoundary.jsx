@@ -42,11 +42,11 @@ export class CaptureRewardErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="safe-top safe-bottom flex h-full flex-col items-center justify-center bg-[#0a0a0b] px-8 text-center">
-          <p className="font-display text-xl font-bold text-warm-white">
+        <div className="bg-app safe-top safe-bottom flex h-full flex-col items-center justify-center px-8 text-center">
+          <p className="text-app font-display text-xl font-bold">
             ¡Figurita guardada!
           </p>
-          <p className="mt-3 max-w-sm font-body text-sm leading-relaxed text-white/55">
+          <p className="text-app-muted mt-3 max-w-sm font-body text-sm leading-relaxed">
             Hubo un problema mostrando la animación. Tu foto ya está en el álbum.
           </p>
         </div>

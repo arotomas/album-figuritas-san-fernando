@@ -1,4 +1,5 @@
 import { MAX_PHOTO_BYTES } from '../config/persistence'
+import { rasterizeFileToCanvas } from './imageOrientation'
 import { withTimeout } from './withTimeout'
 
 const DEFAULT_OPTIONS = {
@@ -175,6 +176,15 @@ function resolveDrawSource(source) {
 async function resolveRasterSource(source) {
   const direct = resolveDrawSource(source)
   if (direct) return direct
+
+  if (source instanceof Blob && typeof createImageBitmap === 'function') {
+    const canvas = await rasterizeFileToCanvas(source)
+    return {
+      drawSource: canvas,
+      width: canvas.width,
+      height: canvas.height,
+    }
+  }
 
   const image = await loadImageFromSource(source)
   return {

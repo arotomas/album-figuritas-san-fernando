@@ -6,6 +6,10 @@ import {
   QA_PLACEHOLDER_JPEG,
 } from '../utils/nativePhotoPrepare'
 import { compressImageWithFallback } from '../utils/imageCompression'
+import {
+  createPhotoPreviewUrl,
+  revokePhotoPreviewUrl,
+} from '../utils/photoEncode'
 import { withTimeout } from '../utils/withTimeout'
 import { vibrateCapture, vibrateReady, vibrateProximityPulse } from '../utils/vibration'
 import { getDistanceMeters } from '../utils/geo'
@@ -205,12 +209,22 @@ export function useCaptureFlow({
   const pendingLocationSnapshotRef = useRef(null)
   const pendingLockedRef = useRef(false)
   const mountedRef = useRef(true)
+  const photoPreviewRef = useRef(null)
 
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      revokePhotoPreviewUrl(photoPreviewRef.current)
+      photoPreviewRef.current = null
     }
+  }, [])
+
+  const setPhotoPreview = useCallback((compressed) => {
+    revokePhotoPreviewUrl(photoPreviewRef.current)
+    const preview = createPhotoPreviewUrl(compressed)
+    photoPreviewRef.current = preview
+    setCompressedPhoto(preview.url)
   }, [])
 
   const safeSetPhase = useCallback((nextPhase) => {
@@ -787,7 +801,7 @@ export function useCaptureFlow({
         bytes: compressed.sizeBytes,
       })
 
-      setCompressedPhoto(compressed.dataUrl)
+      setPhotoPreview(compressed)
 
       const distanceToFigure =
         locationSnapshot?.distanceToFigure ??

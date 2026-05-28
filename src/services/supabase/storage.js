@@ -116,20 +116,9 @@ export function validateFigureImageFile(file) {
   return { ok: true, size: file.size, type: file.type }
 }
 
-function loadImageFromFile(file) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file)
-    const image = new Image()
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      resolve(image)
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error('INVALID_IMAGE_FILE'))
-    }
-    image.src = objectUrl
-  })
+async function loadImageFromFile(file) {
+  const { rasterizeFileToCanvas } = await import('../../utils/imageOrientation.js')
+  return rasterizeFileToCanvas(file)
 }
 
 async function canvasToBlob(canvas, type, quality) {
@@ -161,13 +150,13 @@ export async function optimizeMarkerIconFile(file) {
   }
 
   const image = await loadImageFromFile(file)
-  const sourceSize = Math.min(image.naturalWidth, image.naturalHeight)
+  const sourceSize = Math.min(image.width, image.height)
   if (!sourceSize || sourceSize <= 0) {
     return { ok: false, reason: 'INVALID_IMAGE_DIMENSIONS' }
   }
 
-  const sourceX = Math.floor((image.naturalWidth - sourceSize) / 2)
-  const sourceY = Math.floor((image.naturalHeight - sourceSize) / 2)
+  const sourceX = Math.floor((image.width - sourceSize) / 2)
+  const sourceY = Math.floor((image.height - sourceSize) / 2)
 
   const canvas = document.createElement('canvas')
   canvas.width = MARKER_ICON_TARGET_PX
@@ -221,8 +210,8 @@ export async function optimizeMarkerIconFile(file) {
     ok: true,
     file: optimizedFile,
     transformed: true,
-    sourceWidth: image.naturalWidth,
-    sourceHeight: image.naturalHeight,
+    sourceWidth: image.width,
+    sourceHeight: image.height,
   }
 }
 
@@ -238,8 +227,8 @@ export async function optimizeFigureImageFile(file) {
   if (!baseValidation.ok) return baseValidation
 
   const image = await loadImageFromFile(file)
-  const srcW = image.naturalWidth
-  const srcH = image.naturalHeight
+  const srcW = image.width
+  const srcH = image.height
   if (!srcW || !srcH) return { ok: false, reason: 'INVALID_IMAGE_DIMENSIONS' }
 
   const maxSide = 1280
@@ -519,7 +508,13 @@ export async function uploadCapturePhoto({
   }
 
   try {
-    const blob = dataUrlToBlob(dataUrl)
+    let blob = dataUrlToBlob(dataUrl)
+    try {
+      const { normalizeJpegBlob } = await import('../../utils/photoEncode.js')
+      blob = await normalizeJpegBlob(blob)
+    } catch {
+      // Si no se puede re-normalizar, subir el blob original.
+    }
     const validation = validateUploadBlob(blob, maxBytes)
 
     if (!validation.ok) {

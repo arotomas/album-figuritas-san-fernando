@@ -1,4 +1,6 @@
 import { MAX_PHOTO_BYTES } from '../config/persistence'
+import { createOrientedBitmap, rasterizeFileToCanvas } from './imageOrientation'
+import { isValidJpegBlob, normalizeJpegBlob } from './photoEncode'
 import { withTimeout } from './withTimeout'
 import { mobilePhotoLog } from './mobilePhotoLog'
 
@@ -88,35 +90,40 @@ async function encodeSmallCanvas(canvas, quality) {
     'encodeCanvas',
   )
 
+  let rawBlob = encoded
   if (typeof encoded === 'string') {
     if (!encoded.startsWith('data:image/jpeg')) {
       throw new Error('MOBILE_JPEG_ENCODE_FAILED')
     }
-    return {
-      dataUrl: encoded,
-      sizeBytes: Math.max(1, Math.round(encoded.length * 0.75)),
-      width: canvas.width,
-      height: canvas.height,
-      type: JPEG_MIME,
-    }
+    const [, base64] = encoded.split(',')
+    if (!base64) throw new Error('MOBILE_JPEG_ENCODE_FAILED')
+    const binary = atob(base64.replace(/\s/g, ''))
+    const array = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) array[i] = binary.charCodeAt(i)
+    rawBlob = new Blob([array], { type: JPEG_MIME })
   }
 
-  if (encoded.type !== JPEG_MIME || encoded.size <= 0) {
+  if (!(rawBlob instanceof Blob) || rawBlob.size <= 0) {
     throw new Error('MOBILE_INVALID_JPEG_BLOB')
   }
 
-  const dataUrl = await blobToDataUrl(encoded)
+  const blob =
+    (await isValidJpegBlob(rawBlob))
+      ? await normalizeJpegBlob(rawBlob).catch(() => rawBlob)
+      : await normalizeJpegBlob(rawBlob)
+
+  const dataUrl = await blobToDataUrl(blob)
   if (!dataUrl.startsWith('data:image/jpeg')) {
     throw new Error('MOBILE_JPEG_DATA_URL_FAILED')
   }
 
   return {
     dataUrl,
-    blob: encoded,
-    sizeBytes: encoded.size,
+    blob,
+    sizeBytes: blob.size,
     width: canvas.width,
     height: canvas.height,
-    type: encoded.type,
+    type: blob.type,
   }
 }
 
@@ -135,6 +142,8 @@ async function bitmapToCompressed(bitmap, maxWidth, maxHeight, quality) {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('CANVAS_UNAVAILABLE')
 
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(bitmap, 0, 0, width, height)
   return encodeSmallCanvas(canvas, quality)
 }
@@ -146,16 +155,15 @@ async function loadBitmapFromFile(file, maxDim) {
 
   try {
     return await withTimeout(
-      createImageBitmap(file, {
+      createOrientedBitmap(file, {
         resizeWidth: maxDim,
-        resizeHeight: maxDim,
-        resizeQuality: 'medium',
+        resizeQuality: 'high',
       }),
       LOAD_MS,
       'createImageBitmapResize',
     )
   } catch {
-    return withTimeout(createImageBitmap(file), LOAD_MS, 'createImageBitmap')
+    return withTimeout(createOrientedBitmap(file), LOAD_MS, 'createImageBitmap')
   }
 }
 
@@ -234,17 +242,17 @@ export async function prepareNativeCapturePhoto(file, { isQaTest = false } = {})
   }
 
   try {
-    const img = await loadImageElementFromFile(file)
+    const oriented = await rasterizeFileToCanvas(file)
     const { width, height } = calculateDimensions(
-      img.naturalWidth,
-      img.naturalHeight,
+      oriented.width,
+      oriented.height,
       420,
       420,
     )
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
-    canvas.getContext('2d')?.drawImage(img, 0, 0, width, height)
+    canvas.getContext('2d')?.drawImage(oriented, 0, 0, width, height)
     const result = await encodeSmallCanvas(canvas, 0.35)
     mobilePhotoLog.info('compressed jpeg', {
       mode: 'image-element',

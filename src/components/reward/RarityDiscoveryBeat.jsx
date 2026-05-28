@@ -15,8 +15,8 @@ function RarityDiscoveryBeatInner({ figure, visible = true }) {
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background: `radial-gradient(ellipse at 50% 44%, ${rarity.colors.glow} 0%, transparent 52%), linear-gradient(180deg, rgba(10,10,11,0.2) 0%, rgba(10,10,11,0.94) 100%)`,
-          opacity: 0.55,
+          background: `radial-gradient(ellipse at 50% 44%, ${rarity.colors.glow} 0%, transparent 58%)`,
+          opacity: 0.45,
         }}
         aria-hidden
       />
@@ -55,7 +55,7 @@ function RarityDiscoveryBeatInner({ figure, visible = true }) {
           initial={{ opacity: 0 }}
           animate={visible ? { opacity: 1 } : { opacity: 0 }}
           transition={{ duration: 0.45, delay: 0.2, ease: motionTokens.ease.out }}
-          className="mt-2.5 font-body text-sm leading-relaxed text-white/68"
+          className="mt-2.5 font-body text-sm leading-relaxed text-muted"
         >
           {subline}
         </m.p>
@@ -75,7 +75,7 @@ function RarityDiscoveryBeatInner({ figure, visible = true }) {
           initial={{ opacity: 0 }}
           animate={visible ? { opacity: 1 } : { opacity: 0 }}
           transition={{ duration: 0.4, delay: 0.36, ease: motionTokens.ease.out }}
-          className="mt-5 font-body text-[11px] tracking-wide text-white/42"
+          className="mt-5 font-body text-[11px] tracking-wide text-muted"
         >
           {reassurance}
         </m.p>

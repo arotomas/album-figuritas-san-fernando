@@ -66,8 +66,8 @@ const PhotoUpdatedAnimation = lazyRewardModule(
 
 function RewardSkeleton() {
   return (
-    <div className="safe-top safe-bottom flex h-full items-center justify-center bg-black">
-      <div className="map-skeleton-pulse h-64 w-48 rounded-2xl bg-zinc-800" />
+    <div className="bg-app safe-top safe-bottom flex h-full items-center justify-center">
+      <div className="map-skeleton-pulse h-64 w-48 rounded-2xl bg-border/80" />
     </div>
   )
 }
@@ -546,7 +546,7 @@ export function CaptureFlow() {
   if (isExitingRef.current && location.pathname === '/capture') {
     return (
       <div
-        className="safe-top safe-bottom screen-full bg-[#0a0a0b]"
+        className="bg-app safe-top safe-bottom screen-full"
         aria-busy="true"
         aria-label="Yendo a tu álbum"
       />

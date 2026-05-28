@@ -16,8 +16,8 @@ export default defineConfig({
         short_name: 'Figuritas SF',
         description:
           'Recorré San Fernando, descubrí puntos turísticos y desbloqueá figuritas digitales.',
-        theme_color: '#0a0a0b',
-        background_color: '#0a0a0b',
+        theme_color: '#faf9f7',
+        background_color: '#faf9f7',
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait',

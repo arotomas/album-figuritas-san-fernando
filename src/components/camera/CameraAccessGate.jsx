@@ -10,17 +10,17 @@ export function CameraAccessGate({
   const isDenied = variant === 'denied'
 
   return (
-    <div className="safe-top safe-bottom flex h-full flex-col items-center justify-center bg-zinc-950 px-8 text-center">
+    <div className="bg-app safe-top safe-bottom flex h-full flex-col items-center justify-center px-8 text-center">
       <div className="max-w-sm animate-slide-up">
-        <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-zinc-900">
-          <FaCamera size={36} className="text-zinc-400" aria-hidden />
+        <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-surface">
+          <FaCamera size={36} className="text-muted" aria-hidden />
         </div>
 
-        <h1 className="font-display text-xl font-bold text-white">
+        <h1 className="text-app font-display text-xl font-bold">
           {isDenied ? 'La cámara está bloqueada en Chrome.' : 'Acceso a la cámara'}
         </h1>
 
-        <p className="mt-4 font-body text-sm leading-relaxed text-zinc-400">
+        <p className="text-app-muted mt-4 font-body text-sm leading-relaxed">
           {isDenied
             ? 'No podemos abrir la vista previa web. Podés usar la cámara nativa del celular para sacar la foto.'
             : 'Necesitamos acceso a la cámara para desbloquear figuritas.'}

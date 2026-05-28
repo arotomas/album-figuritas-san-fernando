@@ -62,11 +62,11 @@ export class AppErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="screen-full safe-top safe-bottom safe-x flex flex-col items-center justify-center bg-[#0a0a0b] px-8 text-center">
-          <p className="font-display text-xl font-bold text-warm-white">
+        <div className="bg-app screen-full safe-top safe-bottom safe-x flex flex-col items-center justify-center px-8 text-center">
+          <p className="text-app font-display text-xl font-bold">
             Algo salió mal
           </p>
-          <p className="mt-3 max-w-sm font-body text-sm leading-relaxed text-white/55">
+          <p className="text-app-muted mt-3 max-w-sm font-body text-sm leading-relaxed">
             La app encontró un error inesperado. Podés volver al mapa o recargar para continuar.
           </p>
           {import.meta.env.DEV && this.state.error && (

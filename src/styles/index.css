@@ -12,6 +12,39 @@
   --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Modo claro por defecto; oscuro solo si el sistema lo pide */
+:root {
+  color-scheme: light;
+  --app-bg: #faf9f7;
+  --app-fg: #111113;
+  --app-fg-muted: #8b8b95;
+  --app-theme-color: #faf9f7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --app-bg: #0a0a0b;
+    --app-fg: #faf9f7;
+    --app-fg-muted: rgba(255, 255, 255, 0.55);
+    --app-theme-color: #0a0a0b;
+  }
+}
+
+@layer utilities {
+  .bg-app {
+    background-color: var(--app-bg);
+  }
+
+  .text-app {
+    color: var(--app-fg);
+  }
+
+  .text-app-muted {
+    color: var(--app-fg-muted);
+  }
+}
+
 @layer base {
   *,
   *::before,
@@ -38,8 +71,8 @@
     position: fixed;
     inset: 0;
     font-family: var(--font-sans);
-    background-color: #0a0a0b;
-    color: var(--color-ink);
+    background-color: var(--app-bg);
+    color: var(--app-fg);
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

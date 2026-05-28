@@ -11,14 +11,14 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
   }
 
   return (
-    <div className="safe-top safe-bottom relative flex h-full flex-col overflow-hidden bg-zinc-950 text-warm-white">
+    <div className="bg-app safe-top safe-bottom relative flex h-full flex-col overflow-hidden text-app">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(140,198,63,0.18),transparent_55%)]" />
 
       <header className="relative z-10 flex items-center justify-between px-5 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-white/10 px-4 py-2 text-xs font-bold text-white/75"
+          className="rounded-full border border-border px-4 py-2 text-xs font-bold text-muted"
         >
           Volver
         </button>
@@ -48,13 +48,13 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
           )}
 
           {challenge.exampleUrl && (
-            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/30 p-2">
+            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-border bg-[#f3f3f1] p-2">
               <img
                 src={challenge.exampleUrl}
                 alt="Ejemplo de captura"
                 className="aspect-[4/3] w-full rounded-xl object-cover"
               />
-              <p className="mt-2 px-1 text-center text-[11px] font-semibold uppercase tracking-wide text-white/45">
+              <p className="text-app-muted mt-2 px-1 text-center text-[11px] font-semibold uppercase tracking-wide">
                 Ejemplo de referencia
               </p>
             </div>

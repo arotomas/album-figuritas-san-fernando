@@ -180,7 +180,7 @@ async function loadImageFromFileWithBitmap(file) {
   }
 
   const bitmap = await withTimeout(
-    createImageBitmap(file),
+    createImageBitmap(file, { imageOrientation: 'from-image' }),
     IMAGE_LOAD_TIMEOUT_MS,
     'createImageBitmap',
   )

@@ -6,7 +6,7 @@ export function PhotoUpdatedAnimation({ figure, photoUrl, onComplete }) {
   const rarity = getRarity(figure?.rareza ?? figure?.rarity ?? 'común')
 
   return (
-    <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden bg-zinc-950 px-6 text-center">
+    <div className="bg-app safe-top safe-bottom relative flex h-full flex-col items-center justify-center overflow-hidden px-6 text-center">
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{ background: `radial-gradient(circle at 50% 35%, ${rarity.colors.primary}55, transparent 55%)` }}
@@ -20,7 +20,7 @@ export function PhotoUpdatedAnimation({ figure, photoUrl, onComplete }) {
         className="relative z-10 w-full max-w-xs"
       >
         <div
-          className={`mx-auto overflow-hidden rounded-[1.5rem] border-2 ${rarity.tailwind.border} bg-black/30 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.35)]`}
+          className={`mx-auto overflow-hidden rounded-[1.5rem] border-2 ${rarity.tailwind.border} bg-[#f3f3f1] p-2 shadow-[0_18px_48px_rgba(0,0,0,0.12)]`}
           style={{ boxShadow: `0 18px 48px rgba(0,0,0,0.35), ${rarity.cssGlow}` }}
         >
           {photoUrl ? (
@@ -34,7 +34,7 @@ export function PhotoUpdatedAnimation({ figure, photoUrl, onComplete }) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12, duration: 0.3 }}
-          className={`${typeClasses.display} mt-6 text-2xl text-warm-white`}
+          className={`${typeClasses.display} text-app mt-6 text-2xl`}
         >
           ¡Foto actualizada!
         </m.h1>
