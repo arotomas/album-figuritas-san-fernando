@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import { isQaMode, withQaParam } from '../utils/qaMode'
+import { getPostAuthPath } from '../utils/postAuthRedirect'
 import {
   completeOAuthSession,
   formatAuthErrorMessage,
@@ -161,7 +162,14 @@ export function useAuth() {
           profileCompleted: true,
         })
 
-        navigate(withQaParam('/map', isQaMode(location.search)), { replace: true })
+        navigate(
+          getPostAuthPath({
+            profile,
+            profileCompleted: true,
+            search: location.search,
+          }),
+          { replace: true },
+        )
         return { ok: true }
       } catch (error) {
         authLog.error('profile setup failed', { message: error?.message })

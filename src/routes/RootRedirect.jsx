@@ -1,12 +1,16 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
+import { getPostAuthPathFromStore } from '../utils/postAuthRedirect'
 
-/** Ruta raíz: redirige según sesión Supabase real y perfil completo. */
+/** Ruta raíz: redirige según sesión Supabase real, rol y perfil completo. */
 export function RootRedirect() {
   const authBootstrapped = useAppStore((state) => state.authBootstrapped)
   const supabaseReady = useAppStore((state) => state.supabaseReady)
-  const profileCompleted = useAppStore((state) => state.profileCompleted)
   const location = useLocation()
+  const storeSlice = useAppStore((state) => ({
+    supabaseProfile: state.supabaseProfile,
+    profileCompleted: state.profileCompleted,
+  }))
 
   if (!authBootstrapped) {
     return null
@@ -16,9 +20,6 @@ export function RootRedirect() {
     return <Navigate to={`/login${location.search}`} replace />
   }
 
-  if (!profileCompleted) {
-    return <Navigate to={`/profile-setup${location.search}`} replace />
-  }
-
-  return <Navigate to={`/map${location.search}`} replace />
+  const target = getPostAuthPathFromStore(storeSlice, location.search)
+  return <Navigate to={target} replace />
 }

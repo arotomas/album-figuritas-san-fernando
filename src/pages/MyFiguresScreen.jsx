@@ -44,36 +44,40 @@ function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
     mainProgress.visibleTotal > 0 ? mainProgress.obtained / mainProgress.visibleTotal : 0
 
   return (
-    <div className="album-sticky-bar safe-x shrink-0 px-4 py-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] font-bold tabular-nums text-ink">
-          {mainProgress.obtained}
-          <span className="font-normal text-muted"> / {mainProgress.total}</span>
-        </p>
-        <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted">
-          {STATUS_LABELS[albumStatus] ?? albumStatus}
-        </span>
-      </div>
+    <div className="album-sticky-bar safe-x shrink-0">
+      <div className="px-5 py-3.5 sm:px-6">
+        <div className="mx-auto w-full max-w-[720px]">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] font-bold tabular-nums text-ink">
+              {mainProgress.obtained}
+              <span className="font-normal text-muted"> / {mainProgress.total}</span>
+            </p>
+            <span className="shrink-0 rounded-full bg-black/[0.04] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted">
+              {STATUS_LABELS[albumStatus] ?? albumStatus}
+            </span>
+          </div>
 
-      <div
-        className="mt-1.5 h-1 overflow-hidden rounded-full bg-border/55"
-        role="progressbar"
-        aria-valuenow={mainProgress.obtained}
-        aria-valuemin={0}
-        aria-valuemax={mainProgress.visibleTotal}
-        aria-label={`${mainProgress.obtained} de ${mainProgress.total} figuritas descubiertas`}
-      >
-        <div
-          className="album-progress-fill h-full rounded-full bg-progress transition-[width] duration-500 ease-out"
-          style={{ width: `${Math.min(100, ratio * 100)}%` }}
-        />
-      </div>
+          <div
+            className="mt-2 h-1 overflow-hidden rounded-full bg-border/55"
+            role="progressbar"
+            aria-valuenow={mainProgress.obtained}
+            aria-valuemin={0}
+            aria-valuemax={mainProgress.visibleTotal}
+            aria-label={`${mainProgress.obtained} de ${mainProgress.total} figuritas descubiertas`}
+          >
+            <div
+              className="album-progress-fill h-full rounded-full bg-progress transition-[width] duration-500 ease-out"
+              style={{ width: `${Math.min(100, ratio * 100)}%` }}
+            />
+          </div>
 
-      {missionLine && (
-        <p className="mt-1.5 truncate font-body text-[11px] leading-snug text-muted">
-          {missionLine}
-        </p>
-      )}
+          {missionLine && (
+            <p className="mt-2 font-body text-[11px] leading-snug text-muted">
+              {missionLine}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

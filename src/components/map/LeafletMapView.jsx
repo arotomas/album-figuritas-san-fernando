@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { safeUnmountRoot } from '../../utils/safeReactRoot'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { FaLocationCrosshairs } from 'react-icons/fa6'
@@ -189,7 +190,8 @@ function UserLocationMarker({
     markerRef.current = marker
 
     return () => {
-      rootRef.current?.unmount()
+      safeUnmountRoot(rootRef.current)
+      rootRef.current = null
       marker.remove()
       markerRef.current = null
       renderKeyRef.current = ''
@@ -268,7 +270,7 @@ function FigureMarkersLayer({
     }
 
     markersRef.current.forEach((marker) => marker.remove())
-    rootsRef.current.forEach((root) => root.unmount())
+    rootsRef.current.forEach((root) => safeUnmountRoot(root))
     markersRef.current = []
     rootsRef.current = []
     cacheRef.current = {}
@@ -301,7 +303,7 @@ function FigureMarkersLayer({
 
     return () => {
       markersRef.current.forEach((marker) => marker.remove())
-      rootsRef.current.forEach((root) => root.unmount())
+      rootsRef.current.forEach((root) => safeUnmountRoot(root))
       markersRef.current = []
       rootsRef.current = []
     }

@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
+import { useAdminHistoryGuard } from '../hooks/useAdminHistoryGuard'
 import { hasMinimumRole } from '../utils/roles'
 
 const NAV_ITEMS = [
@@ -29,6 +30,7 @@ function navLinkClass({ isActive }) {
 }
 
 export function AdminLayout() {
+  useAdminHistoryGuard()
   const location = useLocation()
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)
   const pageTitle = PAGE_TITLES[location.pathname] ?? 'Administración'

@@ -6,7 +6,7 @@ import { pullRemoteAlbum } from '../services/supabase/sync'
 import { fetchPublicFigures } from '../services/supabase/figures'
 import { publishAuthSuccessSnapshot } from '../services/supabase/auth'
 import { isProfileComplete } from '../utils/profileValidation'
-import { isQaMode, withQaParam } from '../utils/qaMode'
+import { getPostAuthPath } from '../utils/postAuthRedirect'
 
 export function useAuthNavigation() {
   const navigate = useNavigate()
@@ -50,9 +50,11 @@ export function useAuthNavigation() {
         email: user?.email ?? profile?.email ?? null,
       })
 
-      const nextPath = completed
-        ? withQaParam('/map', isQaMode(location.search))
-        : withQaParam('/profile-setup', isQaMode(location.search))
+      const nextPath = getPostAuthPath({
+        profile,
+        profileCompleted: completed,
+        search: location.search,
+      })
 
       navigate(nextPath, { replace: true })
       return { completed, profile }
