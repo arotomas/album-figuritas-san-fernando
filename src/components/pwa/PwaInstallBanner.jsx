@@ -55,7 +55,7 @@ export function PwaInstallBanner() {
 
   return (
     <div
-      className={`safe-x relative z-30 shrink-0 border-b px-4 py-3 ${
+      className={`safe-x relative z-30 shrink-0 border-b px-5 py-3.5 ${
         isInAppBrowser
           ? 'border-amber-300/50 bg-amber-50'
           : 'border-progress/25 bg-[#f4f9eb]'
@@ -63,40 +63,39 @@ export function PwaInstallBanner() {
       role="region"
       aria-label="Instalar aplicación"
     >
-      <div className="mx-auto flex max-w-lg items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-bold text-ink">{title}</p>
-          <div className="mt-2">
-            <InstallAppInstructions
-              compact
-              isIos={isIos}
-              isSafari={isSafari}
-              isInAppBrowser={isInAppBrowser}
-            />
-          </div>
-          {!isIos && canPromptInstall && (
-            <Button className="mt-3 w-full sm:w-auto" onClick={handleInstall}>
-              Instalar ahora
-            </Button>
-          )}
-          <p className="mt-2 text-[11px] text-muted">
-            También en{' '}
-            <Link to="/options" className="font-semibold text-ink underline-offset-2 hover:underline">
-              Opciones
-            </Link>
-            .
-          </p>
+      {!isInAppBrowser && (
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="absolute right-4 top-3.5 flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-white/80 text-muted"
+          aria-label="Cerrar"
+        >
+          <FaXmark size={14} aria-hidden />
+        </button>
+      )}
+      <div className="mx-auto w-full max-w-lg px-8 text-center">
+        <p className="font-display text-sm font-bold text-ink">{title}</p>
+        <div className="mt-2">
+          <InstallAppInstructions
+            compact
+            centered
+            isIos={isIos}
+            isSafari={isSafari}
+            isInAppBrowser={isInAppBrowser}
+          />
         </div>
-        {!isInAppBrowser && (
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/80 bg-white/80 text-muted"
-            aria-label="Cerrar"
-          >
-            <FaXmark size={14} aria-hidden />
-          </button>
+        {!isIos && canPromptInstall && (
+          <Button className="mx-auto mt-3 w-full max-w-xs" onClick={handleInstall}>
+            Instalar ahora
+          </Button>
         )}
+        <p className="mt-2 text-[11px] text-muted">
+          También en{' '}
+          <Link to="/options" className="font-semibold text-ink underline-offset-2 hover:underline">
+            Opciones
+          </Link>
+          .
+        </p>
       </div>
     </div>
   )
