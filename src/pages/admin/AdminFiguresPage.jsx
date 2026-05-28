@@ -12,7 +12,6 @@ import {
 import { getEventsAdmin } from '../../services/supabase/events'
 import { getEventSelectOptions } from '../../components/admin/adminEventsShared'
 import {
-  MARKER_ICON_MAX_BYTES,
   MARKER_ICON_MIME_TYPES,
   uploadMarkerIcon,
 } from '../../services/supabase/storage'
@@ -190,10 +189,6 @@ export function AdminFiguresPage() {
 
     if (!MARKER_ICON_MIME_TYPES.includes(file.type)) {
       setFigureFormError('El marcador debe ser PNG, JPG/JPEG, WebP o SVG.')
-      return
-    }
-    if (file.size > MARKER_ICON_MAX_BYTES) {
-      setFigureFormError('El ícono no puede superar los 200 KB.')
       return
     }
 
@@ -826,7 +821,9 @@ export function AdminFiguresPage() {
                         />
                       </label>
                       <p className="mt-2 text-xs leading-5 text-muted">
-                        Recomendado: 256x256 px, máximo 200 KB. Acepta PNG, JPG/JPEG, WebP y SVG.
+                        Acepta PNG, JPG/JPEG, WebP y SVG. Si subís una imagen rectangular (ej. 9:16),
+                        se recorta al centro y se optimiza automáticamente a 256x256 para usarla
+                        como marcador.
                       </p>
                       {markerIconUploading && (
                         <p className="mt-2 text-xs font-bold text-progress">Subiendo ícono…</p>

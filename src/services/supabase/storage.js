@@ -14,6 +14,7 @@ export const MARKER_ICON_MIME_TYPES = [
   'image/jpeg',
   'image/jpg',
 ]
+export const MARKER_ICON_TARGET_PX = 256
 
 /** Límite del bucket en Supabase (migration 001). */
 export const STORAGE_BUCKET_MAX_BYTES = 524_288
@@ -78,6 +79,116 @@ export function validateMarkerIconFile(file) {
     }
   }
   return { ok: true, size: file.size, type: file.type }
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('INVALID_IMAGE_FILE'))
+    }
+    image.src = objectUrl
+  })
+}
+
+async function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('ICON_ENCODE_FAILED'))
+          return
+        }
+        resolve(blob)
+      },
+      type,
+      quality,
+    )
+  })
+}
+
+/**
+ * Normaliza imágenes de marcador:
+ * - recorte centrado cuadrado
+ * - resize a 256x256
+ * - compresión automática hasta <= 200 KB
+ */
+export async function optimizeMarkerIconFile(file) {
+  if (!file) return { ok: false, reason: 'NOT_A_FILE' }
+  if (file.type === 'image/svg+xml') {
+    return { ok: true, file, transformed: false }
+  }
+
+  const image = await loadImageFromFile(file)
+  const sourceSize = Math.min(image.naturalWidth, image.naturalHeight)
+  if (!sourceSize || sourceSize <= 0) {
+    return { ok: false, reason: 'INVALID_IMAGE_DIMENSIONS' }
+  }
+
+  const sourceX = Math.floor((image.naturalWidth - sourceSize) / 2)
+  const sourceY = Math.floor((image.naturalHeight - sourceSize) / 2)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = MARKER_ICON_TARGET_PX
+  canvas.height = MARKER_ICON_TARGET_PX
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { ok: false, reason: 'CANVAS_UNAVAILABLE' }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    MARKER_ICON_TARGET_PX,
+    MARKER_ICON_TARGET_PX,
+  )
+
+  const baseName = String(file.name || 'marker-icon')
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+
+  let encoded = await canvasToBlob(canvas, 'image/webp', 0.9)
+  let quality = 0.9
+  while (encoded.size > MARKER_ICON_MAX_BYTES && quality > 0.45) {
+    quality -= 0.1
+    encoded = await canvasToBlob(canvas, 'image/webp', quality)
+  }
+
+  if (encoded.size > MARKER_ICON_MAX_BYTES) {
+    encoded = await canvasToBlob(canvas, 'image/jpeg', 0.82)
+    quality = 0.82
+    while (encoded.size > MARKER_ICON_MAX_BYTES && quality > 0.45) {
+      quality -= 0.08
+      encoded = await canvasToBlob(canvas, 'image/jpeg', quality)
+    }
+  }
+
+  const optimizedFile = new File(
+    [encoded],
+    `${baseName}.${encoded.type === 'image/jpeg' ? 'jpg' : 'webp'}`,
+    {
+      type: encoded.type,
+      lastModified: Date.now(),
+    },
+  )
+
+  return {
+    ok: true,
+    file: optimizedFile,
+    transformed: true,
+    sourceWidth: image.naturalWidth,
+    sourceHeight: image.naturalHeight,
+  }
 }
 
 export function dataUrlToBlob(dataUrl) {
@@ -198,8 +309,13 @@ export async function testStorageUpload() {
 }
 
 export async function uploadMarkerIcon({ figureId, file }) {
-  const validation = validateMarkerIconFile(file)
-  const path = buildMarkerIconStoragePath(figureId, file?.name)
+  const optimization = await optimizeMarkerIconFile(file)
+  if (!optimization.ok) {
+    return { ok: false, ...optimization }
+  }
+  const iconFile = optimization.file
+  const validation = validateMarkerIconFile(iconFile)
+  const path = buildMarkerIconStoragePath(figureId, iconFile?.name)
 
   if (!validation.ok) {
     console.error('[admin-icons]', 'upload error', {
@@ -213,12 +329,13 @@ export async function uploadMarkerIcon({ figureId, file }) {
   console.info('[admin-icons]', 'upload start', {
     bucket: MARKER_ICONS_BUCKET,
     path,
-    size: file.size,
-    type: file.type,
+    size: iconFile.size,
+    type: iconFile.type,
+    transformed: optimization.transformed,
   })
 
-  const { data, error } = await supabase.storage.from(MARKER_ICONS_BUCKET).upload(path, file, {
-    contentType: file.type,
+  const { data, error } = await supabase.storage.from(MARKER_ICONS_BUCKET).upload(path, iconFile, {
+    contentType: iconFile.type,
     upsert: true,
     cacheControl: '31536000',
   })
