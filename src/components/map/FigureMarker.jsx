@@ -3,7 +3,14 @@ import { getRarity } from '../../theme/rarity'
 import { RarityBadge } from '../ui/RarityBadge'
 import { prefersReducedMotion } from '../../utils/performance'
 
-function FigureMarkerInner({ figure, isNear, isPulsing, isActiveTarget = false, isDimmed = false }) {
+function FigureMarkerInner({
+  figure,
+  isNear,
+  isPulsing,
+  isActiveTarget = false,
+  isDimmed = false,
+  counterBearing = null,
+}) {
   const isQaTest = Boolean(figure.isQaTest)
   const rarity = getRarity(figure.rareza)
   const obtained = figure.obtenida
@@ -38,8 +45,16 @@ function FigureMarkerInner({ figure, isNear, isPulsing, isActiveTarget = false, 
 
   return (
     <div
-      className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass} ${activeClass} ${dimClass}`}
+      className="transition-transform duration-[640ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+      style={
+        counterBearing != null && Number.isFinite(counterBearing)
+          ? { transform: `rotate(${counterBearing}deg)` }
+          : undefined
+      }
     >
+      <div
+        className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass} ${activeClass} ${dimClass}`}
+      >
       {isActiveTarget && !obtained && !reduced && (
         <span
           className="figure-active-halo absolute top-1/2 h-[4.5rem] w-[4.5rem] -translate-y-1/2 rounded-full"
@@ -107,6 +122,7 @@ function FigureMarkerInner({ figure, isNear, isPulsing, isActiveTarget = false, 
         className="mt-0.5 h-0 w-0 border-x-[6px] border-t-[8px] border-x-transparent"
         style={{ borderTopColor: pointerColor }}
       />
+      </div>
     </div>
   )
 }

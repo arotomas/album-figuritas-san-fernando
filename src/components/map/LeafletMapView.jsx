@@ -244,6 +244,8 @@ function FigureMarkersLayer({
   figuresSignature,
   nearFigureIdsKey = '',
   activeTargetFigureId = null,
+  cinematicBearing = null,
+  cinematicActive = false,
   onFigureClick,
 }) {
   const map = useMap()
@@ -316,7 +318,12 @@ function FigureMarkersLayer({
       const isDimmed = Boolean(activeTargetFigureId) && !isActiveTarget && !figure.obtenida
       const isNear = nearIds.has(String(figure.id)) || isActiveTarget
       const isPulsing = isNear && !isActiveTarget
-      const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}-${isActiveTarget}-${isDimmed}`
+      const markerBearing = cinematicActive ? cinematicBearing : null
+      const counterBearingBucket =
+        markerBearing != null && Number.isFinite(markerBearing)
+          ? Math.round(markerBearing * 2) / 2
+          : null
+      const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}-${isActiveTarget}-${isDimmed}-${counterBearingBucket ?? 'na'}`
 
       if (cacheRef.current[figure.id] === cacheKey) return
       cacheRef.current[figure.id] = cacheKey
@@ -328,10 +335,11 @@ function FigureMarkersLayer({
           isPulsing={isPulsing}
           isActiveTarget={isActiveTarget}
           isDimmed={isDimmed}
+          counterBearing={markerBearing}
         />,
       )
     })
-  }, [activeTargetFigureId, figures, nearIds, nearFigureIdsKey])
+  }, [activeTargetFigureId, cinematicActive, cinematicBearing, figures, nearIds, nearFigureIdsKey])
 
   return null
 }
@@ -703,6 +711,8 @@ function LeafletMapViewInner({
             figuresSignature={markerFiguresSignature}
             nearFigureIdsKey={nearFigureIdsKey}
             activeTargetFigureId={activeTargetFigureId}
+            cinematicBearing={cinematicBearing}
+            cinematicActive={cinematicModeActive}
             onFigureClick={handleFigureClick}
           />
           {mapPosition && (
