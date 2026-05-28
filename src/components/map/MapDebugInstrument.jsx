@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useMap } from 'react-leaflet'
 import { isMapDebugLoggingEnabled } from '../../config/mapDebug'
 import { mapDebugLog } from '../../utils/mapDebugLog'
+import { mapDebugSession } from '../../utils/mapDebugSession'
 
 /** Parchea métodos Leaflet para loguear flyTo / panTo / invalidateSize (solo diagnóstico). */
 export function MapDebugInstrument() {
@@ -52,6 +53,7 @@ export function MapDebugInstrument() {
       mapDebugLog('invalidateSize', 'map.invalidateSize', {
         animate: options?.animate,
         pan: options?.pan,
+        duringGesture: mapDebugSession.gestureActive,
         stack: new Error().stack?.split('\n').slice(1, 4).join(' | '),
       })
       return originals.invalidateSize(options)

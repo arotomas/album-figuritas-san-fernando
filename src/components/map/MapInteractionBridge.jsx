@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
 import { mapDebugLog } from '../../utils/mapDebugLog'
+import { setMapDebugGesturePhase } from '../../utils/mapDebugSession'
 
 /**
  * Pausa el pan automático y/o la rotación cinematográfica tras gestos manuales en el mapa.
@@ -35,8 +36,9 @@ export function MapInteractionBridge({
       }
     }
 
-    const markGestureActive = () => {
+    const markGestureActive = (phase = 'move') => {
       if (mapGestureActiveRef) mapGestureActiveRef.current = true
+      setMapDebugGesturePhase(phase)
       clearGestureEndTimer()
     }
 
@@ -45,6 +47,8 @@ export function MapInteractionBridge({
       gestureEndTimerRef.current = setTimeout(() => {
         gestureEndTimerRef.current = null
         if (mapGestureActiveRef) mapGestureActiveRef.current = false
+        setMapDebugGesturePhase('idle')
+        mapDebugLog('gesture', 'gesture idle')
       }, gestureEndHoldMs)
     }
 
@@ -81,27 +85,35 @@ export function MapInteractionBridge({
       scheduleResume()
     }
 
-    const onZoomStart = (event) => {
-      if (event?.originalEvent) pause({ fromUser: true })
-    }
-
     const onMoveStart = (event) => {
       if (event?.originalEvent || map.dragging?.moved?.()) {
+        markGestureActive('drag')
         pause({ fromUser: true })
       }
     }
 
     const container = map.getContainer()
     const onPinchTouchStart = (event) => {
-      if (event.touches?.length >= 2) pause({ fromUser: true })
+      if (event.touches?.length >= 2) {
+        markGestureActive('pinch')
+        pause({ fromUser: true })
+      }
     }
 
     const onDragStart = () => {
+      markGestureActive('drag')
       pause({ fromUser: true })
     }
 
     const onGestureStart = () => {
-      markGestureActive()
+      markGestureActive('move')
+    }
+
+    const onZoomStart = (event) => {
+      if (event?.originalEvent) {
+        markGestureActive('zoom')
+        pause({ fromUser: true })
+      }
     }
 
     map.on('dragstart', onDragStart)

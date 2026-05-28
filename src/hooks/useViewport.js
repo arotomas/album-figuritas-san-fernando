@@ -42,9 +42,11 @@ function isStandaloneMode() {
 
 let lastViewportHeight = 0
 let lastViewportOffsetTop = 0
+let viewportVarsInitialized = false
 
 function applyViewportVars() {
-  if (isMapDebugFlagEnabled(MAP_DEBUG_FLAG.VIEWPORT_SYNC)) {
+  const viewportSyncDisabled = isMapDebugFlagEnabled(MAP_DEBUG_FLAG.VIEWPORT_SYNC)
+  if (viewportSyncDisabled && viewportVarsInitialized) {
     mapDebugLog('viewport', 'applyViewportVars skipped (MAP_DEBUG_DISABLE_VIEWPORT_SYNC)')
     return
   }
@@ -83,6 +85,7 @@ function applyViewportVars() {
   root.classList.toggle('keyboard-open', keyboardOpen)
   root.classList.toggle('standalone', standalone)
 
+  viewportVarsInitialized = true
   window.dispatchEvent(new CustomEvent('viewport-update'))
 }
 

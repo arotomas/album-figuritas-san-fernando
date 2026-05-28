@@ -49,6 +49,32 @@ const URL_TOKEN_TO_FLAG = {
   disable_marker_animations: MAP_DEBUG_FLAG.MARKER_ANIMATIONS,
   markers: MAP_DEBUG_FLAG.MARKER_ANIMATIONS,
   marker_animations: MAP_DEBUG_FLAG.MARKER_ANIMATIONS,
+  bisect_only_resize: '__bisect_only_resize__',
+  bisect_only_viewport: '__bisect_only_viewport__',
+  bisect_only_auto_follow: '__bisect_only_auto_follow__',
+  bisect_only_bearing: '__bisect_only_bearing__',
+  bisect_only_rotation: '__bisect_only_rotation__',
+  bisect_only_gpu: '__bisect_only_gpu__',
+  bisect_only_transitions: '__bisect_only_transitions__',
+  bisect_only_marker_animations: '__bisect_only_marker_animations__',
+}
+
+/** Una sola capa ON; el resto OFF (para bisect). */
+function bisectOnlyEnable(disableFlagToAllow) {
+  return Object.fromEntries(
+    ALL_FLAGS.map((key) => [key, key !== disableFlagToAllow]),
+  )
+}
+
+const BISECT_PRESETS = {
+  __bisect_only_resize__: bisectOnlyEnable(MAP_DEBUG_FLAG.RESIZE_OBSERVER),
+  __bisect_only_viewport__: bisectOnlyEnable(MAP_DEBUG_FLAG.VIEWPORT_SYNC),
+  __bisect_only_auto_follow__: bisectOnlyEnable(MAP_DEBUG_FLAG.AUTO_FOLLOW),
+  __bisect_only_bearing__: bisectOnlyEnable(MAP_DEBUG_FLAG.BEARING),
+  __bisect_only_rotation__: bisectOnlyEnable(MAP_DEBUG_FLAG.ROTATION),
+  __bisect_only_gpu__: bisectOnlyEnable(MAP_DEBUG_FLAG.GPU),
+  __bisect_only_transitions__: bisectOnlyEnable(MAP_DEBUG_FLAG.TRANSITIONS),
+  __bisect_only_marker_animations__: bisectOnlyEnable(MAP_DEBUG_FLAG.MARKER_ANIMATIONS),
 }
 
 const STORAGE_KEY = 'map_debug_flags'
@@ -100,6 +126,10 @@ function parseUrlFlagTokens() {
     const mapped = URL_TOKEN_TO_FLAG[token]
     if (mapped === '__preset_leaflet_pure__') {
       Object.assign(next, LEAFLET_PURE_FLAGS)
+      continue
+    }
+    if (BISECT_PRESETS[mapped]) {
+      Object.assign(next, BISECT_PRESETS[mapped])
       continue
     }
     if (mapped) next[mapped] = true
@@ -189,6 +219,28 @@ export function getActiveMapDebugFlagLabels() {
   )
 }
 
+/** Capas que siguen activas aunque leaflet-pure esté ON (no tienen flag). */
+export function getLeafletPureResidualLayers() {
+  return [
+    'Leaflet MapContainer + TileLayer (OSM)',
+    'FigureMarkersLayer (divIcon + createRoot) — sin animaciones si flags ON',
+    'UserLocationMarker + UserLocationDot (transiciones CSS propias, sin flag)',
+    'ExplorationController flyTo/fitBounds si modo exploración activo',
+    'handleRecenter / fitBounds misión (acción explícita usuario)',
+    'MapInteractionBridge (pausa follow; no mueve cámara)',
+    'preferCanvas en MapContainer',
+    'GPS hooks (datos; no mueven mapa si AUTO_FOLLOW off)',
+    'Overlays UI (GPS banner, NearFigureOverlay, botón recentrar gpu-layer)',
+  ]
+}
+
+export function auditLeafletPureConfig() {
+  const flags = getMapDebugFlags()
+  const disabled = ALL_FLAGS.filter((k) => flags[k])
+  const enabled = ALL_FLAGS.filter((k) => !flags[k])
+  return { flags, disabled, enabled, residual: getLeafletPureResidualLayers() }
+}
+
 if (typeof window !== 'undefined') {
   window.__mapDebug = {
     flags: MAP_DEBUG_FLAG,
@@ -202,6 +254,18 @@ if (typeof window !== 'undefined') {
       window.location.reload()
     },
     active: getActiveMapDebugFlagLabels,
+    audit: auditLeafletPureConfig,
+    sessionReport: () => {
+      if (typeof window.__mapDebugFormatSession === 'function') {
+        return window.__mapDebugFormatSession()
+      }
+      return 'Import mapDebugSession.formatMapDebugSessionReport on window first'
+    },
+    resetSession: () => {
+      if (typeof window.__mapDebugResetSession === 'function') {
+        window.__mapDebugResetSession()
+      }
+    },
   }
 
   if (isMapDebugActive()) {
