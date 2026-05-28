@@ -16,7 +16,12 @@ function FigureTargetPromptInner({ figure, onConfirm, onDismiss }) {
           </p>
         </div>
         <div className="flex gap-2 p-4">
-          <PremiumButton variant="ghost" size="md" className="flex-1" onClick={onDismiss}>
+          <PremiumButton
+            variant="ghost"
+            size="md"
+            className="flex-1 border border-white/25 bg-white/10 text-white hover:bg-white/20"
+            onClick={onDismiss}
+          >
             Cancelar
           </PremiumButton>
           <PremiumButton variant="lime" size="md" className="flex-1" onClick={onConfirm}>
