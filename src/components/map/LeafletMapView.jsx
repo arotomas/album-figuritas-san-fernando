@@ -54,9 +54,20 @@ import 'leaflet/dist/leaflet.css'
 function MapResizeHandler() {
   const map = useMap()
   const frameRef = useRef(null)
+  const lastSizeRef = useRef({ w: 0, h: 0 })
 
   useEffect(() => {
-    const invalidate = () => {
+    const container = map.getContainer()
+    const observeTarget = container.parentElement ?? container
+
+    const invalidateIfLayoutChanged = () => {
+      const w = observeTarget.clientWidth
+      const h = observeTarget.clientHeight
+      if (w <= 0 || h <= 0) return
+      const last = lastSizeRef.current
+      if (last.w === w && last.h === h) return
+      lastSizeRef.current = { w, h }
+
       if (frameRef.current != null) return
       frameRef.current = requestAnimationFrame(() => {
         frameRef.current = null
@@ -64,29 +75,32 @@ function MapResizeHandler() {
       })
     }
 
-    invalidate()
-    const timer = setTimeout(invalidate, 120)
+    lastSizeRef.current = {
+      w: observeTarget.clientWidth,
+      h: observeTarget.clientHeight,
+    }
+    invalidateIfLayoutChanged()
+    const timer = setTimeout(invalidateIfLayoutChanged, 120)
 
-    const container = map.getContainer()
-    const observeTarget = container.parentElement ?? container
     const resizeObserver =
       typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(() => invalidate())
+        ? new ResizeObserver(() => invalidateIfLayoutChanged())
         : null
     resizeObserver?.observe(observeTarget)
     if (observeTarget !== container) resizeObserver?.observe(container)
 
-    window.visualViewport?.addEventListener('resize', invalidate)
-    window.addEventListener('viewport-update', invalidate)
-    window.addEventListener('orientationchange', invalidate)
+    const onWindowResize = () => invalidateIfLayoutChanged()
+    window.addEventListener('resize', onWindowResize)
+    window.addEventListener('viewport-update', onWindowResize)
+    window.addEventListener('orientationchange', onWindowResize)
 
     return () => {
       clearTimeout(timer)
       if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
       resizeObserver?.disconnect()
-      window.visualViewport?.removeEventListener('resize', invalidate)
-      window.removeEventListener('viewport-update', invalidate)
-      window.removeEventListener('orientationchange', invalidate)
+      window.removeEventListener('resize', onWindowResize)
+      window.removeEventListener('viewport-update', onWindowResize)
+      window.removeEventListener('orientationchange', onWindowResize)
     }
   }, [map])
 
@@ -110,6 +124,7 @@ function MapFlyController({
   recenterTick = 0,
   missionFollow = false,
   followPaused = false,
+  followPausedRef,
 }) {
   const map = useMap()
   const lastCenteredRef = useRef(null)
@@ -138,7 +153,8 @@ function MapFlyController({
 
     if (manualRecenter) prevRecenterTickRef.current = recenterTick
 
-    if (followPaused && !manualRecenter) return
+    const followLocked = followPaused || followPausedRef?.current
+    if (followLocked && !manualRecenter) return
 
     const moved =
       prev &&
@@ -172,7 +188,7 @@ function MapFlyController({
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : missionFollow ? 1.05 : 0.55,
     })
-  }, [followPaused, map, missionFollow, moveThreshold, position, reducedMotion, zoom, recenterTick])
+  }, [followPaused, followPausedRef, map, missionFollow, moveThreshold, position, reducedMotion, zoom, recenterTick])
 
   return null
 }
@@ -371,6 +387,7 @@ function LeafletMapViewInner({
   onBonusDiscovered,
 }) {
   const mapRef = useRef(null)
+  const mapFollowPausedRef = useRef(false)
   const [mapInstanceKey] = useState(() => Date.now())
   const [recenterTick, setRecenterTick] = useState(0)
   const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
@@ -465,6 +482,7 @@ function LeafletMapViewInner({
   }, [clearActiveTargetFigure])
 
   const handleFollowPausedChange = useCallback((paused) => {
+    mapFollowPausedRef.current = paused
     setMissionFollowPaused(paused)
   }, [])
 
@@ -557,7 +575,9 @@ function LeafletMapViewInner({
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return
 
+    mapFollowPausedRef.current = false
     setMissionFollowPaused(false)
+    setMapRotationPaused(false)
     mapRef.current.flyTo([mapPosition.lat, mapPosition.lng], USER_ZOOM, {
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : 0.7,
@@ -713,6 +733,7 @@ function LeafletMapViewInner({
             recenterTick={recenterTick}
             missionFollow={Boolean(activeTargetFigureId)}
             followPaused={missionFollowPaused}
+            followPausedRef={mapFollowPausedRef}
           />
           <MapInteractionBridge
             autoResumeFollow={Boolean(activeTargetFigureId)}

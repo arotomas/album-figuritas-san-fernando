@@ -16,17 +16,25 @@ export function MapInteractionBridge({
   const resumeTimerRef = useRef(null)
 
   useEffect(() => {
+    const clearResumeTimer = () => {
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current)
+        resumeTimerRef.current = null
+      }
+    }
+
     const scheduleResume = () => {
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
+      if (!autoResumeFollow) return
+      clearResumeTimer()
       resumeTimerRef.current = setTimeout(() => {
+        resumeTimerRef.current = null
         onRotationPausedChange?.(false)
-        if (autoResumeFollow) {
-          onFollowPausedChange?.(false)
-        }
+        onFollowPausedChange?.(false)
       }, rotationPauseResumeMs)
     }
 
     const pause = () => {
+      clearResumeTimer()
       onRotationPausedChange?.(true)
       onFollowPausedChange?.(true)
       scheduleResume()
@@ -36,13 +44,26 @@ export function MapInteractionBridge({
       if (event?.originalEvent) pause()
     }
 
+    const onMoveStart = () => {
+      if (map.dragging?.moved?.()) pause()
+    }
+
+    const container = map.getContainer()
+    const onPinchTouchStart = (event) => {
+      if (event.touches?.length >= 2) pause()
+    }
+
     map.on('dragstart', pause)
+    map.on('movestart', onMoveStart)
     map.on('zoomstart', onZoomStart)
+    container.addEventListener('touchstart', onPinchTouchStart, { passive: true })
 
     return () => {
       map.off('dragstart', pause)
+      map.off('movestart', onMoveStart)
       map.off('zoomstart', onZoomStart)
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
+      container.removeEventListener('touchstart', onPinchTouchStart)
+      clearResumeTimer()
     }
   }, [autoResumeFollow, map, onFollowPausedChange, onRotationPausedChange, rotationPauseResumeMs])
 
