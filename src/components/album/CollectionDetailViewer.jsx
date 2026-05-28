@@ -52,8 +52,13 @@ function CollectionFigureTile({ figure, isNew, onSelect }) {
           )}
         </div>
         <p className="mt-2 line-clamp-2 font-display text-sm font-black text-warm-white">
-          {obtained ? figure.nombre : 'Por descubrir'}
+          {figure.nombre}
         </p>
+        {!obtained && (
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-white/45">
+            Sin capturar
+          </p>
+        )}
       </div>
     </m.button>
   )

@@ -159,11 +159,11 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
         <>
           <LockedFigureCard figure={figure} variant="thumb" className="rounded-none" />
           <div className="bg-charcoal px-3 pb-3 pt-2">
-            <p className="font-display text-sm font-black text-white/75">????</p>
+            <p className="line-clamp-2 font-display text-sm font-black leading-tight text-white/90">
+              {figure.nombre}
+            </p>
             <p className="mt-1 text-[10px] leading-4 text-white/45">
-              {isBonus
-                ? 'Se revela cuando algo especial esté cerca.'
-                : 'Se revela al completar más figuritas.'}
+              {isBonus ? 'Bonus · sin capturar' : 'Sin capturar'}
             </p>
             <div className="mt-2 opacity-75">
               <RarityBadge rareza={figure.rareza} size="sm" />

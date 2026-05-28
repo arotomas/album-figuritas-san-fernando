@@ -105,7 +105,7 @@ export function FigureDetailSheet({
                       {obtained ? 'Figurita obtenida' : 'Figurita bloqueada'}
                     </p>
                     <h2 className={`${typeClasses.headline} mt-1 text-xl text-warm-white`}>
-                      {obtained ? figure.nombre : '????'}
+                      {figure.nombre}
                     </h2>
                   </div>
                   <RarityBadge rareza={figure.rareza} size="sm" />
