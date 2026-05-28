@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { getRarity } from '../../theme/rarity'
 import { RarityBadge } from '../ui/RarityBadge'
 import { prefersReducedMotion } from '../../utils/performance'
+import { isMapDebugFlagEnabled, MAP_DEBUG_FLAG } from '../../config/mapDebug'
 
 function FigureMarkerInner({
   figure,
@@ -45,11 +46,13 @@ function FigureMarkerInner({
 
   const hasBearing =
     counterBearing != null && Number.isFinite(counterBearing)
+  const disableTransitions =
+    isMapDebugFlagEnabled(MAP_DEBUG_FLAG.TRANSITIONS) || disableMarkerAnim
 
   return (
     <div
       className={
-        hasBearing
+        hasBearing && !disableTransitions
           ? 'transition-transform duration-[640ms] ease-[cubic-bezier(0.22,1,0.36,1)]'
           : undefined
       }

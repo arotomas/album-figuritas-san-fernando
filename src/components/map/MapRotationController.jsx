@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MAP_ROTATION_CSS_MS } from '../../config/mapRotation'
 import { prefersReducedMotion } from '../../utils/performance'
+import { mapDebugLog } from '../../utils/mapDebugLog'
 
 /**
  * Rota el pane del mapa alrededor del usuario (CSS transform, GPU).
@@ -11,6 +12,7 @@ export function MapRotationController({ position, bearing, enabled }) {
   const map = useMap()
   const paneRef = useRef(null)
   const lastBearingRef = useRef(null)
+  const lastLoggedBearingRef = useRef(null)
 
   useEffect(() => {
     const pane = map.getPane('mapPane')
@@ -43,6 +45,14 @@ export function MapRotationController({ position, bearing, enabled }) {
     pane.style.transformOrigin = `${center.x}px ${center.y}px`
     pane.style.transform = `rotate(${-bearing}deg)`
     lastBearingRef.current = bearing
+
+    if (lastLoggedBearingRef.current !== bearing) {
+      lastLoggedBearingRef.current = bearing
+      mapDebugLog('rotation', 'mapPane transform', {
+        bearing,
+        origin: { x: center.x, y: center.y },
+      })
+    }
   }, [bearing, enabled, map, position?.lat, position?.lng])
 
   useEffect(() => {

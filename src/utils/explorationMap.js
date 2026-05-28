@@ -6,6 +6,7 @@ import {
   EXPLORATION_MAX_ZOOM_NEAR,
 } from '../config/exploration'
 import { formatDistance, getDistanceMeters } from './geo'
+import { mapDebugLog } from './mapDebugLog'
 
 export function measureExplorationDistanceMeters(user, target) {
   if (!user?.lat || !user?.lng || !target?.lat || !target?.lng) return null
@@ -57,6 +58,7 @@ export function fitBoundsBetweenUserAndTarget(
     [target.lat, target.lng],
   ]
 
+  mapDebugLog('flyTo', 'exploration flyToBounds', { maxZoom, distanceM })
   map.flyToBounds(bounds, {
     padding: EXPLORATION_BOUNDS_PADDING,
     maxZoom,
@@ -69,6 +71,7 @@ export function fitBoundsBetweenUserAndTarget(
 export function flyToExplorationTarget(map, target, { reducedMotion = false } = {}) {
   if (!map || !target?.lat || !target?.lng) return
 
+  mapDebugLog('flyTo', 'exploration flyTo target', { target })
   map.flyTo([target.lat, target.lng], EXPLORATION_MAX_ZOOM, {
     duration: reducedMotion ? 0 : EXPLORATION_FLY_DURATION_S,
     easeLinearity: 0.24,

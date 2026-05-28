@@ -52,6 +52,14 @@ import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
+import {
+  isMapDebugFlagEnabled,
+  isMapDebugLoggingEnabled,
+  MAP_DEBUG_FLAG,
+} from '../../config/mapDebug'
+import { mapDebugLog } from '../../utils/mapDebugLog'
+import { MapDebugInstrument } from './MapDebugInstrument'
+import { MapDebugStatusBanner } from './MapDebugStatusBanner'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -62,13 +70,19 @@ function MapResizeHandler({ mapGestureActiveRef }) {
   const lastSizeRef = useRef({ w: 0, h: 0 })
 
   useEffect(() => {
+    if (isMapDebugFlagEnabled(MAP_DEBUG_FLAG.RESIZE_OBSERVER)) {
+      mapDebugLog('resize', 'MapResizeHandler skipped (MAP_DEBUG_DISABLE_RESIZE_OBSERVER)')
+      return undefined
+    }
+
     const container = map.getContainer()
     const observeTarget = container.parentElement ?? container
 
-    const runInvalidate = () => {
+    const runInvalidate = (reason) => {
       if (frameRef.current != null) return
       frameRef.current = requestAnimationFrame(() => {
         frameRef.current = null
+        mapDebugLog('invalidateSize', 'MapResizeHandler → invalidateSize', { reason })
         map.invalidateSize({ animate: false })
       })
     }
@@ -98,7 +112,7 @@ function MapResizeHandler({ mapGestureActiveRef }) {
 
       pendingRef.current = false
       lastSizeRef.current = { w, h }
-      runInvalidate()
+      runInvalidate(force ? 'flush-after-gesture' : 'layout-changed')
     }
 
     const flushPendingInvalidate = () => {
@@ -182,6 +196,8 @@ function MapFlyController({
   }, [map])
 
   useEffect(() => {
+    if (isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW)) return
+
     if (!position) return
 
     const { lat, lng, accuracy } = position
@@ -197,7 +213,16 @@ function MapFlyController({
       followPausedRef?.current ||
       mapGestureActiveRef?.current ||
       (userControlledRef?.current && !manualRecenter)
-    if (followLocked && !manualRecenter) return
+    if (followLocked && !manualRecenter) {
+      mapDebugLog('autoFollow', 'skipped (locked)', {
+        explorationActive,
+        followPaused,
+        followPausedRef: followPausedRef?.current,
+        mapGesture: mapGestureActiveRef?.current,
+        userControlled: userControlledRef?.current,
+      })
+      return
+    }
 
     // Sin misión activa: solo centrar al primer fix o al botón recentrar.
     if (!missionFollow && !isFirst && !manualRecenter) return
@@ -222,6 +247,14 @@ function MapFlyController({
 
     if (isFirst || manualRecenter) {
       panningRef.current = true
+      mapDebugLog('autoFollow', 'flyTo', {
+        lat,
+        lng,
+        zoom,
+        isFirst,
+        manualRecenter,
+        missionFollow,
+      })
       map.flyTo([lat, lng], zoom, {
         animate: !reducedMotion,
         duration: reducedMotion ? 0 : 1.1,
@@ -230,6 +263,7 @@ function MapFlyController({
     }
 
     panningRef.current = true
+    mapDebugLog('autoFollow', 'panTo', { lat, lng, missionFollow })
     map.panTo([lat, lng], {
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : missionFollow ? 1.05 : 0.55,
@@ -548,6 +582,9 @@ function LeafletMapViewInner({
         [mapPosition.lat, mapPosition.lng],
         [pendingTargetFigure.lat, pendingTargetFigure.lng],
       ])
+      mapDebugLog('fitBounds', 'confirm mission target', {
+        figureId: pendingTargetFigure.id,
+      })
       mapRef.current.fitBounds(bounds, {
         padding: [72, 72],
         maxZoom: 16,
@@ -579,7 +616,12 @@ function LeafletMapViewInner({
     typeof window !== 'undefined' &&
     (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
 
-  const cinematicRotationEnabled = !reducedMotion && !prefersTouchMap
+  const cinematicRotationEnabled =
+    !reducedMotion &&
+    !prefersTouchMap &&
+    !isMapDebugFlagEnabled(MAP_DEBUG_FLAG.ROTATION) &&
+    !isMapDebugFlagEnabled(MAP_DEBUG_FLAG.BEARING)
+
   const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
     mapPosition,
     {
@@ -672,6 +714,10 @@ function LeafletMapViewInner({
     mapFollowPausedRef.current = false
     setMissionFollowPaused(false)
     setMapRotationPaused(false)
+    mapDebugLog('flyTo', 'handleRecenter button', {
+      lat: mapPosition.lat,
+      lng: mapPosition.lng,
+    })
     mapRef.current.flyTo([mapPosition.lat, mapPosition.lng], USER_ZOOM, {
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : 0.7,
@@ -801,9 +847,12 @@ function LeafletMapViewInner({
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
       <div
-        className="map-container absolute inset-0 h-full w-full"
+        className={`map-container absolute inset-0 h-full w-full ${
+          isMapDebugFlagEnabled(MAP_DEBUG_FLAG.GPU) ? '' : 'gpu-layer'
+        } ${isMapDebugFlagEnabled(MAP_DEBUG_FLAG.TRANSITIONS) ? 'map-debug-no-transitions' : ''}`}
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}
       >
+        <MapDebugStatusBanner />
         <MapContainer
           key={mapInstanceKey}
           center={DEFAULT_CENTER}
@@ -820,7 +869,9 @@ function LeafletMapViewInner({
             {...TILE_OPTIONS}
           />
           <MapInstanceBridge mapRef={mapRef} />
+          {isMapDebugLoggingEnabled() && <MapDebugInstrument />}
           <MapResizeHandler mapGestureActiveRef={mapGestureActiveRef} />
+          {!isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW) && (
           <MapFlyController
             position={followCenter ?? mapPosition}
             zoom={USER_ZOOM}
@@ -833,6 +884,7 @@ function LeafletMapViewInner({
             mapGestureActiveRef={mapGestureActiveRef}
             explorationActive={explorationActive}
           />
+          )}
           {explorationActive && (
             <ExplorationController
               userPosition={mapPosition}
@@ -848,11 +900,13 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          <MapRotationController
-            position={mapPosition}
-            bearing={cinematicBearing}
-            enabled={cinematicModeActive}
-          />
+          {!isMapDebugFlagEnabled(MAP_DEBUG_FLAG.ROTATION) && (
+            <MapRotationController
+              position={mapPosition}
+              bearing={cinematicBearing}
+              enabled={cinematicModeActive}
+            />
+          )}
           <FigureMarkersLayer
             figures={markerFigures}
             figuresSignature={markerFiguresSignature}

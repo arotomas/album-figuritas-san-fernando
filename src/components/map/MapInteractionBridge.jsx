@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
+import { mapDebugLog } from '../../utils/mapDebugLog'
 
 /**
  * Pausa el pan automático y/o la rotación cinematográfica tras gestos manuales en el mapa.
@@ -56,9 +57,16 @@ export function MapInteractionBridge({
       if (!autoResumeFollow) return
       if (userControlledRef?.current) return
       clearResumeTimer()
+      mapDebugLog('autoFollow', 'mission follow resume scheduled', {
+        ms: rotationPauseResumeMs,
+      })
       resumeTimerRef.current = setTimeout(() => {
         resumeTimerRef.current = null
-        if (userControlledRef?.current) return
+        if (userControlledRef?.current) {
+          mapDebugLog('autoFollow', 'mission follow resume cancelled (user control)')
+          return
+        }
+        mapDebugLog('autoFollow', 'mission follow resume → follow unpaused')
         onRotationPausedChange?.(false)
         onFollowPausedChange?.(false)
       }, rotationPauseResumeMs)
@@ -66,6 +74,7 @@ export function MapInteractionBridge({
 
     const pause = ({ fromUser = true } = {}) => {
       clearResumeTimer()
+      mapDebugLog('gesture', 'map interaction pause', { fromUser })
       onRotationPausedChange?.(true)
       onFollowPausedChange?.(true)
       if (fromUser) markUserControl()

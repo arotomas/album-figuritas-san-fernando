@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { isMapDebugFlagEnabled, MAP_DEBUG_FLAG } from '../config/mapDebug'
+import { mapDebugLog } from '../utils/mapDebugLog'
 
 function readUnitHeight(unit) {
   if (typeof document === 'undefined') return null
@@ -42,6 +44,11 @@ let lastViewportHeight = 0
 let lastViewportOffsetTop = 0
 
 function applyViewportVars() {
+  if (isMapDebugFlagEnabled(MAP_DEBUG_FLAG.VIEWPORT_SYNC)) {
+    mapDebugLog('viewport', 'applyViewportVars skipped (MAP_DEBUG_DISABLE_VIEWPORT_SYNC)')
+    return
+  }
+
   const root = document.documentElement
   const vv = window.visualViewport
   const height = Math.round(vv?.height ?? window.innerHeight)
@@ -56,6 +63,14 @@ function applyViewportVars() {
   ) {
     return
   }
+
+  mapDebugLog('viewport', 'viewport-update dispatched', {
+    height,
+    offsetTop,
+    heightDelta,
+    offsetDelta,
+    innerHeight: window.innerHeight,
+  })
 
   lastViewportHeight = height
   lastViewportOffsetTop = offsetTop

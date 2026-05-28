@@ -290,6 +290,12 @@
     border: none !important;
   }
 
+  .map-debug-no-transitions .leaflet-figure-marker,
+  .map-debug-no-transitions .leaflet-figure-marker * {
+    transition: none !important;
+    animation: none !important;
+  }
+
   .exploration-route-line {
     filter: drop-shadow(0 0 10px rgba(163, 230, 53, 0.65));
   }

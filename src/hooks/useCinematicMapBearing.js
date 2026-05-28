@@ -22,6 +22,8 @@ import {
   shortestAngleDelta,
 } from '../utils/mapBearing'
 import { rotationTrace } from '../utils/rotationTrace'
+import { isMapDebugFlagEnabled, MAP_DEBUG_FLAG } from '../config/mapDebug'
+import { mapDebugLog } from '../utils/mapDebugLog'
 
 const DEV = import.meta.env.DEV
 
@@ -83,7 +85,7 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
   }
 
   useEffect(() => {
-    if (!enabled || paused) {
+    if (!effectiveEnabled || paused) {
       if (DEV && paused && !pausedLoggedRef.current) {
         pausedLoggedRef.current = true
         rotationTrace('paused by interaction')
@@ -91,8 +93,8 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       if (!paused) pausedLoggedRef.current = false
     }
 
-    if (!enabled || paused || !position?.lat || !position?.lng) {
-      if (!enabled || paused) {
+    if (!effectiveEnabled || paused || !position?.lat || !position?.lng) {
+      if (!effectiveEnabled || paused) {
         targetRef.current = null
         walkingRef.current = false
         quietLockedRef.current = false
@@ -331,7 +333,7 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       })
     }
   }, [
-    enabled,
+    effectiveEnabled,
     paused,
     position?.accuracy,
     position?.heading,
@@ -342,7 +344,7 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
   ])
 
   useEffect(() => {
-    if (!enabled) {
+    if (!effectiveEnabled) {
       displayRef.current = null
       targetRef.current = null
       cogAnchorRef.current = null
@@ -415,6 +417,9 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
 
         if (lastPublishedRef.current == null || delta >= MAP_ROTATION_MIN_DELTA_DEG) {
           lastPublishedRef.current = displayRef.current
+          mapDebugLog('bearing', 'publish', {
+            published: Math.round(displayRef.current * 10) / 10,
+          })
           setBearing(displayRef.current)
           if (DEV) {
             rotationTrace('publish bearing', {
@@ -437,7 +442,7 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
 
     const id = window.setInterval(tick, MAP_ROTATION_UPDATE_MS)
     return () => window.clearInterval(id)
-  }, [enabled, paused])
+  }, [effectiveEnabled, paused])
 
   useEffect(() => {
     if (position?.lat == null || position?.lng == null) {
