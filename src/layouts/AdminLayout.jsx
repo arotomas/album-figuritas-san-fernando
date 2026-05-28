@@ -1,6 +1,7 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import { useAdminHistoryGuard } from '../hooks/useAdminHistoryGuard'
+import { withQaParam } from '../qa/qaCore'
 import { hasMinimumRole } from '../utils/roles'
 
 const NAV_ITEMS = [
@@ -78,10 +79,20 @@ export function AdminLayout() {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted">
-              Dashboard operativo
-            </p>
-            <h2 className="mt-1 text-2xl font-black">{pageTitle}</h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted">
+                  Dashboard operativo
+                </p>
+                <h2 className="mt-1 text-2xl font-black">{pageTitle}</h2>
+              </div>
+              <Link
+                to={withQaParam('/map?player=1')}
+                className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-bold text-ink shadow-sm transition-colors hover:bg-slate-50"
+              >
+                Abrir app jugador
+              </Link>
+            </div>
           </header>
 
           <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">

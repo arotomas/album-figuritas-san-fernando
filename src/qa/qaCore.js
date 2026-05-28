@@ -61,13 +61,19 @@ export function isDevBuild() {
 }
 
 export function setQaAccessContext({ profile, userId, email } = {}) {
-  qaAccessContext = {
+  const next = {
     profile: profile ?? null,
     userId: userId ?? null,
     email: email ?? null,
   }
+  const changed =
+    qaAccessContext.userId !== next.userId ||
+    qaAccessContext.email !== next.email ||
+    qaAccessContext.profile !== next.profile
+
+  qaAccessContext = next
   clearQaSessionForNonStaff()
-  notifyUrlFlagChange()
+  if (changed) notifyUrlFlagChange()
 }
 
 function isQaTesterWhitelisted() {
@@ -182,6 +188,18 @@ function parseSearchParams(search = '') {
   return params
 }
 
+function areUrlFlagsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+const QA_MASTER_FLAGS = {
+  qa: true,
+  debugGps: true,
+  mockLocation: true,
+  debugUniverse: true,
+  debugReveal: true,
+}
+
 function applyParamFlags(params) {
   let changed = false
 
@@ -190,26 +208,18 @@ function applyParamFlags(params) {
   const staffOrDev = isViteDev() || canUseQaShell()
 
   if (readFlag(QA_URL_PARAMS.master) && staffOrDev) {
-    urlFlags = {
-      qa: true,
-      debugGps: true,
-      mockLocation: true,
-      debugUniverse: true,
-      debugReveal: true,
-    }
     persistQaMasterFlag()
-    changed = true
+    if (!areUrlFlagsEqual(urlFlags, QA_MASTER_FLAGS)) {
+      urlFlags = { ...QA_MASTER_FLAGS }
+      changed = true
+    }
   } else {
     const master = readPersistedQaMasterFlag()
     if (master) {
-      urlFlags = {
-        qa: true,
-        debugGps: true,
-        mockLocation: true,
-        debugUniverse: true,
-        debugReveal: true,
+      if (!areUrlFlagsEqual(urlFlags, QA_MASTER_FLAGS)) {
+        urlFlags = { ...QA_MASTER_FLAGS }
+        changed = true
       }
-      changed = true
     } else {
       const persisted = staffOrDev ? readPersistedUrlFlags() : null
       const next = {
@@ -304,7 +314,18 @@ export function syncQaFromUrl(searchString) {
 /** @deprecated alias */
 export const syncQaModeFromUrl = syncQaFromUrl
 
-/** @deprecated alias — misma semántica que isQaMasterActive con sync URL */
+/** Lee si QA está activo en URL o sesión sin re-sincronizar flags (evita notify en bucle). */
+export function readQaModeFromSearch(searchString = '') {
+  if (typeof window === 'undefined') return false
+
+  const params = parseSearchParams(searchString)
+  const staffOrDev = isViteDev() || canUseQaShell()
+  if (params.get(QA_URL_PARAMS.master) === '1' && staffOrDev) return true
+  if (readPersistedQaMasterFlag()) return true
+  return Boolean(urlFlags.qa)
+}
+
+/** @deprecated alias — sincroniza URL una vez y devuelve si QA está activo */
 export function isQaMode(searchString) {
   if (typeof window === 'undefined') return false
   syncQaFromUrl(searchString)

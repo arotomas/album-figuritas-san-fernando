@@ -15,6 +15,7 @@ export {
   isQaBadgeVisible,
   isQaMasterActive,
   isQaMode,
+  readQaModeFromSearch,
   isQaShellActive,
   isQaStaffUser,
   isUniverseDiagnosticsEnabled,

@@ -1,6 +1,16 @@
-import { isQaMode, withQaParam } from '../qa/index.js'
+import { readQaModeFromSearch, syncQaFromUrl, withQaParam } from '../qa/index.js'
 import { hasMinimumRole } from './roles'
 import { isProfileComplete } from './profileValidation'
+
+function parseSearch(search = '') {
+  const raw = search.startsWith('?') ? search.slice(1) : search
+  return new URLSearchParams(raw)
+}
+
+function wantsPlayerApp(search = '') {
+  const params = parseSearch(search)
+  return params.get('player') === '1' || params.get('app') === '1'
+}
 
 /** Destino por defecto del panel (moderadores y admins). */
 export const ADMIN_HOME_PATH = '/admin/players'
@@ -13,8 +23,12 @@ export const PLAYER_HOME_PATH = '/map'
  * Staff (moderador+) va al panel; jugadores al mapa o profile-setup.
  */
 export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
-  const qa = isQaMode(search)
+  if (typeof window !== 'undefined') {
+    syncQaFromUrl(search)
+  }
+  const qa = readQaModeFromSearch(search)
   const isStaff = hasMinimumRole(profile, 'moderator')
+  const openPlayerApp = wantsPlayerApp(search)
   const completed =
     profileCompleted === true ||
     (profileCompleted !== false && isProfileComplete(profile))
@@ -23,7 +37,7 @@ export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
     return withQaParam('/profile-setup', qa)
   }
 
-  if (isStaff) {
+  if (isStaff && !openPlayerApp) {
     return withQaParam(ADMIN_HOME_PATH, qa)
   }
 

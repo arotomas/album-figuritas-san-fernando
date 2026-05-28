@@ -39,7 +39,7 @@ function App() {
   }, [location.pathname, location.search])
 
   useEffect(() => {
-    if (!isQaShellActive()) {
+    if (!isQaShellActive() && useAppStore.getState().qaTestFigure) {
       clearQaTestFigure()
     }
   }, [clearQaTestFigure, location.pathname, location.search])

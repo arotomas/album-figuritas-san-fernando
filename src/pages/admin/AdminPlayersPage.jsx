@@ -105,15 +105,19 @@ export function AdminPlayersPage() {
   const debouncedFilters = useDebouncedValue(playerFilters, 300)
   const debouncedQuickTab = useDebouncedValue(quickTab, 150)
 
-  const listQueryKey = useMemo(
+  const filtersKey = useMemo(
     () =>
       JSON.stringify({
         debouncedFilters,
         debouncedQuickTab,
         pageSize,
-        page,
       }),
-    [debouncedFilters, debouncedQuickTab, pageSize, page],
+    [debouncedFilters, debouncedQuickTab, pageSize],
+  )
+
+  const listQueryKey = useMemo(
+    () => `${filtersKey}:${page}`,
+    [filtersKey, page],
   )
 
   const loadMetrics = useCallback(async () => {
@@ -131,10 +135,6 @@ export function AdminPlayersPage() {
       if (metricsRequest.isLatest(id)) setMetricsLoading(false)
     }
   }, [metricsRequest])
-
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedFilters, debouncedQuickTab, pageSize])
 
   useEffect(() => {
     const { id, signal } = listRequest.begin()
@@ -161,7 +161,7 @@ export function AdminPlayersPage() {
         if (!listRequest.isLatest(id)) return
         setPlayers(result.players)
         setTotal(result.total)
-        setPage(result.page)
+        setPage((current) => (current === result.page ? current : result.page))
       })
       .catch((loadError) => {
         if (isAbortError(loadError) || !listRequest.isLatest(id)) return
@@ -192,10 +192,12 @@ export function AdminPlayersPage() {
 
   const updatePlayerFilter = useCallback((key, value) => {
     setPlayerFilters((current) => ({ ...current, [key]: value }))
+    setPage(1)
   }, [])
 
   const handleQuickTabChange = useCallback((tabId) => {
     setQuickTab(tabId)
+    setPage(1)
   }, [])
 
   const handlePageChange = useCallback((nextPage) => {
@@ -204,11 +206,13 @@ export function AdminPlayersPage() {
 
   const handlePageSizeChange = useCallback((nextPageSize) => {
     setPageSize(nextPageSize)
+    setPage(1)
   }, [])
 
   const clearFilters = useCallback(() => {
     setPlayerFilters(DEFAULT_PLAYER_FILTERS)
     setQuickTab('all')
+    setPage(1)
   }, [])
 
   const refreshAll = useCallback(async () => {
