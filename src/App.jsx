@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isQaShellActive, setQaAccessContext, syncQaFromUrl } from './qa/qaCore'
 import { LazyMotion, domAnimation } from 'framer-motion'
@@ -11,20 +11,29 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
 import { useAppStore } from './store/useAppStore'
-import { hasSplashBeenDismissed, markSplashDismissed } from './utils/splashDismissed'
 
 function App() {
   const { isBooting, bootPhase } = useAppBootGate()
-  const [splashComplete, setSplashComplete] = useState(hasSplashBeenDismissed)
+  const [splashComplete, setSplashComplete] = useState(false)
   const handleSplashComplete = useCallback(() => {
-    markSplashDismissed()
     setSplashComplete(true)
   }, [])
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)
   const supabaseUserId = useAppStore((state) => state.supabaseUserId)
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated)
+  const authBootstrapped = useAppStore((state) => state.authBootstrapped)
+  const wasAuthenticatedRef = useRef(null)
   const isAdminRoute = location.pathname.startsWith('/admin')
+
+  useEffect(() => {
+    if (!authBootstrapped) return
+    if (wasAuthenticatedRef.current === true && !isAuthenticated) {
+      setSplashComplete(false)
+    }
+    wasAuthenticatedRef.current = isAuthenticated
+  }, [authBootstrapped, isAuthenticated])
 
   useEffect(() => {
     setQaAccessContext({
