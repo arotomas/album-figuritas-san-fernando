@@ -1,9 +1,10 @@
-import { Suspense, useEffect } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isQaShellActive, setQaAccessContext, syncQaFromUrl } from './qa/qaCore'
 import { LazyMotion, domAnimation } from 'framer-motion'
 import { AppRoutes } from './routes'
 import { AppBootScreen } from './components/layout/AppBootScreen'
+import { SplashScreen } from './components/splash'
 import { ViewportProvider } from './components/layout/ViewportProvider'
 import { AppSkeleton } from './components/performance/AppSkeleton'
 import { ConnectionStatus } from './components/qa/ConnectionStatus'
@@ -13,6 +14,8 @@ import { useAppStore } from './store/useAppStore'
 
 function App() {
   const { isBooting, bootPhase } = useAppBootGate()
+  const [splashComplete, setSplashComplete] = useState(false)
+  const handleSplashComplete = useCallback(() => setSplashComplete(true), [])
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)
@@ -43,6 +46,14 @@ function App() {
         <div className="app-shell h-app overflow-hidden bg-[#0a0a0b] text-ink">
           <AppBootScreen phase={bootPhase} />
         </div>
+      </ViewportProvider>
+    )
+  }
+
+  if (!splashComplete) {
+    return (
+      <ViewportProvider>
+        <SplashScreen onComplete={handleSplashComplete} />
       </ViewportProvider>
     )
   }

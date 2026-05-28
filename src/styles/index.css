@@ -216,6 +216,11 @@
     min-height: var(--bottom-nav-height);
   }
 
+  .splash-screen {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .map-container .leaflet-map-pane {
     /* Rotación cinematográfica — transform aplicado por MapRotationController */
     backface-visibility: hidden;
