@@ -3,7 +3,17 @@ import { m, AnimatePresence } from 'framer-motion'
 import { FaXmark } from 'react-icons/fa6'
 import { formatExplorationDistance } from '../../../utils/explorationMap'
 
-function ExplorationDistanceBadgeInner({ visible, targetName, distanceMeters, onExit }) {
+function ExplorationDistanceBadgeInner({
+  visible,
+  targetName,
+  distanceMeters,
+  hasUserLocation = false,
+  onExit,
+}) {
+  const distanceLabel = hasUserLocation
+    ? `A ${formatExplorationDistance(distanceMeters)}`
+    : 'Activá ubicación para ver la ruta'
+
   return (
     <AnimatePresence>
       {visible && (
@@ -21,8 +31,12 @@ function ExplorationDistanceBadgeInner({ visible, targetName, distanceMeters, on
               <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-progress/90">
                 Modo exploración
               </p>
-              <p className="mt-0.5 font-display text-sm font-bold text-white">
-                A {formatExplorationDistance(distanceMeters)}
+              <p
+                className={`mt-0.5 font-display text-sm font-bold leading-snug ${
+                  hasUserLocation ? 'text-white' : 'text-amber-100'
+                }`}
+              >
+                {distanceLabel}
               </p>
               {targetName && (
                 <p className="truncate text-[11px] text-white/55">{targetName}</p>

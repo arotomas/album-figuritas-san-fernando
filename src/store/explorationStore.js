@@ -6,6 +6,7 @@ const initialState = {
   targetCoordinates: null,
   targetName: null,
   distanceMeters: null,
+  hasUserLocation: false,
   pendingCamera: false,
 }
 
@@ -25,6 +26,7 @@ export const useExplorationStore = create((set) => ({
       targetCoordinates: { lat, lng },
       targetName: figure?.nombre ?? 'Destino',
       distanceMeters: null,
+      hasUserLocation: false,
       pendingCamera: true,
     })
     return true
@@ -41,6 +43,10 @@ export const useExplorationStore = create((set) => ({
 
   clearPendingCamera() {
     set({ pendingCamera: false })
+  },
+
+  setHasUserLocation(hasUserLocation) {
+    set({ hasUserLocation: Boolean(hasUserLocation) })
   },
 
   stopExploration() {

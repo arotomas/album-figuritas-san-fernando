@@ -31,14 +31,15 @@ function ExplorationLineLayerInner({ active, userPosition, targetCoordinates }) 
 
     if (!lineRef.current) {
       lineRef.current = L.polyline(latlngs, {
-        color: '#8cc63f',
-        weight: 2.25,
-        opacity: 0.52,
-        dashArray: '7 12',
+        color: '#a3e635',
+        weight: 4.5,
+        opacity: 0.92,
+        dashArray: '10 14',
         lineCap: 'round',
         lineJoin: 'round',
         className: 'exploration-route-line',
         interactive: false,
+        pane: 'markerPane',
       }).addTo(map)
       lineRef.current.bringToFront()
     } else {

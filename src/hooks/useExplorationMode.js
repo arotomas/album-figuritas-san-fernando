@@ -13,10 +13,14 @@ export function useExplorationDistanceSync(userPosition) {
   const active = useExplorationStore((state) => state.active)
   const targetCoordinates = useExplorationStore((state) => state.targetCoordinates)
   const setDistanceMeters = useExplorationStore((state) => state.setDistanceMeters)
+  const setHasUserLocation = useExplorationStore((state) => state.setHasUserLocation)
   const metaRef = useRef({ at: 0, meters: null })
 
   useEffect(() => {
-    if (!active || !userPosition?.lat || !userPosition?.lng || !targetCoordinates) {
+    const hasFix = Boolean(active && userPosition?.lat != null && userPosition?.lng != null)
+    setHasUserLocation(hasFix)
+
+    if (!active || !hasFix || !targetCoordinates) {
       metaRef.current = { at: 0, meters: null }
       return undefined
     }
@@ -48,6 +52,7 @@ export function useExplorationDistanceSync(userPosition) {
   }, [
     active,
     setDistanceMeters,
+    setHasUserLocation,
     targetCoordinates,
     userPosition?.lat,
     userPosition?.lng,

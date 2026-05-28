@@ -22,6 +22,7 @@ export function MapScreen() {
   const explorationActive = useExplorationStore((state) => state.active)
   const explorationTargetName = useExplorationStore((state) => state.targetName)
   const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
+  const explorationHasUserLocation = useExplorationStore((state) => state.hasUserLocation)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
   const mainProgress = useMemo(() => getMainProgressState(figures), [figures])
@@ -97,6 +98,7 @@ export function MapScreen() {
         visible={explorationActive}
         targetName={explorationTargetName}
         distanceMeters={explorationDistanceMeters}
+        hasUserLocation={explorationHasUserLocation}
         onExit={stopExploration}
       />
 
