@@ -3,7 +3,7 @@
  * Producción pública: inactivo salvo rol privilegiado, ?qa=1 en sesión o tester whitelist.
  */
 
-import { isSuperAdminProfile } from '../utils/roles'
+import { isAdminProfile } from '../utils/roles'
 import {
   getQaRuntimeState,
   resetQaRuntime,
@@ -66,6 +66,7 @@ export function setQaAccessContext({ profile, userId, email } = {}) {
     userId: userId ?? null,
     email: email ?? null,
   }
+  clearQaSessionForNonStaff()
   notifyUrlFlagChange()
 }
 
@@ -84,8 +85,29 @@ function isQaTesterWhitelisted() {
   return tokens.some((token) => token === userId || token === email)
 }
 
-function isQaPrivilegedUser() {
-  return isSuperAdminProfile(qaAccessContext.profile) || isQaTesterWhitelisted()
+/** Admin, super admin o testers en whitelist — no jugadores ni moderadores. */
+function canUseQaShell() {
+  return isAdminProfile(qaAccessContext.profile) || isQaTesterWhitelisted()
+}
+
+function clearQaSessionForNonStaff() {
+  if (isViteDev() || canUseQaShell()) return
+
+  urlFlags = {
+    qa: false,
+    debugGps: false,
+    mockLocation: false,
+    debugUniverse: false,
+    debugReveal: false,
+  }
+
+  try {
+    sessionStorage.removeItem(STORAGE_SESSION_QA)
+    sessionStorage.removeItem(STORAGE_LEGACY_QA)
+    sessionStorage.removeItem(STORAGE_QA_FLAGS)
+  } catch {
+    // ignore
+  }
 }
 
 function purgeLegacyLocalStorageQa() {
@@ -119,6 +141,8 @@ function persistQaMasterFlag() {
 }
 
 function readPersistedQaMasterFlag() {
+  if (!isViteDev() && !canUseQaShell()) return false
+
   if (readSessionQaFlag()) return true
 
   try {
@@ -163,7 +187,9 @@ function applyParamFlags(params) {
 
   const readFlag = (key) => params.get(key) === '1'
 
-  if (readFlag(QA_URL_PARAMS.master)) {
+  const staffOrDev = isViteDev() || canUseQaShell()
+
+  if (readFlag(QA_URL_PARAMS.master) && staffOrDev) {
     urlFlags = {
       qa: true,
       debugGps: true,
@@ -185,13 +211,21 @@ function applyParamFlags(params) {
       }
       changed = true
     } else {
-      const persisted = readPersistedUrlFlags()
+      const persisted = staffOrDev ? readPersistedUrlFlags() : null
       const next = {
         qa: false,
-        debugGps: readFlag(QA_URL_PARAMS.debugGps) || Boolean(persisted?.debugGps),
-        mockLocation: readFlag(QA_URL_PARAMS.mockLocation) || Boolean(persisted?.mockLocation),
-        debugUniverse: readFlag(QA_URL_PARAMS.debugUniverse) || Boolean(persisted?.debugUniverse),
-        debugReveal: readFlag(QA_URL_PARAMS.debugReveal) || Boolean(persisted?.debugReveal),
+        debugGps:
+          staffOrDev &&
+          (readFlag(QA_URL_PARAMS.debugGps) || Boolean(persisted?.debugGps)),
+        mockLocation:
+          staffOrDev &&
+          (readFlag(QA_URL_PARAMS.mockLocation) || Boolean(persisted?.mockLocation)),
+        debugUniverse:
+          staffOrDev &&
+          (readFlag(QA_URL_PARAMS.debugUniverse) || Boolean(persisted?.debugUniverse)),
+        debugReveal:
+          staffOrDev &&
+          (readFlag(QA_URL_PARAMS.debugReveal) || Boolean(persisted?.debugReveal)),
       }
 
       if (JSON.stringify(next) !== JSON.stringify(urlFlags)) {
@@ -199,6 +233,10 @@ function applyParamFlags(params) {
         changed = true
       }
     }
+  }
+
+  if (!staffOrDev) {
+    clearQaSessionForNonStaff()
   }
 
   if (changed) {
@@ -210,6 +248,8 @@ function applyParamFlags(params) {
 }
 
 export function activateQaMode({ log = true } = {}) {
+  if (!isViteDev() && !canUseQaShell()) return false
+
   urlFlags = {
     qa: true,
     debugGps: true,
@@ -226,13 +266,17 @@ export function activateQaMode({ log = true } = {}) {
   return true
 }
 
-/** Shell QA visible: Vite DEV, super admin, tester whitelist o ?qa=1 en sesión. */
+/** Shell QA: solo Vite DEV, admin/super admin o testers whitelist. */
 export function isQaShellActive() {
   if (typeof window === 'undefined') return isViteDev()
   if (isViteDev()) return true
-  if (isQaPrivilegedUser()) return true
-  if (urlFlags.qa || readSessionQaFlag()) return true
-  return false
+  if (!canUseQaShell()) return false
+  return true
+}
+
+/** Indica si el perfil actual puede ver herramientas QA (para UI condicional). */
+export function isQaStaffUser() {
+  return isViteDev() || canUseQaShell()
 }
 
 /** QA master activo — mismo gate que shell para prod pública. */

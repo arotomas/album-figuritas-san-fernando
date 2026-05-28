@@ -16,6 +16,7 @@ export {
   isQaMasterActive,
   isQaMode,
   isQaShellActive,
+  isQaStaffUser,
   isUniverseDiagnosticsEnabled,
   isViteDev,
   openQaPanel,
