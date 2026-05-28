@@ -57,7 +57,7 @@ export function SplashScreen({ onComplete }) {
           draggable={false}
         />
 
-        <div className="safe-bottom relative z-10 mt-auto flex w-full shrink-0 items-center justify-center px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 min-h-[clamp(3.25rem,12vh,5.5rem)]">
+        <div className="absolute inset-x-0 bottom-[max(4rem,calc(env(safe-area-inset-bottom)+3.25rem))] z-10 flex items-center justify-center px-6 sm:bottom-[max(4.5rem,calc(env(safe-area-inset-bottom)+3.5rem))]">
           <m.button
             type="button"
             onClick={handleBegin}
