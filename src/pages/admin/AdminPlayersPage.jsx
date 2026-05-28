@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   deletePlayer,
   getAdminPlayerMetrics,
@@ -26,6 +26,7 @@ import {
   DEFAULT_PLAYER_FILTERS,
   getDefaultPageSize,
 } from '../../components/admin/players/playerAdminUtils'
+import { scheduleEffectUpdate } from '../../utils/scheduleEffectUpdate'
 
 function DeleteUserModal({ player, confirmText, onConfirmTextChange, onCancel, onConfirm, busy }) {
   const expected = player?.username ?? ''
@@ -68,6 +69,8 @@ export function AdminPlayersPage() {
 
   const listRequest = useLatestRequest()
   const metricsRequest = useLatestRequest()
+  const listRequestRef = useRef(listRequest)
+  listRequestRef.current = listRequest
 
   const [players, setPlayers] = useState([])
   const [total, setTotal] = useState(0)
@@ -122,7 +125,7 @@ export function AdminPlayersPage() {
 
   const loadMetrics = useCallback(async () => {
     const { id, signal } = metricsRequest.begin()
-    setMetricsLoading(true)
+    scheduleEffectUpdate(() => setMetricsLoading(true))
 
     try {
       const nextMetrics = await getAdminPlayerMetrics({ signal })
@@ -137,9 +140,12 @@ export function AdminPlayersPage() {
   }, [metricsRequest])
 
   useEffect(() => {
-    const { id, signal } = listRequest.begin()
-    setLoading(true)
-    setListError(null)
+    const request = listRequestRef.current
+    const { id, signal } = request.begin()
+    scheduleEffectUpdate(() => {
+      setLoading(true)
+      setListError(null)
+    })
 
     getAdminPlayersPage(
       {
@@ -158,19 +164,19 @@ export function AdminPlayersPage() {
       { signal },
     )
       .then((result) => {
-        if (!listRequest.isLatest(id)) return
+        if (!request.isLatest(id)) return
         setPlayers(result.players)
         setTotal(result.total)
         setPage((current) => (current === result.page ? current : result.page))
       })
       .catch((loadError) => {
-        if (isAbortError(loadError) || !listRequest.isLatest(id)) return
+        if (isAbortError(loadError) || !request.isLatest(id)) return
         setListError(normalizeAdminError(loadError))
       })
       .finally(() => {
-        if (listRequest.isLatest(id)) setLoading(false)
+        if (request.isLatest(id)) setLoading(false)
       })
-  }, [listQueryKey, listRequest])
+  }, [listQueryKey])
 
   useEffect(() => {
     void loadMetrics()

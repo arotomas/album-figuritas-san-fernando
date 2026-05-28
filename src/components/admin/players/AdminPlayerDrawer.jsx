@@ -156,20 +156,27 @@ export function AdminPlayerDrawer({
     return total > 0 ? Math.round((obtained / total) * 100) : 0
   }, [mainProgress])
 
+  const hadOpenPlayerRef = useRef(false)
+
   useEffect(() => {
     if (!open || !selectedPlayerId) {
-      setBasic(null)
-      setCaptures(null)
-      setAlbumFigures(null)
-      setShowMap(false)
-      setConfirmAction(null)
-      setPendingRole(null)
       basicRequest.cancelAll()
       capturesRequest.cancelAll()
       albumRequest.cancelAll()
+
+      if (hadOpenPlayerRef.current) {
+        hadOpenPlayerRef.current = false
+        setBasic(null)
+        setCaptures(null)
+        setAlbumFigures(null)
+        setShowMap(false)
+        setConfirmAction(null)
+        setPendingRole(null)
+      }
       return undefined
     }
 
+    hadOpenPlayerRef.current = true
     const { id } = basicRequest.begin()
     setBasicLoading(true)
 

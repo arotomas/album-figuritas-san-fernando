@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa6'
 import { getAdminPlayerMapMarkers } from '../../../services/supabase/adminPlayers'
 import { isAbortError, normalizeAdminError } from '../../../utils/adminAsync'
@@ -41,16 +41,22 @@ export const AdminPlayersMapSection = memo(function AdminPlayersMapSection() {
       })
   }, [mapRequest])
 
+  const wasExpandedRef = useRef(false)
+
   useEffect(() => {
     if (!expanded) {
       mapRequest.cancelAll()
-      setMapMounted(false)
-      setMarkers([])
-      setLoading(false)
-      setError(null)
+      if (wasExpandedRef.current) {
+        wasExpandedRef.current = false
+        setMapMounted(false)
+        setMarkers([])
+        setLoading(false)
+        setError(null)
+      }
       return undefined
     }
 
+    wasExpandedRef.current = true
     loadMarkers()
     return undefined
   }, [expanded, loadMarkers, mapRequest])

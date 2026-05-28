@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+function serializeDebouncedValue(value) {
+  if (value == null || typeof value !== 'object') return value
+  return JSON.stringify(value)
+}
 
 function areDebouncedValuesEqual(a, b) {
   if (a === b) return true
@@ -12,6 +17,7 @@ function areDebouncedValuesEqual(a, b) {
 export function useDebouncedValue(value, delayMs = 300) {
   const [debounced, setDebounced] = useState(value)
   const latestRef = useRef(value)
+  const valueKey = useMemo(() => serializeDebouncedValue(value), [value])
 
   latestRef.current = value
 
@@ -23,7 +29,7 @@ export function useDebouncedValue(value, delayMs = 300) {
     }, delayMs)
 
     return () => clearTimeout(timer)
-  }, [value, delayMs])
+  }, [valueKey, delayMs])
 
   return debounced
 }

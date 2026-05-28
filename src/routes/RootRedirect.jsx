@@ -7,10 +7,8 @@ export function RootRedirect() {
   const authBootstrapped = useAppStore((state) => state.authBootstrapped)
   const supabaseReady = useAppStore((state) => state.supabaseReady)
   const location = useLocation()
-  const storeSlice = useAppStore((state) => ({
-    supabaseProfile: state.supabaseProfile,
-    profileCompleted: state.profileCompleted,
-  }))
+  const supabaseProfile = useAppStore((state) => state.supabaseProfile)
+  const profileCompleted = useAppStore((state) => state.profileCompleted)
 
   if (!authBootstrapped) {
     return null
@@ -20,6 +18,9 @@ export function RootRedirect() {
     return <Navigate to={`/login${location.search}`} replace />
   }
 
-  const target = getPostAuthPathFromStore(storeSlice, location.search)
+  const target = getPostAuthPathFromStore(
+    { supabaseProfile, profileCompleted },
+    location.search,
+  )
   return <Navigate to={target} replace />
 }

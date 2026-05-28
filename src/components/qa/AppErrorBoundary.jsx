@@ -61,7 +61,7 @@ export class AppErrorBoundary extends Component {
           <p className="text-app-muted mt-3 max-w-sm font-body text-sm leading-relaxed">
             La app encontró un error inesperado. Podés volver al inicio o recargar para continuar.
           </p>
-          {import.meta.env.DEV && this.state.error && (
+          {this.state.error?.message && (
             <pre className="mt-4 max-h-32 w-full overflow-auto rounded-xl bg-black/40 p-3 text-left text-[10px] text-red-300">
               {this.state.error.message}
             </pre>
