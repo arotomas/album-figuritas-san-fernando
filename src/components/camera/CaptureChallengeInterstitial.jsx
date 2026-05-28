@@ -12,13 +12,13 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
 
   return (
     <div className="bg-app safe-top safe-bottom relative flex h-full flex-col overflow-hidden text-app">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(140,198,63,0.18),transparent_55%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(140,198,63,0.14),transparent_58%)] dark:bg-[radial-gradient(circle_at_50%_0%,rgba(140,198,63,0.2),transparent_55%)]" />
 
       <header className="relative z-10 flex items-center justify-between px-5 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-border px-4 py-2 text-xs font-bold text-muted"
+          className="rounded-full border border-border bg-warm-white/80 px-4 py-2 text-xs font-bold text-ink dark:border-white/15 dark:bg-white/5 dark:text-warm-white"
         >
           Volver
         </button>
@@ -35,26 +35,26 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
           className="mx-auto w-full max-w-md"
         >
           <p className={`${typeClasses.micro} text-progress`}>📸 Cómo capturar esta figurita</p>
-          <h1 className={`${typeClasses.display} mt-3 text-3xl leading-tight text-warm-white`}>
+          <h1 className={`${typeClasses.display} text-app mt-3 text-3xl leading-tight`}>
             {challenge.title}
           </h1>
-          <p className="mt-4 font-body text-base leading-7 text-white/78">
+          <p className="text-app-muted mt-4 font-body text-base leading-7">
             {challenge.description}
           </p>
           {challenge.extraTip && (
-            <p className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-white/60">
+            <p className="text-app-muted mt-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-6 dark:border-white/10 dark:bg-white/5">
               {challenge.extraTip}
             </p>
           )}
 
           {challenge.exampleUrl && (
-            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-border bg-[#f3f3f1] p-2">
+            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-border bg-surface p-2 shadow-sm dark:bg-[#141416] dark:shadow-none">
               <img
                 src={challenge.exampleUrl}
                 alt="Ejemplo de captura"
                 className="aspect-[4/3] w-full rounded-xl object-cover"
               />
-              <p className="text-app-muted mt-2 px-1 text-center text-[11px] font-semibold uppercase tracking-wide">
+              <p className="text-muted mt-2 px-1 text-center text-[11px] font-semibold uppercase tracking-wide dark:text-white/55">
                 Ejemplo de referencia
               </p>
             </div>
