@@ -63,12 +63,12 @@ export function SplashScreen({ onComplete }) {
             onClick={handleBegin}
             disabled={!canContinue || isExiting}
             whileTap={canContinue && !isExiting ? motionTokens.tap : undefined}
-            whileHover={canContinue && !isExiting ? { scale: 1.02 } : undefined}
+            whileHover={canContinue && !isExiting ? { scale: 1.01 } : undefined}
             transition={motionTokens.spring.soft}
-            className={`font-display w-full max-w-xs py-3.5 text-center text-[15px] font-bold uppercase tracking-[0.12em] transition-opacity duration-300 ${
+            className={`font-display mx-auto block w-[80%] min-w-[200px] max-w-sm rounded-2xl border border-white/25 py-4 text-center text-sm font-semibold uppercase tracking-[0.14em] shadow-[0_8px_28px_rgba(0,0,0,0.22)] transition-[opacity,background-color,transform] duration-300 ${
               canContinue && !isExiting
-                ? 'text-white active:opacity-80'
-                : 'cursor-not-allowed text-white/40'
+                ? 'bg-progress text-white active:scale-[0.98]'
+                : 'cursor-not-allowed border-white/15 bg-progress/45 text-white/55'
             }`}
           >
             Comenzar
