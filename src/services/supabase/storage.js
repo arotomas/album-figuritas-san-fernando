@@ -15,6 +15,13 @@ export const MARKER_ICON_MIME_TYPES = [
   'image/jpg',
 ]
 export const MARKER_ICON_TARGET_PX = 256
+export const FIGURE_IMAGE_MAX_BYTES = 200 * 1024
+export const FIGURE_IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/webp',
+  'image/jpeg',
+  'image/jpg',
+]
 
 /** Límite del bucket en Supabase (migration 001). */
 export const STORAGE_BUCKET_MAX_BYTES = 524_288
@@ -60,6 +67,18 @@ export function buildMarkerIconStoragePath(figureId, filename, timestamp = Date.
   return `marker-icons/${safeFigureId}/${timestamp}-${safeFilename}`
 }
 
+export function buildFigureImageStoragePath(figureId, filename, timestamp = Date.now()) {
+  const safeFigureId = sanitizeStorageSegment(figureId, 'temp')
+  const safeFilename = sanitizeStorageSegment(filename, 'figure-image')
+  return `figure-images/${safeFigureId}/${timestamp}-${safeFilename}`
+}
+
+export function buildChallengeExampleStoragePath(figureId, filename, timestamp = Date.now()) {
+  const safeFigureId = sanitizeStorageSegment(figureId, 'temp')
+  const safeFilename = sanitizeStorageSegment(filename, 'challenge-example')
+  return `challenge-examples/${safeFigureId}/${timestamp}-${safeFilename}`
+}
+
 export function validateMarkerIconFile(file) {
   if (!(file instanceof File)) {
     return { ok: false, reason: 'NOT_A_FILE' }
@@ -77,6 +96,22 @@ export function validateMarkerIconFile(file) {
       size: file.size,
       maxBytes: MARKER_ICON_MAX_BYTES,
     }
+  }
+  return { ok: true, size: file.size, type: file.type }
+}
+
+export function validateFigureImageFile(file) {
+  if (!(file instanceof File)) {
+    return { ok: false, reason: 'NOT_A_FILE' }
+  }
+  if (!FIGURE_IMAGE_MIME_TYPES.includes(file.type)) {
+    return { ok: false, reason: 'INVALID_MIME', type: file.type }
+  }
+  if (file.size <= 0) {
+    return { ok: false, reason: 'EMPTY_FILE', size: file.size }
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { ok: false, reason: 'FILE_TOO_LARGE_SOURCE', size: file.size, maxBytes: 5 * 1024 * 1024 }
   }
   return { ok: true, size: file.size, type: file.type }
 }
@@ -189,6 +224,69 @@ export async function optimizeMarkerIconFile(file) {
     sourceWidth: image.naturalWidth,
     sourceHeight: image.naturalHeight,
   }
+}
+
+/**
+ * Normaliza imagen general de figurita/consigna:
+ * - conserva relación de aspecto
+ * - limita lado mayor
+ * - comprime a WebP/JPEG para entrar al límite del bucket
+ */
+export async function optimizeFigureImageFile(file) {
+  if (!file) return { ok: false, reason: 'NOT_A_FILE' }
+  const baseValidation = validateFigureImageFile(file)
+  if (!baseValidation.ok) return baseValidation
+
+  const image = await loadImageFromFile(file)
+  const srcW = image.naturalWidth
+  const srcH = image.naturalHeight
+  if (!srcW || !srcH) return { ok: false, reason: 'INVALID_IMAGE_DIMENSIONS' }
+
+  const maxSide = 1280
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH))
+  const targetW = Math.max(1, Math.round(srcW * scale))
+  const targetH = Math.max(1, Math.round(srcH * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = targetW
+  canvas.height = targetH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { ok: false, reason: 'CANVAS_UNAVAILABLE' }
+
+  ctx.clearRect(0, 0, targetW, targetH)
+  ctx.drawImage(image, 0, 0, targetW, targetH)
+
+  const baseName = String(file.name || 'figure-image')
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+
+  let encoded = await canvasToBlob(canvas, 'image/webp', 0.9)
+  let quality = 0.9
+  while (encoded.size > FIGURE_IMAGE_MAX_BYTES && quality > 0.4) {
+    quality -= 0.08
+    encoded = await canvasToBlob(canvas, 'image/webp', quality)
+  }
+
+  if (encoded.size > FIGURE_IMAGE_MAX_BYTES) {
+    encoded = await canvasToBlob(canvas, 'image/jpeg', 0.82)
+    quality = 0.82
+    while (encoded.size > FIGURE_IMAGE_MAX_BYTES && quality > 0.4) {
+      quality -= 0.08
+      encoded = await canvasToBlob(canvas, 'image/jpeg', quality)
+    }
+  }
+
+  if (encoded.size > FIGURE_IMAGE_MAX_BYTES) {
+    return { ok: false, reason: 'FILE_TOO_LARGE', size: encoded.size, maxBytes: FIGURE_IMAGE_MAX_BYTES }
+  }
+
+  const optimizedFile = new File(
+    [encoded],
+    `${baseName}.${encoded.type === 'image/jpeg' ? 'jpg' : 'webp'}`,
+    { type: encoded.type, lastModified: Date.now() },
+  )
+
+  return { ok: true, file: optimizedFile, transformed: true, sourceWidth: srcW, sourceHeight: srcH }
 }
 
 export function dataUrlToBlob(dataUrl) {
@@ -368,6 +466,30 @@ export async function uploadMarkerIcon({ figureId, file }) {
     return { ok: false, reason: 'NO_PUBLIC_URL', path, data }
   }
 
+  return { ok: true, path, publicUrl, data }
+}
+
+export async function uploadFigureImageAsset({ figureId, file, kind = 'figure' }) {
+  const optimization = await optimizeFigureImageFile(file)
+  if (!optimization.ok) return { ok: false, ...optimization }
+
+  const optimizedFile = optimization.file
+  const pathBuilder = kind === 'challenge' ? buildChallengeExampleStoragePath : buildFigureImageStoragePath
+  const path = pathBuilder(figureId, optimizedFile?.name)
+
+  const { data, error } = await supabase.storage.from(MARKER_ICONS_BUCKET).upload(path, optimizedFile, {
+    contentType: optimizedFile.type,
+    upsert: true,
+    cacheControl: '31536000',
+  })
+
+  if (error) {
+    return { ok: false, reason: error.message, error: summarizeUploadError(error), path }
+  }
+
+  const { data: publicData } = supabase.storage.from(MARKER_ICONS_BUCKET).getPublicUrl(path)
+  const publicUrl = publicData?.publicUrl ?? null
+  if (!publicUrl) return { ok: false, reason: 'NO_PUBLIC_URL', path, data }
   return { ok: true, path, publicUrl, data }
 }
 

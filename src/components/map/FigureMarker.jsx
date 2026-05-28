@@ -41,7 +41,6 @@ function FigureMarkerInner({
   const glowColor = isQaTest ? 'rgba(34,211,238,0.55)' : rarity.colors.glow
   const accentClass = isQaTest ? 'bg-cyan-400' : rarity.tailwind.accent
   const pointerColor = isQaTest ? '#22d3ee' : rarity.colors.secondary
-  const iconSize = Number(figure.marker_icon_size) || 48
   const markerVisualUrl = figure.marker_icon_url || figure.image_url || null
 
   return (
@@ -86,15 +85,20 @@ function FigureMarkerInner({
       <div className={cardClass}>
         <div className={`h-0.5 w-full ${accentClass}`} />
 
-        <div className="flex items-center justify-center py-3 text-2xl">
+        <div
+          className={
+            markerVisualUrl
+              ? 'h-[78px] w-full overflow-hidden'
+              : 'flex items-center justify-center py-3 text-2xl'
+          }
+        >
           {obtained ? (
             '✓'
           ) : markerVisualUrl ? (
             <img
               src={markerVisualUrl}
               alt=""
-              className="object-contain"
-              style={{ width: iconSize, height: iconSize }}
+              className="h-full w-full object-cover object-center"
             />
           ) : (
             figure.emoji

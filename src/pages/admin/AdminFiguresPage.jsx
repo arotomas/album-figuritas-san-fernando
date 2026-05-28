@@ -12,7 +12,9 @@ import {
 import { getEventsAdmin } from '../../services/supabase/events'
 import { getEventSelectOptions } from '../../components/admin/adminEventsShared'
 import {
+  FIGURE_IMAGE_MIME_TYPES,
   MARKER_ICON_MIME_TYPES,
+  uploadFigureImageAsset,
   uploadMarkerIcon,
 } from '../../services/supabase/storage'
 import {
@@ -44,6 +46,8 @@ export function AdminFiguresPage() {
   const [figureFormMessage, setFigureFormMessage] = useState(null)
   const [figureSaving, setFigureSaving] = useState(false)
   const [markerIconUploading, setMarkerIconUploading] = useState(false)
+  const [figureImageUploading, setFigureImageUploading] = useState(false)
+  const [challengeImageUploading, setChallengeImageUploading] = useState(false)
   const figureFormRef = useRef(null)
   const [figureFilters, setFigureFilters] = useState({
     type: 'all',
@@ -216,6 +220,70 @@ export function AdminFiguresPage() {
       setFigureFormError(uploadError?.message ?? 'No pudimos subir el ícono del marcador.')
     } finally {
       setMarkerIconUploading(false)
+    }
+  }
+
+  const handleFigureImageFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setFigureFormError(null)
+    setFigureFormMessage(null)
+    if (!FIGURE_IMAGE_MIME_TYPES.includes(file.type)) {
+      setFigureFormError('La imagen debe ser PNG, JPG/JPEG o WebP.')
+      return
+    }
+
+    const figureId = editingFigureId || figureForm.id || buildFigureId(figureForm.title || 'figurita')
+    setFigureImageUploading(true)
+    setFigureForm((current) => ({ ...current, id: figureId }))
+    try {
+      const result = await uploadFigureImageAsset({ figureId, file, kind: 'figure' })
+      if (!result.ok) {
+        setFigureFormError(result.reason ?? 'No pudimos subir la imagen de la figurita.')
+        return
+      }
+      setFigureForm((current) => ({ ...current, id: figureId, image_url: result.publicUrl }))
+      setFigureFormMessage('Imagen de figurita subida')
+    } catch (error) {
+      setFigureFormError(error?.message ?? 'No pudimos subir la imagen de la figurita.')
+    } finally {
+      setFigureImageUploading(false)
+    }
+  }
+
+  const handleChallengeImageFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setFigureFormError(null)
+    setFigureFormMessage(null)
+    if (!FIGURE_IMAGE_MIME_TYPES.includes(file.type)) {
+      setFigureFormError('La imagen ejemplo debe ser PNG, JPG/JPEG o WebP.')
+      return
+    }
+
+    const figureId = editingFigureId || figureForm.id || buildFigureId(figureForm.title || 'figurita')
+    setChallengeImageUploading(true)
+    setFigureForm((current) => ({ ...current, id: figureId }))
+    try {
+      const result = await uploadFigureImageAsset({ figureId, file, kind: 'challenge' })
+      if (!result.ok) {
+        setFigureFormError(result.reason ?? 'No pudimos subir la imagen ejemplo.')
+        return
+      }
+      setFigureForm((current) => ({
+        ...current,
+        id: figureId,
+        challenge_example_image_url: result.publicUrl,
+      }))
+      setFigureFormMessage('Imagen ejemplo subida')
+    } catch (error) {
+      setFigureFormError(error?.message ?? 'No pudimos subir la imagen ejemplo.')
+    } finally {
+      setChallengeImageUploading(false)
     }
   }
 
@@ -466,6 +534,19 @@ export function AdminFiguresPage() {
                         placeholder="https://..."
                         className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
                       />
+                    </label>
+                    <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                      Subir imagen ejemplo
+                      <input
+                        type="file"
+                        accept={FIGURE_IMAGE_MIME_TYPES.join(',')}
+                        onChange={handleChallengeImageFileChange}
+                        disabled={challengeImageUploading}
+                        className="mt-2 block w-full text-sm normal-case tracking-normal text-ink file:mr-3 file:rounded-xl file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:opacity-50"
+                      />
+                      <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-muted">
+                        Recomendado: horizontal 4:3 o 16:9, mínimo 960px lado mayor.
+                      </span>
                     </label>
                   </div>
 
@@ -730,6 +811,19 @@ export function AdminFiguresPage() {
                     className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
                   />
                 </label>
+                <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+                  Subir imagen de figurita
+                  <input
+                    type="file"
+                    accept={FIGURE_IMAGE_MIME_TYPES.join(',')}
+                    onChange={handleFigureImageFileChange}
+                    disabled={figureImageUploading}
+                    className="mt-2 block w-full text-sm normal-case tracking-normal text-ink file:mr-3 file:rounded-xl file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:opacity-50"
+                  />
+                  <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-muted">
+                    Recomendado: 3:4 (álbum) o 9:16; se optimiza automáticamente para web.
+                  </span>
+                </label>
 
                 {figureForm.image_url && (
                   <img
@@ -845,11 +939,16 @@ export function AdminFiguresPage() {
 
                 <button
                   type="submit"
-                  disabled={figureSaving || markerIconUploading}
+                  disabled={
+                    figureSaving ||
+                    markerIconUploading ||
+                    figureImageUploading ||
+                    challengeImageUploading
+                  }
                   className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
                 >
-                  {markerIconUploading
-                    ? 'Subiendo ícono…'
+                  {markerIconUploading || figureImageUploading || challengeImageUploading
+                    ? 'Subiendo imagen…'
                     : figureSaving
                       ? 'Guardando…'
                       : editingFigureId
