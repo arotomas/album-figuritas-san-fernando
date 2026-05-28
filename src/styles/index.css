@@ -234,8 +234,9 @@
     width: 100% !important;
   }
 
-  .map-container {
-    filter: saturate(0.55) brightness(0.78) contrast(1.08);
+  /* Colores del mapa — ver MAP_TILE_FILTER en config/map.js */
+  .map-container .leaflet-tile-pane {
+    filter: var(--map-tile-filter, saturate(1.08) brightness(1.02) contrast(1.04));
   }
 
   .map-container .leaflet-control-attribution {

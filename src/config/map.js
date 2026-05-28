@@ -25,3 +25,9 @@ export const TILE_OPTIONS = {
   maxZoom: 19,
   subdomains: ['a', 'b', 'c'],
 }
+
+/**
+ * Filtro CSS solo sobre los tiles (no marcadores).
+ * Antes: saturate(0.55) brightness(0.78) — look cinematográfico apagado.
+ */
+export const MAP_TILE_FILTER = 'saturate(1.08) brightness(1.02) contrast(1.04)'

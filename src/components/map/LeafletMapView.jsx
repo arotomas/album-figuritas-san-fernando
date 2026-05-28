@@ -6,6 +6,7 @@ import { FaLocationCrosshairs } from 'react-icons/fa6'
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
+  MAP_TILE_FILTER,
   TILE_ATTRIBUTION,
   TILE_OPTIONS,
   TILE_URL,
@@ -659,7 +660,10 @@ function LeafletMapViewInner({
 
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
-      <div className="map-container gpu-layer absolute inset-0 h-full w-full">
+      <div
+        className="map-container gpu-layer absolute inset-0 h-full w-full"
+        style={{ '--map-tile-filter': MAP_TILE_FILTER }}
+      >
         <MapContainer
           key={mapInstanceKey}
           center={DEFAULT_CENTER}
