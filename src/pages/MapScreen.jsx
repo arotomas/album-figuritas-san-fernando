@@ -19,6 +19,10 @@ export function MapScreen() {
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const startCaptureSession = useAppStore((state) => state.startCaptureSession)
+  const explorationActive = useExplorationStore((state) => state.active)
+  const explorationTargetName = useExplorationStore((state) => state.targetName)
+  const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
+  const stopExploration = useExplorationStore((state) => state.stopExploration)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
   const mainProgress = useMemo(() => getMainProgressState(figures), [figures])
   const visiblePlayerFigures = useMemo(
