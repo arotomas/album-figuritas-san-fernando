@@ -255,14 +255,6 @@
     border: none !important;
   }
 
-  .map-vignette {
-    background: radial-gradient(
-      ellipse at 50% 45%,
-      transparent 35%,
-      rgba(10, 10, 11, 0.42) 100%
-    );
-  }
-
   .capture-screen {
     touch-action: none;
     user-select: none;

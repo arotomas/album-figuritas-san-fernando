@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { AuthBrandHeader } from '../components/auth'
 import { BottomNav } from '../components/BottomNav'
-import { Logo } from '../components/Logo'
 import { navTrace } from '../utils/capturePipelineTrace'
 
 export function AppLayout() {
@@ -26,8 +26,8 @@ export function AppLayout() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
 
       {!hideChromeHeader && (
-        <header className="safe-top safe-x shrink-0 border-b border-border/60 px-6 py-3">
-          <Logo size="sm" />
+        <header className="safe-top safe-x shrink-0 border-b border-border/60 bg-warm-white px-4 py-2">
+          <AuthBrandHeader variant="app" />
         </header>
       )}
 

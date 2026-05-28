@@ -710,8 +710,6 @@ function LeafletMapViewInner({
             />
           )}
         </MapContainer>
-
-        <div className="map-vignette pointer-events-none absolute inset-0 z-[400]" aria-hidden />
       </div>
 
       {showAcquisitionBanner && (
