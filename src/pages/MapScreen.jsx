@@ -11,7 +11,7 @@ import {
 } from '../utils/figureGameRules'
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 import { useExplorationStore } from '../store/explorationStore'
-import { ExplorationDistanceBadge } from '../components/map/exploration'
+import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
 
 export function MapScreen() {
   const navigate = useNavigate()

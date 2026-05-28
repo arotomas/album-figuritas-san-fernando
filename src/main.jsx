@@ -8,8 +8,14 @@ import './lib/supabase.js'
 import './styles/index.css'
 import { bootLog, bootWarn } from './utils/bootLog.js'
 import { initPwaInstallCapture } from './utils/pwaInstallController.js'
+import { useExplorationStore } from './store/explorationStore.js'
 
 bootLog('main entry')
+try {
+  useExplorationStore.getState().stopExploration()
+} catch (error) {
+  bootWarn('exploration reset on boot skipped', error?.message)
+}
 try {
   initPwaInstallCapture()
 } catch (error) {

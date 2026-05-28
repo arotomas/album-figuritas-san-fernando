@@ -1,5 +1,3 @@
-import distance from '@turf/distance'
-import { point } from '@turf/helpers'
 import {
   EXPLORATION_BOUNDS_PADDING,
   EXPLORATION_DISTANCE_NEAR_M,
@@ -7,21 +5,33 @@ import {
   EXPLORATION_MAX_ZOOM,
   EXPLORATION_MAX_ZOOM_NEAR,
 } from '../config/exploration'
-import { formatDistance } from './geo'
+import { formatDistance, getDistanceMeters } from './geo'
 
 export function measureExplorationDistanceMeters(user, target) {
   if (!user?.lat || !user?.lng || !target?.lat || !target?.lng) return null
-
-  return (
-    distance(point([user.lng, user.lat]), point([target.lng, target.lat]), {
-      units: 'kilometers',
-    }) * 1000
-  )
+  return getDistanceMeters(user.lat, user.lng, target.lat, target.lng)
 }
 
 export function formatExplorationDistance(meters) {
   if (meters == null || !Number.isFinite(meters)) return '—'
   return formatDistance(meters)
+}
+
+function mapHasLayout(map) {
+  const container = map?.getContainer?.()
+  return Boolean(container && container.clientWidth >= 2 && container.clientHeight >= 2)
+}
+
+function safeMapCamera(map, run) {
+  try {
+    run()
+    return true
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('[exploration] camera skipped', error?.message ?? error)
+    }
+    return false
+  }
 }
 
 /**
@@ -73,18 +83,31 @@ export function runExplorationCamera(
 ) {
   if (!map || !target?.lat || !target?.lng) return false
 
+  let attempts = 0
+  const maxAttempts = 48
+
   const apply = () => {
-    if (user?.lat != null && user?.lng != null) {
-      fitBoundsBetweenUserAndTarget(map, user, target, { reducedMotion })
-    } else {
-      flyToExplorationTarget(map, target, { reducedMotion })
-    }
+    if (!mapHasLayout(map)) return false
+
+    return safeMapCamera(map, () => {
+      if (user?.lat != null && user?.lng != null) {
+        fitBoundsBetweenUserAndTarget(map, user, target, { reducedMotion })
+      } else {
+        flyToExplorationTarget(map, target, { reducedMotion })
+      }
+    })
+  }
+
+  const schedule = () => {
+    if (apply() || attempts >= maxAttempts) return
+    attempts += 1
+    requestAnimationFrame(schedule)
   }
 
   if (map._loaded) {
-    apply()
+    schedule()
   } else {
-    map.whenReady(apply)
+    map.whenReady(schedule)
   }
 
   return true

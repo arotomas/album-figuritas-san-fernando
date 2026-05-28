@@ -759,11 +759,13 @@ function LeafletMapViewInner({
             followPausedRef={mapFollowPausedRef}
             explorationActive={explorationActive}
           />
-          <ExplorationController
-            userPosition={mapPosition}
-            reducedMotion={reducedMotion}
-            onPauseMapFollow={handlePauseMapFollowForExploration}
-          />
+          {explorationActive && (
+            <ExplorationController
+              userPosition={mapPosition}
+              reducedMotion={reducedMotion}
+              onPauseMapFollow={handlePauseMapFollowForExploration}
+            />
+          )}
           <MapInteractionBridge
             autoResumeFollow={Boolean(activeTargetFigureId)}
             onFollowPausedChange={handleFollowPausedChange}
