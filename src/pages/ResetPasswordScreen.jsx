@@ -27,7 +27,7 @@ export function ResetPasswordScreen() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-8 py-10">
+    <div className="flex min-h-0 flex-1 flex-col px-8 pb-10 pt-1">
       <AuthBrandHeader className="mb-8" />
       <form onSubmit={handleSubmit} className="mx-auto w-full max-w-sm space-y-4">
         <div className="text-center">

@@ -1,5 +1,8 @@
 /** Splash institucional — tiempos de visualización (ms). */
 
+/** localStorage: splash ya visto (no volver a mostrar tras reload / OAuth). */
+export const SPLASH_DISMISSED_STORAGE_KEY = 'album-splash-dismissed'
+
 /** Tiempo antes de habilitar el botón «Comenzar». */
 export const SPLASH_MIN_DISPLAY_MS = 1_800
 

@@ -8,19 +8,19 @@ const LOGOS = {
 function AuthBrandHeaderInner({ className = '' }) {
   return (
     <header
-      className={`flex shrink-0 items-center justify-between gap-4 ${className}`}
+      className={`flex w-full shrink-0 items-center justify-between gap-2 sm:gap-3 ${className}`}
       aria-label="Álbum Figuritas de San Fernando"
     >
       <img
         src={LOGOS.albumHorizontal}
         alt="Álbum Figuritas de San Fernando"
-        className="h-14 w-auto max-w-[min(72vw,300px)] object-contain object-left sm:h-16 sm:max-w-[min(76vw,340px)]"
+        className="h-28 min-w-0 w-auto max-w-[58%] object-contain object-left sm:h-32 sm:max-w-[60%]"
         draggable={false}
       />
       <img
         src={LOGOS.municipio}
         alt="Municipalidad de San Fernando"
-        className="h-11 w-auto max-w-[min(40vw,180px)] shrink-0 object-contain object-right sm:h-14 sm:max-w-[min(44vw,210px)]"
+        className="h-[5.5rem] w-auto max-w-[40%] shrink-0 object-contain object-right sm:h-28 sm:max-w-[38%]"
         draggable={false}
       />
     </header>

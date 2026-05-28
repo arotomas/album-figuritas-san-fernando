@@ -48,7 +48,7 @@ export function RegisterScreen() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-8 pt-1">
       <AuthBrandHeader className="mb-6" />
 
       <motion.form

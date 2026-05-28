@@ -11,11 +11,15 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
 import { useAppStore } from './store/useAppStore'
+import { hasSplashBeenDismissed, markSplashDismissed } from './utils/splashDismissed'
 
 function App() {
   const { isBooting, bootPhase } = useAppBootGate()
-  const [splashComplete, setSplashComplete] = useState(false)
-  const handleSplashComplete = useCallback(() => setSplashComplete(true), [])
+  const [splashComplete, setSplashComplete] = useState(hasSplashBeenDismissed)
+  const handleSplashComplete = useCallback(() => {
+    markSplashDismissed()
+    setSplashComplete(true)
+  }, [])
   const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)

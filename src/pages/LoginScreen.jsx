@@ -40,8 +40,8 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-between px-8 py-10">
-      <AuthBrandHeader className="mb-8 mt-2" />
+    <div className="flex min-h-0 flex-1 flex-col justify-between px-8 pb-10 pt-1">
+      <AuthBrandHeader className="mb-6" />
 
       <motion.div
         variants={staggerContainer}

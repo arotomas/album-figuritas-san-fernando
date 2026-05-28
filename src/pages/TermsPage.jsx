@@ -3,7 +3,7 @@ import { AuthBrandHeader } from '../components/auth'
 
 export function TermsPage() {
   return (
-    <div className="scroll-y-app safe-top safe-x flex min-h-full flex-col bg-warm-white px-6 py-8">
+    <div className="scroll-y-app safe-top safe-x flex min-h-full flex-col bg-warm-white px-6 pb-8 pt-2">
       <AuthBrandHeader className="mb-6" />
 
       <article className="mx-auto w-full max-w-lg space-y-5 pb-10">
