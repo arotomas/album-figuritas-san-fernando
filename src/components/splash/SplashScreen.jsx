@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { LazyMotion, domAnimation, m } from 'framer-motion'
-import { SPLASH_AUTO_COMPLETE_MS, SPLASH_MIN_DISPLAY_MS } from '../../config/splash'
+import { SPLASH_EXIT_FADE_MS, SPLASH_MIN_DISPLAY_MS } from '../../config/splash'
 import { motion as motionTokens } from '../../theme/motion'
 
 const ASSETS = {
@@ -14,6 +14,11 @@ const introTransition = {
   ease: [0.22, 1, 0.36, 1],
 }
 
+const exitTransition = {
+  duration: SPLASH_EXIT_FADE_MS / 1000,
+  ease: [0.22, 1, 0.36, 1],
+}
+
 const breathingTransition = {
   duration: 4.8,
   repeat: Infinity,
@@ -22,27 +27,35 @@ const breathingTransition = {
 
 export function SplashScreen({ onComplete }) {
   const [canContinue, setCanContinue] = useState(false)
+  const [isExiting, setIsExiting] = useState(false)
   const completedRef = useRef(false)
-
-  const finish = useCallback(() => {
-    if (completedRef.current) return
-    completedRef.current = true
-    onComplete?.()
-  }, [onComplete])
 
   useEffect(() => {
     const minTimer = window.setTimeout(() => setCanContinue(true), SPLASH_MIN_DISPLAY_MS)
-    const autoTimer = window.setTimeout(finish, SPLASH_AUTO_COMPLETE_MS)
+    return () => window.clearTimeout(minTimer)
+  }, [])
 
-    return () => {
-      window.clearTimeout(minTimer)
-      window.clearTimeout(autoTimer)
-    }
-  }, [finish])
+  const handleBegin = useCallback(() => {
+    if (!canContinue || completedRef.current || isExiting) return
+    completedRef.current = true
+    setIsExiting(true)
+  }, [canContinue, isExiting])
+
+  const handleExitComplete = useCallback(() => {
+    if (!isExiting) return
+    onComplete?.()
+  }, [isExiting, onComplete])
 
   return (
     <LazyMotion features={domAnimation} strict>
-      <div className="splash-screen safe-top safe-bottom fixed inset-0 z-[9000] flex min-h-0 flex-col overflow-hidden bg-black">
+      <m.div
+        className="splash-screen safe-top safe-bottom fixed inset-0 z-[9000] flex min-h-0 flex-col overflow-hidden bg-black"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: isExiting ? 0 : 1 }}
+        transition={exitTransition}
+        onAnimationComplete={handleExitComplete}
+        aria-hidden={isExiting}
+      >
         <img
           src={ASSETS.background}
           alt=""
@@ -65,8 +78,8 @@ export function SplashScreen({ onComplete }) {
           <m.div
             className="flex w-full max-w-md flex-col items-center"
             initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={introTransition}
+            animate={{ opacity: isExiting ? 0 : 1, scale: isExiting ? 0.98 : 1 }}
+            transition={isExiting ? exitTransition : introTransition}
           >
             <img
               src={ASSETS.logoMunicipio}
@@ -77,8 +90,8 @@ export function SplashScreen({ onComplete }) {
 
             <m.div
               className="flex w-full max-w-[min(88vw,300px)] items-center justify-center"
-              animate={{ scale: [1, 1.02, 1] }}
-              transition={breathingTransition}
+              animate={isExiting ? { scale: 1 } : { scale: [1, 1.02, 1] }}
+              transition={isExiting ? exitTransition : breathingTransition}
             >
               <img
                 src={ASSETS.logoAlbum}
@@ -91,8 +104,12 @@ export function SplashScreen({ onComplete }) {
             <m.p
               className="mt-8 max-w-[18rem] text-center font-body text-[15px] font-medium leading-snug tracking-wide text-white/92"
               initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45, duration: 0.85, ease: 'easeOut' }}
+              animate={{ opacity: isExiting ? 0 : 1, y: isExiting ? 4 : 0 }}
+              transition={
+                isExiting
+                  ? exitTransition
+                  : { delay: 0.45, duration: 0.85, ease: 'easeOut' }
+              }
             >
               Recorré, descubrí y coleccioná San Fernando
             </m.p>
@@ -101,13 +118,13 @@ export function SplashScreen({ onComplete }) {
           <div className="mt-auto w-full max-w-md pt-10">
             <m.button
               type="button"
-              onClick={finish}
-              disabled={!canContinue}
-              whileTap={canContinue ? motionTokens.tap : undefined}
-              whileHover={canContinue ? { scale: 1.01 } : undefined}
+              onClick={handleBegin}
+              disabled={!canContinue || isExiting}
+              whileTap={canContinue && !isExiting ? motionTokens.tap : undefined}
+              whileHover={canContinue && !isExiting ? { scale: 1.01 } : undefined}
               transition={motionTokens.spring.soft}
               className={`font-display w-[80%] min-w-[200px] max-w-full rounded-2xl border border-white/20 py-4 text-sm font-semibold uppercase tracking-[0.14em] shadow-[0_10px_32px_rgba(0,0,0,0.28)] transition-[opacity,background-color,transform] duration-300 ${
-                canContinue
+                canContinue && !isExiting
                   ? 'bg-warm-white text-ink active:scale-[0.98]'
                   : 'cursor-not-allowed bg-white/55 text-ink/45'
               } mx-auto block`}
@@ -116,7 +133,7 @@ export function SplashScreen({ onComplete }) {
             </m.button>
           </div>
         </div>
-      </div>
+      </m.div>
     </LazyMotion>
   )
 }

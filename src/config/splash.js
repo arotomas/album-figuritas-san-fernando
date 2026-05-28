@@ -1,5 +1,7 @@
 /** Splash institucional — tiempos de visualización (ms). */
 
+/** Tiempo antes de habilitar el botón «Comenzar». */
 export const SPLASH_MIN_DISPLAY_MS = 1_800
 
-export const SPLASH_AUTO_COMPLETE_MS = 2_400
+/** Fade-out al tocar «Comenzar» antes de entrar a la app. */
+export const SPLASH_EXIT_FADE_MS = 300
