@@ -189,7 +189,7 @@ export function AdminFiguresPage() {
     setFigureFormMessage(null)
 
     if (!MARKER_ICON_MIME_TYPES.includes(file.type)) {
-      setFigureFormError('El ícono debe ser PNG, WebP o SVG.')
+      setFigureFormError('El marcador debe ser PNG, JPG/JPEG, WebP o SVG.')
       return
     }
     if (file.size > MARKER_ICON_MAX_BYTES) {
@@ -791,11 +791,11 @@ export function AdminFiguresPage() {
                     />
                   </label>
                   <label className="col-span-2 block text-xs font-bold uppercase tracking-wide text-muted">
-                    Ícono marcador URL
+                    Ícono/imagen marcador URL
                     <input
                       value={figureForm.marker_icon_url}
                       onChange={(event) => updateFigureForm('marker_icon_url', event.target.value)}
-                      placeholder="PNG transparente 256x256, máx. 200 KB"
+                      placeholder="PNG/JPG/WebP/SVG (recomendado 256x256, máx. 200 KB)"
                       className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
                     />
                   </label>
@@ -816,7 +816,7 @@ export function AdminFiguresPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <label className="block text-xs font-bold uppercase tracking-wide text-muted">
-                        Subir ícono del marcador
+                        Subir ícono/imagen del marcador
                         <input
                           type="file"
                           accept={MARKER_ICON_MIME_TYPES.join(',')}
@@ -826,8 +826,7 @@ export function AdminFiguresPage() {
                         />
                       </label>
                       <p className="mt-2 text-xs leading-5 text-muted">
-                        Recomendado: PNG transparente 256x256 px, máximo 200 KB. También acepta WebP
-                        y SVG.
+                        Recomendado: 256x256 px, máximo 200 KB. Acepta PNG, JPG/JPEG, WebP y SVG.
                       </p>
                       {markerIconUploading && (
                         <p className="mt-2 text-xs font-bold text-progress">Subiendo ícono…</p>

@@ -7,7 +7,13 @@ import { getSessionUserId } from './auth'
 export const CAPTURES_BUCKET = 'captures'
 export const MARKER_ICONS_BUCKET = 'marker-icons'
 export const MARKER_ICON_MAX_BYTES = 200 * 1024
-export const MARKER_ICON_MIME_TYPES = ['image/png', 'image/webp', 'image/svg+xml']
+export const MARKER_ICON_MIME_TYPES = [
+  'image/png',
+  'image/webp',
+  'image/svg+xml',
+  'image/jpeg',
+  'image/jpg',
+]
 
 /** Límite del bucket en Supabase (migration 001). */
 export const STORAGE_BUCKET_MAX_BYTES = 524_288

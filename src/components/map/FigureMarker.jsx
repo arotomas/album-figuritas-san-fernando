@@ -42,6 +42,7 @@ function FigureMarkerInner({
   const accentClass = isQaTest ? 'bg-cyan-400' : rarity.tailwind.accent
   const pointerColor = isQaTest ? '#22d3ee' : rarity.colors.secondary
   const iconSize = Number(figure.marker_icon_size) || 48
+  const markerVisualUrl = figure.marker_icon_url || figure.image_url || null
 
   return (
     <div
@@ -88,9 +89,9 @@ function FigureMarkerInner({
         <div className="flex items-center justify-center py-3 text-2xl">
           {obtained ? (
             '✓'
-          ) : figure.marker_icon_url ? (
+          ) : markerVisualUrl ? (
             <img
-              src={figure.marker_icon_url}
+              src={markerVisualUrl}
               alt=""
               className="object-contain"
               style={{ width: iconSize, height: iconSize }}
