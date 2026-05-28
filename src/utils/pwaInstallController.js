@@ -59,6 +59,19 @@ export function isIosSafari() {
   }
 }
 
+/** Instagram, WhatsApp, etc. — no permiten instalar PWA. */
+export function isInAppBrowser() {
+  if (typeof navigator === 'undefined') return false
+  try {
+    const ua = navigator.userAgent
+    return /(FBAN|FBAV|Instagram|Twitter|LinkedInApp|WhatsApp|Telegram|Snapchat|Line\/|GSA\/)/i.test(
+      ua,
+    )
+  } catch {
+    return false
+  }
+}
+
 /** Chromium/Android/desktop donde puede existir beforeinstallprompt. */
 export function isNativeInstallPlatform() {
   if (typeof navigator === 'undefined') return false
@@ -92,15 +105,19 @@ function buildSnapshot() {
   const canPromptInstall = Boolean(deferredPrompt) && !isInstalled
   const isIos = isIosDevice()
   const isSafari = isIosSafari()
+  const inAppBrowser = isInAppBrowser()
   const nativePlatform = isNativeInstallPlatform()
 
   const showInstallCta =
-    !initFailed && !isInstalled && (isIos || canPromptInstall || nativePlatform)
+    !initFailed &&
+    !isInstalled &&
+    (inAppBrowser || isIos || canPromptInstall || nativePlatform)
 
   return {
     isInstalled,
     isIos,
     isSafari,
+    isInAppBrowser: inAppBrowser,
     nativePlatform,
     canPromptInstall,
     showInstallCta,

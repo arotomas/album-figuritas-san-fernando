@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AuthBrandHeader } from '../components/auth'
 import { BottomNav } from '../components/BottomNav'
+import { PwaInstallBanner } from '../components/pwa/PwaInstallBanner'
 import { navTrace } from '../utils/capturePipelineTrace'
 
 export function AppLayout() {
@@ -26,6 +27,7 @@ export function AppLayout() {
       </header>
 
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
+        <PwaInstallBanner />
         <Outlet />
       </main>
 
