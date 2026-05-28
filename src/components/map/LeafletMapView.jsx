@@ -53,14 +53,28 @@ import 'leaflet/dist/leaflet.css'
 
 function MapResizeHandler() {
   const map = useMap()
+  const frameRef = useRef(null)
 
   useEffect(() => {
     const invalidate = () => {
-      requestAnimationFrame(() => map.invalidateSize({ animate: false }))
+      if (frameRef.current != null) return
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null
+        map.invalidateSize({ animate: false })
+      })
     }
 
     invalidate()
     const timer = setTimeout(invalidate, 120)
+
+    const container = map.getContainer()
+    const observeTarget = container.parentElement ?? container
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => invalidate())
+        : null
+    resizeObserver?.observe(observeTarget)
+    if (observeTarget !== container) resizeObserver?.observe(container)
 
     window.visualViewport?.addEventListener('resize', invalidate)
     window.addEventListener('viewport-update', invalidate)
@@ -68,6 +82,8 @@ function MapResizeHandler() {
 
     return () => {
       clearTimeout(timer)
+      if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
+      resizeObserver?.disconnect()
       window.visualViewport?.removeEventListener('resize', invalidate)
       window.removeEventListener('viewport-update', invalidate)
       window.removeEventListener('orientationchange', invalidate)
@@ -699,7 +715,7 @@ function LeafletMapViewInner({
             followPaused={missionFollowPaused}
           />
           <MapInteractionBridge
-            followPauseEnabled={Boolean(activeTargetFigureId)}
+            autoResumeFollow={Boolean(activeTargetFigureId)}
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />

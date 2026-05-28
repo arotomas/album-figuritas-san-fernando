@@ -38,6 +38,9 @@ export function PwaInstallBanner() {
   const handleDismiss = useCallback(() => {
     writeDismissed()
     setDismissed(true)
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent('viewport-update'))
+    })
   }, [])
 
   const handleInstall = useCallback(async () => {

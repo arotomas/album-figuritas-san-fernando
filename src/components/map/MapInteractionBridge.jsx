@@ -3,10 +3,11 @@ import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
 
 /**
- * Pausa follow de misión y/o rotación cinematográfica tras gestos manuales en el mapa.
+ * Pausa el pan automático y/o la rotación cinematográfica tras gestos manuales en el mapa.
+ * Con autoResumeFollow, el pan vuelve solo tras una pausa (modo misión).
  */
 export function MapInteractionBridge({
-  followPauseEnabled = false,
+  autoResumeFollow = false,
   onFollowPausedChange,
   onRotationPausedChange,
   rotationPauseResumeMs = MISSION_FOLLOW_RESUME_MS,
@@ -19,7 +20,7 @@ export function MapInteractionBridge({
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
       resumeTimerRef.current = setTimeout(() => {
         onRotationPausedChange?.(false)
-        if (followPauseEnabled) {
+        if (autoResumeFollow) {
           onFollowPausedChange?.(false)
         }
       }, rotationPauseResumeMs)
@@ -27,9 +28,7 @@ export function MapInteractionBridge({
 
     const pause = () => {
       onRotationPausedChange?.(true)
-      if (followPauseEnabled) {
-        onFollowPausedChange?.(true)
-      }
+      onFollowPausedChange?.(true)
       scheduleResume()
     }
 
@@ -45,13 +44,7 @@ export function MapInteractionBridge({
       map.off('zoomstart', onZoomStart)
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
     }
-  }, [
-    followPauseEnabled,
-    map,
-    onFollowPausedChange,
-    onRotationPausedChange,
-    rotationPauseResumeMs,
-  ])
+  }, [autoResumeFollow, map, onFollowPausedChange, onRotationPausedChange, rotationPauseResumeMs])
 
   return null
 }
