@@ -43,14 +43,17 @@ function FigureMarkerInner({
   const pointerColor = isQaTest ? '#22d3ee' : rarity.colors.secondary
   const markerVisualUrl = figure.marker_icon_url || figure.image_url || null
 
+  const hasBearing =
+    counterBearing != null && Number.isFinite(counterBearing)
+
   return (
     <div
-      className="transition-transform duration-[640ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-      style={
-        counterBearing != null && Number.isFinite(counterBearing)
-          ? { transform: `rotate(${counterBearing}deg)` }
+      className={
+        hasBearing
+          ? 'transition-transform duration-[640ms] ease-[cubic-bezier(0.22,1,0.36,1)]'
           : undefined
       }
+      style={hasBearing ? { transform: `rotate(${counterBearing}deg)` } : undefined}
     >
       <div
         className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass} ${activeClass} ${dimClass}`}

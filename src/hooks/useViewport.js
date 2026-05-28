@@ -38,11 +38,28 @@ function isStandaloneMode() {
   )
 }
 
+let lastViewportHeight = 0
+let lastViewportOffsetTop = 0
+
 function applyViewportVars() {
   const root = document.documentElement
   const vv = window.visualViewport
   const height = Math.round(vv?.height ?? window.innerHeight)
   const offsetTop = Math.round(vv?.offsetTop ?? 0)
+  const heightDelta = Math.abs(height - lastViewportHeight)
+  const offsetDelta = Math.abs(offsetTop - lastViewportOffsetTop)
+
+  if (
+    lastViewportHeight > 0 &&
+    heightDelta < 3 &&
+    offsetDelta < 3
+  ) {
+    return
+  }
+
+  lastViewportHeight = height
+  lastViewportOffsetTop = offsetTop
+
   const keyboardOpen = height < window.innerHeight * 0.78
   const standalone = isStandaloneMode()
 
@@ -85,13 +102,11 @@ export function useViewport() {
     const onChange = () => applyViewportVars()
 
     window.visualViewport?.addEventListener('resize', onChange)
-    window.visualViewport?.addEventListener('scroll', onChange)
     window.addEventListener('resize', onChange)
     window.addEventListener('orientationchange', onChange)
 
     return () => {
       window.visualViewport?.removeEventListener('resize', onChange)
-      window.visualViewport?.removeEventListener('scroll', onChange)
       window.removeEventListener('resize', onChange)
       window.removeEventListener('orientationchange', onChange)
     }

@@ -9,12 +9,15 @@ import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
 export function MapInteractionBridge({
   autoResumeFollow = false,
   userControlledRef,
+  mapGestureActiveRef,
   onFollowPausedChange,
   onRotationPausedChange,
   rotationPauseResumeMs = MISSION_FOLLOW_RESUME_MS,
+  gestureEndHoldMs = 360,
 }) {
   const map = useMap()
   const resumeTimerRef = useRef(null)
+  const gestureEndTimerRef = useRef(null)
 
   useEffect(() => {
     const clearResumeTimer = () => {
@@ -24,8 +27,29 @@ export function MapInteractionBridge({
       }
     }
 
+    const clearGestureEndTimer = () => {
+      if (gestureEndTimerRef.current) {
+        clearTimeout(gestureEndTimerRef.current)
+        gestureEndTimerRef.current = null
+      }
+    }
+
+    const markGestureActive = () => {
+      if (mapGestureActiveRef) mapGestureActiveRef.current = true
+      clearGestureEndTimer()
+    }
+
+    const markGestureEnded = () => {
+      clearGestureEndTimer()
+      gestureEndTimerRef.current = setTimeout(() => {
+        gestureEndTimerRef.current = null
+        if (mapGestureActiveRef) mapGestureActiveRef.current = false
+      }, gestureEndHoldMs)
+    }
+
     const markUserControl = () => {
       if (userControlledRef) userControlledRef.current = true
+      markGestureActive()
     }
 
     const scheduleResume = () => {
@@ -60,24 +84,41 @@ export function MapInteractionBridge({
 
     const container = map.getContainer()
     const onPinchTouchStart = (event) => {
-      if (event.touches?.length >= 2) pause()
+      if (event.touches?.length >= 2) pause({ fromUser: true })
     }
 
-    map.on('dragstart', pause)
+    const onDragStart = () => {
+      pause({ fromUser: true })
+    }
+
+    const onGestureStart = () => {
+      markGestureActive()
+    }
+
+    map.on('dragstart', onDragStart)
     map.on('movestart', onMoveStart)
     map.on('zoomstart', onZoomStart)
+    map.on('touchstart', onGestureStart)
+    map.on('moveend', markGestureEnded)
+    map.on('zoomend', markGestureEnded)
     container.addEventListener('touchstart', onPinchTouchStart, { passive: true })
 
     return () => {
-      map.off('dragstart', pause)
+      map.off('dragstart', onDragStart)
       map.off('movestart', onMoveStart)
       map.off('zoomstart', onZoomStart)
+      map.off('touchstart', onGestureStart)
+      map.off('moveend', markGestureEnded)
+      map.off('zoomend', markGestureEnded)
       container.removeEventListener('touchstart', onPinchTouchStart)
       clearResumeTimer()
+      clearGestureEndTimer()
     }
   }, [
     autoResumeFollow,
+    gestureEndHoldMs,
     map,
+    mapGestureActiveRef,
     onFollowPausedChange,
     onRotationPausedChange,
     rotationPauseResumeMs,

@@ -31,3 +31,9 @@ export const TILE_OPTIONS = {
  * Antes: saturate(0.55) brightness(0.78) — look cinematográfico apagado.
  */
 export const MAP_TILE_FILTER = 'saturate(1.08) brightness(1.02) contrast(1.04)'
+
+/** Mínimo cambio de layout antes de invalidateSize (evita jitter en móvil). */
+export const MAP_RESIZE_MIN_DELTA_PX = 6
+
+/** Espera tras gesto táctil antes de volver a medir el mapa. */
+export const MAP_GESTURE_END_HOLD_MS = 360

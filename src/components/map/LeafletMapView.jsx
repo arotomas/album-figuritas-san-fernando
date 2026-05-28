@@ -7,6 +7,8 @@ import { FaLocationCrosshairs } from 'react-icons/fa6'
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
+  MAP_GESTURE_END_HOLD_MS,
+  MAP_RESIZE_MIN_DELTA_PX,
   MAP_TILE_FILTER,
   TILE_ATTRIBUTION,
   TILE_OPTIONS,
@@ -53,28 +55,55 @@ import { useExplorationStore } from '../../store/explorationStore'
 
 import 'leaflet/dist/leaflet.css'
 
-function MapResizeHandler() {
+function MapResizeHandler({ mapGestureActiveRef }) {
   const map = useMap()
   const frameRef = useRef(null)
+  const pendingRef = useRef(false)
   const lastSizeRef = useRef({ w: 0, h: 0 })
 
   useEffect(() => {
     const container = map.getContainer()
     const observeTarget = container.parentElement ?? container
 
-    const invalidateIfLayoutChanged = () => {
-      const w = observeTarget.clientWidth
-      const h = observeTarget.clientHeight
-      if (w <= 0 || h <= 0) return
-      const last = lastSizeRef.current
-      if (last.w === w && last.h === h) return
-      lastSizeRef.current = { w, h }
-
+    const runInvalidate = () => {
       if (frameRef.current != null) return
       frameRef.current = requestAnimationFrame(() => {
         frameRef.current = null
         map.invalidateSize({ animate: false })
       })
+    }
+
+    const invalidateIfLayoutChanged = ({ force = false } = {}) => {
+      const w = observeTarget.clientWidth
+      const h = observeTarget.clientHeight
+      if (w <= 0 || h <= 0) return
+
+      const last = lastSizeRef.current
+      const widthDelta = Math.abs(last.w - w)
+      const heightDelta = Math.abs(last.h - h)
+
+      if (
+        !force &&
+        last.w > 0 &&
+        widthDelta < MAP_RESIZE_MIN_DELTA_PX &&
+        heightDelta < MAP_RESIZE_MIN_DELTA_PX
+      ) {
+        return
+      }
+
+      if (!force && mapGestureActiveRef?.current) {
+        pendingRef.current = true
+        return
+      }
+
+      pendingRef.current = false
+      lastSizeRef.current = { w, h }
+      runInvalidate()
+    }
+
+    const flushPendingInvalidate = () => {
+      if (!pendingRef.current) return
+      invalidateIfLayoutChanged({ force: true })
     }
 
     lastSizeRef.current = {
@@ -95,6 +124,8 @@ function MapResizeHandler() {
     window.addEventListener('resize', onWindowResize)
     window.addEventListener('viewport-update', onWindowResize)
     window.addEventListener('orientationchange', onWindowResize)
+    map.on('moveend', flushPendingInvalidate)
+    map.on('zoomend', flushPendingInvalidate)
 
     return () => {
       clearTimeout(timer)
@@ -103,8 +134,10 @@ function MapResizeHandler() {
       window.removeEventListener('resize', onWindowResize)
       window.removeEventListener('viewport-update', onWindowResize)
       window.removeEventListener('orientationchange', onWindowResize)
+      map.off('moveend', flushPendingInvalidate)
+      map.off('zoomend', flushPendingInvalidate)
     }
-  }, [map])
+  }, [map, mapGestureActiveRef])
 
   return null
 }
@@ -128,6 +161,7 @@ function MapFlyController({
   followPaused = false,
   followPausedRef,
   userControlledRef,
+  mapGestureActiveRef,
   explorationActive = false,
 }) {
   const map = useMap()
@@ -161,6 +195,7 @@ function MapFlyController({
       explorationActive ||
       followPaused ||
       followPausedRef?.current ||
+      mapGestureActiveRef?.current ||
       (userControlledRef?.current && !manualRecenter)
     if (followLocked && !manualRecenter) return
 
@@ -208,6 +243,7 @@ function MapFlyController({
     moveThreshold,
     position,
     reducedMotion,
+    mapGestureActiveRef,
     userControlledRef,
     zoom,
     recenterTick,
@@ -429,6 +465,7 @@ function LeafletMapViewInner({
   const mapRef = useRef(null)
   const mapFollowPausedRef = useRef(false)
   const userControlledMapRef = useRef(false)
+  const mapGestureActiveRef = useRef(false)
   const [mapInstanceKey] = useState(() => Date.now())
   const [recenterTick, setRecenterTick] = useState(0)
   const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
@@ -538,7 +575,11 @@ function LeafletMapViewInner({
     setMapRotationPaused(paused)
   }, [])
 
-  const cinematicRotationEnabled = !reducedMotion
+  const prefersTouchMap =
+    typeof window !== 'undefined' &&
+    (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
+
+  const cinematicRotationEnabled = !reducedMotion && !prefersTouchMap
   const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
     mapPosition,
     {
@@ -760,7 +801,7 @@ function LeafletMapViewInner({
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
       <div
-        className="map-container gpu-layer absolute inset-0 h-full w-full"
+        className="map-container absolute inset-0 h-full w-full"
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}
       >
         <MapContainer
@@ -771,6 +812,7 @@ function LeafletMapViewInner({
           attributionControl
           className="!h-full !w-full"
           preferCanvas
+          bounceAtZoomLimits={false}
         >
           <TileLayer
             url={TILE_URL}
@@ -778,7 +820,7 @@ function LeafletMapViewInner({
             {...TILE_OPTIONS}
           />
           <MapInstanceBridge mapRef={mapRef} />
-          <MapResizeHandler />
+          <MapResizeHandler mapGestureActiveRef={mapGestureActiveRef} />
           <MapFlyController
             position={followCenter ?? mapPosition}
             zoom={USER_ZOOM}
@@ -788,6 +830,7 @@ function LeafletMapViewInner({
             followPaused={missionFollowPaused}
             followPausedRef={mapFollowPausedRef}
             userControlledRef={userControlledMapRef}
+            mapGestureActiveRef={mapGestureActiveRef}
             explorationActive={explorationActive}
           />
           {explorationActive && (
@@ -800,6 +843,8 @@ function LeafletMapViewInner({
           <MapInteractionBridge
             autoResumeFollow={Boolean(activeTargetFigureId)}
             userControlledRef={userControlledMapRef}
+            mapGestureActiveRef={mapGestureActiveRef}
+            gestureEndHoldMs={MAP_GESTURE_END_HOLD_MS}
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
