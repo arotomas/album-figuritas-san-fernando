@@ -58,9 +58,11 @@ export function MapRotationController({ position, bearing, enabled }) {
       pane.style.transform = `rotate(${-lastBearingRef.current}deg)`
     }
 
-    map.on('move', syncOrigin)
+    map.on('moveend', syncOrigin)
+    map.on('zoomend', syncOrigin)
     return () => {
-      map.off('move', syncOrigin)
+      map.off('moveend', syncOrigin)
+      map.off('zoomend', syncOrigin)
     }
   }, [bearing, enabled, map, position?.lat, position?.lng])
 

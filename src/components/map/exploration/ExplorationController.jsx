@@ -24,7 +24,7 @@ function ExplorationControllerInner({
   useEffect(() => {
     if (!active) return undefined
     onPauseMapFollow?.(true)
-    return () => onPauseMapFollow?.(false)
+    return undefined
   }, [active, onPauseMapFollow])
 
   useEffect(() => {

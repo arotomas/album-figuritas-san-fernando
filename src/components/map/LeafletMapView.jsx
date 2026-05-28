@@ -127,6 +127,7 @@ function MapFlyController({
   missionFollow = false,
   followPaused = false,
   followPausedRef,
+  userControlledRef,
   explorationActive = false,
 }) {
   const map = useMap()
@@ -157,8 +158,14 @@ function MapFlyController({
     if (manualRecenter) prevRecenterTickRef.current = recenterTick
 
     const followLocked =
-      explorationActive || followPaused || followPausedRef?.current
+      explorationActive ||
+      followPaused ||
+      followPausedRef?.current ||
+      (userControlledRef?.current && !manualRecenter)
     if (followLocked && !manualRecenter) return
+
+    // Sin misión activa: solo centrar al primer fix o al botón recentrar.
+    if (!missionFollow && !isFirst && !manualRecenter) return
 
     const moved =
       prev &&
@@ -201,6 +208,7 @@ function MapFlyController({
     moveThreshold,
     position,
     reducedMotion,
+    userControlledRef,
     zoom,
     recenterTick,
   ])
@@ -280,10 +288,15 @@ function UserLocationMarker({
   return null
 }
 
+function sortFiguresForMapLayer(figures) {
+  return [...figures].sort((a, b) => String(a.id).localeCompare(String(b.id)))
+}
+
 function buildFiguresLayerSignature(figures) {
-  return figures
-    .map((figure) =>
-      `${figure.id}:${figure.obtenida ? 1 : 0}:${figure.lat}:${figure.lng}`,
+  return sortFiguresForMapLayer(figures)
+    .map(
+      (figure) =>
+        `${figure.id}:${figure.obtenida ? 1 : 0}:${Number(figure.lat).toFixed(6)}:${Number(figure.lng).toFixed(6)}`,
     )
     .join('|')
 }
@@ -311,7 +324,7 @@ function FigureMarkersLayer({
   )
 
   useEffect(() => {
-    const layerFigures = figuresRef.current
+    const layerFigures = sortFiguresForMapLayer(figuresRef.current)
 
     if (import.meta.env.DEV) {
       console.info('[map-figures]', 'markers render', JSON.stringify({
@@ -360,8 +373,10 @@ function FigureMarkersLayer({
     }
   }, [figuresSignature, map])
 
+  const bearingForMarkers = cinematicActive ? cinematicBearing : null
+
   useEffect(() => {
-    figuresRef.current.forEach((figure, index) => {
+    sortFiguresForMapLayer(figuresRef.current).forEach((figure, index) => {
       const root = rootsRef.current[index]
       if (!root) return
 
@@ -371,7 +386,7 @@ function FigureMarkersLayer({
       const isDimmed = Boolean(activeTargetFigureId) && !isActiveTarget && !figure.obtenida
       const isNear = nearIds.has(String(figure.id)) || isActiveTarget
       const isPulsing = isNear && !isActiveTarget
-      const markerBearing = cinematicActive ? cinematicBearing : null
+      const markerBearing = bearingForMarkers
       const counterBearingBucket =
         markerBearing != null && Number.isFinite(markerBearing)
           ? Math.round(markerBearing * 2) / 2
@@ -392,7 +407,13 @@ function FigureMarkersLayer({
         />,
       )
     })
-  }, [activeTargetFigureId, cinematicActive, cinematicBearing, figuresSignature, nearIds, nearFigureIdsKey])
+  }, [
+    activeTargetFigureId,
+    bearingForMarkers,
+    cinematicActive,
+    figuresSignature,
+    nearFigureIdsKey,
+  ])
 
   return null
 }
@@ -407,6 +428,7 @@ function LeafletMapViewInner({
 }) {
   const mapRef = useRef(null)
   const mapFollowPausedRef = useRef(false)
+  const userControlledMapRef = useRef(false)
   const [mapInstanceKey] = useState(() => Date.now())
   const [recenterTick, setRecenterTick] = useState(0)
   const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
@@ -559,15 +581,18 @@ function LeafletMapViewInner({
     [nearFigures],
   )
 
+  const nearFiguresRef = useRef(nearFigures)
+  nearFiguresRef.current = nearFigures
+
   const markerFigures = useMemo(() => {
     const byId = new Map(figures.map((figure) => [String(figure.id), figure]))
-    nearFigures.forEach((figure) => {
+    nearFiguresRef.current.forEach((figure) => {
       if (figure.is_bonus && !byId.has(String(figure.id))) {
         byId.set(String(figure.id), figure)
       }
     })
-    return [...byId.values()]
-  }, [figures, nearFigureIdsKey, nearFigures])
+    return sortFiguresForMapLayer([...byId.values()])
+  }, [figures, nearFigureIdsKey])
 
   const markerFiguresSignature = useMemo(
     () => buildFiguresLayerSignature(markerFigures),
@@ -602,6 +627,7 @@ function LeafletMapViewInner({
     if (!mapRef.current || !mapPosition) return
 
     stopExploration()
+    userControlledMapRef.current = false
     mapFollowPausedRef.current = false
     setMissionFollowPaused(false)
     setMapRotationPaused(false)
@@ -761,6 +787,7 @@ function LeafletMapViewInner({
             missionFollow={Boolean(activeTargetFigureId)}
             followPaused={missionFollowPaused}
             followPausedRef={mapFollowPausedRef}
+            userControlledRef={userControlledMapRef}
             explorationActive={explorationActive}
           />
           {explorationActive && (
@@ -772,6 +799,7 @@ function LeafletMapViewInner({
           )}
           <MapInteractionBridge
             autoResumeFollow={Boolean(activeTargetFigureId)}
+            userControlledRef={userControlledMapRef}
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />

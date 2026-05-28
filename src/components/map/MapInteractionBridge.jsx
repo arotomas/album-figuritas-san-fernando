@@ -8,6 +8,7 @@ import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
  */
 export function MapInteractionBridge({
   autoResumeFollow = false,
+  userControlledRef,
   onFollowPausedChange,
   onRotationPausedChange,
   rotationPauseResumeMs = MISSION_FOLLOW_RESUME_MS,
@@ -23,29 +24,38 @@ export function MapInteractionBridge({
       }
     }
 
+    const markUserControl = () => {
+      if (userControlledRef) userControlledRef.current = true
+    }
+
     const scheduleResume = () => {
       if (!autoResumeFollow) return
+      if (userControlledRef?.current) return
       clearResumeTimer()
       resumeTimerRef.current = setTimeout(() => {
         resumeTimerRef.current = null
+        if (userControlledRef?.current) return
         onRotationPausedChange?.(false)
         onFollowPausedChange?.(false)
       }, rotationPauseResumeMs)
     }
 
-    const pause = () => {
+    const pause = ({ fromUser = true } = {}) => {
       clearResumeTimer()
       onRotationPausedChange?.(true)
       onFollowPausedChange?.(true)
+      if (fromUser) markUserControl()
       scheduleResume()
     }
 
     const onZoomStart = (event) => {
-      if (event?.originalEvent) pause()
+      if (event?.originalEvent) pause({ fromUser: true })
     }
 
-    const onMoveStart = () => {
-      if (map.dragging?.moved?.()) pause()
+    const onMoveStart = (event) => {
+      if (event?.originalEvent || map.dragging?.moved?.()) {
+        pause({ fromUser: true })
+      }
     }
 
     const container = map.getContainer()
@@ -65,7 +75,14 @@ export function MapInteractionBridge({
       container.removeEventListener('touchstart', onPinchTouchStart)
       clearResumeTimer()
     }
-  }, [autoResumeFollow, map, onFollowPausedChange, onRotationPausedChange, rotationPauseResumeMs])
+  }, [
+    autoResumeFollow,
+    map,
+    onFollowPausedChange,
+    onRotationPausedChange,
+    rotationPauseResumeMs,
+    userControlledRef,
+  ])
 
   return null
 }
