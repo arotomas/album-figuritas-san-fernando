@@ -1,20 +1,15 @@
 /**
  * Reducción binaria de rotación (base estable: 496b6ae).
  * Una rama por prueba; flags acumulativos según orden de activación.
- *
- * Prueba 1: mapRotationController
- * Prueba 2: + cinematicBearingHook
- * Prueba 3: + markerCounterBearing
- * Prueba 4: + userTrackHeading
  */
 export const MAP_ROTATION_BINARY = {
   mapRotationController: true,
-  cinematicBearingHook: false,
+  cinematicBearingHook: true,
   markerCounterBearing: false,
   userTrackHeading: false,
 }
 
-export const MAP_ROTATION_BINARY_LABEL = 'bin-01-map-controller'
+export const MAP_ROTATION_BINARY_LABEL = 'bin-02-cinematic-bearing'
 
 export function isMapRotationInteractionActive() {
   return (
