@@ -3,10 +3,9 @@ import { useMap } from 'react-leaflet'
 import { MAP_ROTATION_CSS_MS } from '../../config/mapRotation'
 import { prefersReducedMotion } from '../../utils/performance'
 import {
-  MAP_ROTATION_PROGRESSIVE_STEP,
   canWriteMapPaneStyles,
-  getMapRotationProgressiveFlags,
-} from '../../config/mapRotationProgressive'
+  getMapRotationControllerFlags,
+} from '../../config/mapRotationFlags'
 import { logRotationDelta, readPaneRotation } from '../../utils/rotationDeltaLog'
 
 /**
@@ -18,7 +17,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   const paneRef = useRef(null)
   const lastBearingRef = useRef(null)
   const frozenSnapshotRef = useRef(null)
-  const flags = getMapRotationProgressiveFlags()
+  const flags = getMapRotationControllerFlags()
   const writeStyles = canWriteMapPaneStyles()
 
   useEffect(() => {

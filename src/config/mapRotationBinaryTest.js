@@ -1,18 +1,19 @@
 import {
-  MAP_ROTATION_PROGRESSIVE_LABEL,
-  MAP_ROTATION_PROGRESSIVE_STEP,
+  getMapRotationAppFlags,
+  getMapRotationModeLabel,
   isMapRotationControllerMounted,
   isMapRotationInteractionActive,
-} from './mapRotationProgressive'
+} from './mapRotationFlags'
 
-/** Serie progresiva: sin hook cinemático ni counterBearing en marcadores. */
+const appFlags = getMapRotationAppFlags()
+
 export const MAP_ROTATION_BINARY = {
   mapRotationController: isMapRotationControllerMounted(),
-  cinematicBearingHook: false,
-  markerCounterBearing: false,
-  userTrackHeading: false,
+  cinematicBearingHook: appFlags.cinematicBearingHook,
+  markerCounterBearing: appFlags.markerCounterBearing,
+  userTrackHeading: appFlags.userTrackHeading,
 }
 
-export const MAP_ROTATION_BINARY_LABEL = MAP_ROTATION_PROGRESSIVE_LABEL
+export const MAP_ROTATION_BINARY_LABEL = getMapRotationModeLabel()
 
 export { isMapRotationInteractionActive }

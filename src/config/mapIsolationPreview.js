@@ -5,11 +5,18 @@
 export {
   MAP_ROTATION_PROGRESSIVE_STEP,
   MAP_ROTATION_PROGRESSIVE_LABEL,
-  getMapRotationProgressiveFlags,
+} from './mapRotationProgressive'
+
+export {
+  MAP_ROTATION_MODE,
+} from './mapRotationMode'
+
+export {
+  getMapRotationControllerFlags,
   isMapRotationControllerMounted,
   isMapRotationInteractionActive,
   canWriteMapPaneStyles,
-} from './mapRotationProgressive'
+} from './mapRotationFlags'
 
 export { MAP_ROTATION_BINARY, MAP_ROTATION_BINARY_LABEL } from './mapRotationBinaryTest'
 
