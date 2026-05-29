@@ -3,6 +3,8 @@
  * Filtrar consola remota: [ROTATION_DELTA]
  */
 
+import { pushMapDiagnosticEvent } from './mapDiagnosticFeed'
+
 export function logRotationDelta({
   file,
   fn,
@@ -13,9 +15,10 @@ export function logRotationDelta({
   next,
   meta,
 }) {
-  console.info('[ROTATION_DELTA]', {
+  const row = {
     iso: new Date().toISOString(),
     t: Math.round(performance.now()),
+    source: 'ROTATION_DELTA',
     file,
     fn,
     line,
@@ -24,7 +27,9 @@ export function logRotationDelta({
     prev,
     next,
     ...(meta != null ? { meta } : {}),
-  })
+  }
+  console.info('[ROTATION_DELTA]', row)
+  pushMapDiagnosticEvent(row)
 }
 
 export function readPaneRotation(pane) {

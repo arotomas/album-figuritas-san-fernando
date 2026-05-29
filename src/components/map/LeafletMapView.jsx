@@ -66,6 +66,7 @@ import {
   logAutoCenterBlocked,
 } from '../../utils/mapUserDragFollowIsolation'
 import { installMapCameraInstrumentation } from '../../utils/mapCameraInstrumentation'
+import { MapDiagnosticOverlay } from './MapDiagnosticOverlay'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -794,6 +795,7 @@ function LeafletMapViewInner({
 
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
+      <MapDiagnosticOverlay />
       <div
         className="map-container absolute inset-0 h-full w-full"
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}

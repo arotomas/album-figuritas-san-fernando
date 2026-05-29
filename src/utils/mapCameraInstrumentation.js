@@ -3,6 +3,8 @@
  * Consola: filtrar [MAP_CAMERA]
  */
 
+import { pushMapDiagnosticEvent } from './mapDiagnosticFeed'
+
 const INSTRUMENTED = new WeakSet()
 
 const stats = {
@@ -71,11 +73,14 @@ function centerSnapshot(map) {
 }
 
 function logMapCamera(method, payload) {
-  console.info('[MAP_CAMERA]', {
+  const row = {
     iso: new Date().toISOString(),
     t: Math.round(performance.now()),
+    source: 'MAP_CAMERA',
     ...payload,
-  })
+  }
+  console.info('[MAP_CAMERA]', row)
+  pushMapDiagnosticEvent(row)
 }
 
 function bumpSite(method, stack) {
