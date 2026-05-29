@@ -52,6 +52,7 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
+import { MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION } from '../../config/mapIsolationPreview'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 import {
   isUserDragAutoCenterBlocked,
@@ -223,13 +224,15 @@ function UserLocationMarker({
   isCoarse = false,
   cinematicBearing = null,
   cinematicActive = false,
+  trackHeading = true,
 }) {
   const map = useMap()
   const markerRef = useRef(null)
   const rootRef = useRef(null)
   const renderKeyRef = useRef('')
-  const smoothedCompassHeading = useSmoothedHeading(position)
-  const compassHeading = cinematicActive ? null : smoothedCompassHeading
+  const smoothedCompassHeading = useSmoothedHeading(trackHeading ? position : null)
+  const compassHeading =
+    !trackHeading || cinematicActive ? null : smoothedCompassHeading
 
   useEffect(() => {
     const el = document.createElement('div')
@@ -547,7 +550,10 @@ function LeafletMapViewInner({
     typeof window !== 'undefined' &&
     (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
 
-  const cinematicRotationEnabled = !reducedMotion && !prefersTouchMap
+  const cinematicRotationEnabled =
+    !MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION &&
+    !reducedMotion &&
+    !prefersTouchMap
   const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
     mapPosition,
     {
@@ -804,13 +810,13 @@ function LeafletMapViewInner({
           {freePanMode ? (
             <MapCameraGestureBridge userControlledCameraRef={userControlledMapRef} />
           ) : null}
-          {explorationActive && (
+          {!MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION && explorationActive ? (
             <ExplorationController
               userPosition={mapPosition}
               reducedMotion={reducedMotion}
               onPauseMapFollow={handlePauseMapFollowForExploration}
             />
-          )}
+          ) : null}
           <MapInteractionBridge
             autoResumeFollow={freePanMode ? false : Boolean(activeTargetFigureId)}
             userControlledRef={userControlledMapRef}
@@ -819,26 +825,41 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          <MapRotationController
-            position={mapPosition}
-            bearing={cinematicBearing}
-            enabled={cinematicModeActive}
-          />
+          {!MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION ? (
+            <MapRotationController
+              position={mapPosition}
+              bearing={cinematicBearing}
+              enabled={cinematicModeActive}
+            />
+          ) : null}
           <FigureMarkersLayer
             figures={markerFigures}
             figuresSignature={markerFiguresSignature}
             nearFigureIdsKey={nearFigureIdsKey}
             activeTargetFigureId={activeTargetFigureId}
-            cinematicBearing={explorationActive ? null : cinematicBearing}
-            cinematicActive={cinematicModeActive && !explorationActive}
+            cinematicBearing={
+              MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION || explorationActive
+                ? null
+                : cinematicBearing
+            }
+            cinematicActive={
+              !MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION &&
+              cinematicModeActive &&
+              !explorationActive
+            }
             onFigureClick={handleFigureClick}
           />
           {mapPosition && (
             <UserLocationMarker
               position={mapPosition}
               isCoarse={!trustedPosition || !hasUsablePosition}
-              cinematicBearing={cinematicBearing}
-              cinematicActive={cinematicModeActive}
+              cinematicBearing={
+                MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION ? null : cinematicBearing
+              }
+              cinematicActive={
+                !MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION && cinematicModeActive
+              }
+              trackHeading={!MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION}
             />
           )}
         </MapContainer>
