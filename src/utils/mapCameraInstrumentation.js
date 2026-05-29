@@ -4,6 +4,10 @@
  */
 
 import { pushMapDiagnosticEvent } from './mapDiagnosticFeed'
+import {
+  parseMapCameraStackOrigin,
+  siteKeyFromParsedOrigin,
+} from './mapCameraStackParse'
 
 const INSTRUMENTED = new WeakSet()
 
@@ -17,17 +21,6 @@ const stats = {
   moveend: 0,
   centerChange: 0,
   bySite: {},
-}
-
-function siteKeyFromStack(stack) {
-  if (!stack) return 'unknown'
-  const lines = stack.split('\n').slice(2, 8)
-  const appLine = lines.find(
-    (line) =>
-      line.includes('/src/') &&
-      !line.includes('mapCameraInstrumentation'),
-  )
-  return appLine?.trim() ?? lines[0]?.trim() ?? 'unknown'
 }
 
 function serializeArgs(method, args) {
@@ -72,7 +65,7 @@ function centerSnapshot(map) {
   }
 }
 
-function logMapCamera(method, payload) {
+function logMapCamera(_method, payload) {
   const row = {
     iso: new Date().toISOString(),
     t: Math.round(performance.now()),
@@ -84,10 +77,20 @@ function logMapCamera(method, payload) {
 }
 
 function bumpSite(method, stack) {
-  const site = siteKeyFromStack(stack)
+  const origin = parseMapCameraStackOrigin(stack)
+  const site = siteKeyFromParsedOrigin(origin)
   const key = `${method} :: ${site}`
   stats.bySite[key] = (stats.bySite[key] ?? 0) + 1
-  return site
+  return origin
+}
+
+function attachOrigin(payload, stack) {
+  const origin = parseMapCameraStackOrigin(stack)
+  return {
+    ...payload,
+    ...origin,
+    site: siteKeyFromParsedOrigin(origin),
+  }
 }
 
 function wrapMapMethod(map, methodName) {
@@ -96,21 +99,20 @@ function wrapMapMethod(map, methodName) {
 
   map[methodName] = function mapCameraWrapped(...args) {
     const stack = new Error(`[MAP_CAMERA] ${methodName}`).stack
-    const site = bumpSite(methodName, stack)
     stats[methodName] += 1
 
     const centerBefore = centerSnapshot(map)
     const serializedArgs = serializeArgs(methodName, args)
 
-    logMapCamera(methodName, {
+    bumpSite(methodName, stack)
+
+    logMapCamera(methodName, attachOrigin({
       kind: 'api-call',
       method: methodName,
-      site,
-      file: site,
       args: serializedArgs,
       centerBefore,
       stack,
-    })
+    }, stack))
 
     const result = original(...args)
 
@@ -121,14 +123,13 @@ function wrapMapMethod(map, methodName) {
       centerBefore.zoom !== centerAfter.zoom
     ) {
       stats.centerChange += 1
-      logMapCamera(methodName, {
+      logMapCamera(methodName, attachOrigin({
         kind: 'center-after-call',
         method: methodName,
-        site,
         centerBefore,
         centerAfter,
         stack,
-      })
+      }, stack))
     }
 
     return result
@@ -151,13 +152,13 @@ export function installMapCameraInstrumentation(map) {
     stats[eventName] += 1
     const center = centerSnapshot(map)
     const stack = new Error(`[MAP_CAMERA] ${eventName}`).stack
-    const site = bumpSite(eventName, stack)
     const originalEvent = Boolean(event?.originalEvent)
 
-    logMapCamera(eventName, {
+    bumpSite(eventName, stack)
+
+    logMapCamera(eventName, attachOrigin({
       kind: 'map-event',
       event: eventName,
-      site,
       center,
       originalEvent,
       centerDelta:
@@ -168,7 +169,7 @@ export function installMapCameraInstrumentation(map) {
             }
           : undefined,
       stack,
-    })
+    }, stack))
 
     if (
       center.lat !== lastLoggedCenter.lat ||
@@ -176,14 +177,14 @@ export function installMapCameraInstrumentation(map) {
       center.zoom !== lastLoggedCenter.zoom
     ) {
       stats.centerChange += 1
-      logMapCamera(eventName, {
+      logMapCamera(eventName, attachOrigin({
         kind: 'center-changed',
         event: eventName,
         centerBefore: lastLoggedCenter,
         centerAfter: center,
         originalEvent,
         stack,
-      })
+      }, stack))
       lastLoggedCenter = center
     }
   }
