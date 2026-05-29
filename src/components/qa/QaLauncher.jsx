@@ -11,6 +11,10 @@ import {
 } from '../../qa/qaCore'
 import { useQaCore } from '../../qa/useQaCore'
 import { logUniverseEventsSnapshot } from '../../utils/universeDiagnostics'
+import {
+  QaCameraDebugSection,
+  shouldShowQaCameraSection,
+} from './QaCameraDebugSection'
 
 const ACTIONS = [
   { id: 'gps', label: 'GPS' },
@@ -71,7 +75,7 @@ export function QaLauncher() {
   return (
     <div className="pointer-events-auto fixed bottom-20 right-3 z-[600] flex flex-col items-end gap-2">
       {open && (
-        <div className="w-44 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/95 shadow-lg backdrop-blur-md">
+        <div className="max-h-[min(72vh,520px)] w-[min(92vw,17rem)] overflow-hidden overflow-y-auto rounded-xl border border-white/15 bg-zinc-950/95 shadow-lg backdrop-blur-md">
           <p className="border-b border-white/10 px-3 py-2 font-sans text-[10px] font-bold uppercase tracking-wide text-amber-200">
             QA Launcher
           </p>
@@ -97,6 +101,7 @@ export function QaLauncher() {
               </li>
             ))}
           </ul>
+          {shouldShowQaCameraSection() ? <QaCameraDebugSection /> : null}
         </div>
       )}
 

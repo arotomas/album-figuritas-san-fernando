@@ -63,7 +63,7 @@ export function MapCameraDebugOverlay() {
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--bottom-nav-height,4.5rem)+0.25rem)] z-[9500] max-h-[42vh] px-1 sm:px-2"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-height,4.5rem)+4.5rem)] z-[10050] max-h-[38vh] px-1 sm:px-2"
       role="status"
       aria-live="polite"
     >

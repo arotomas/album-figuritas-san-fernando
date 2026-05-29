@@ -399,6 +399,18 @@ export function withQaParam(path, active = isQaMasterActive()) {
   const [pathname, rawSearch = ''] = path.split('?')
   const params = new URLSearchParams(rawSearch)
   params.set(QA_URL_PARAMS.master, '1')
+
+  if (typeof window !== 'undefined') {
+    const current = new URLSearchParams(window.location.search)
+    if (current.get('map_debug_log') === '1') {
+      params.set('map_debug_log', '1')
+    }
+    const mapDebug = current.get('map_debug')
+    if (mapDebug) {
+      params.set('map_debug', mapDebug)
+    }
+  }
+
   const query = params.toString()
   return query ? `${pathname}?${query}` : pathname
 }
