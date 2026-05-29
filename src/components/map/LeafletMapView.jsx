@@ -65,6 +65,7 @@ import {
   isUserDragAutoCenterBlocked,
   logAutoCenterBlocked,
 } from '../../utils/mapUserDragFollowIsolation'
+import { installMapCameraInstrumentation } from '../../utils/mapCameraInstrumentation'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -73,6 +74,7 @@ function MapInstanceBridge({ mapRef }) {
 
   useEffect(() => {
     mapRef.current = map
+    installMapCameraInstrumentation(map)
   }, [map, mapRef])
 
   return null
