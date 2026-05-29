@@ -823,6 +823,21 @@ function LeafletMapViewInner({
 
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
+      {freePanMode ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-[99999] border-b-4 border-white/30 bg-green-600 px-3 py-4 text-center shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="font-sans text-xl font-black uppercase leading-tight tracking-wide text-white sm:text-2xl">
+            MAP FREE CAMERA ACTIVA
+          </p>
+          <p className="mt-1 font-mono text-base font-bold text-white sm:text-lg">
+            freeCamera: ON
+          </p>
+        </div>
+      ) : null}
+
       <div
         className="map-container absolute inset-0 h-full w-full"
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}
@@ -994,17 +1009,8 @@ function LeafletMapViewInner({
         <button
           type="button"
           onClick={handleRecenter}
-          className={`gpu-layer absolute right-4 top-4 z-[500] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full shadow-md active:scale-95 ${
-            freePanMode
-              ? 'bg-emerald-900/95 ring-1 ring-emerald-400/50 text-emerald-100'
-              : 'bg-zinc-900/90 text-white'
-          }`}
+          className="gpu-layer absolute right-4 top-4 z-[500] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-zinc-900/90 text-white shadow-md active:scale-95"
           aria-label="Centrar en mi ubicación"
-          title={
-            freePanMode
-              ? 'Modo cámara libre: solo este botón recentra'
-              : 'Centrar en mi ubicación'
-          }
         >
           <FaLocationCrosshairs size={18} />
         </button>
