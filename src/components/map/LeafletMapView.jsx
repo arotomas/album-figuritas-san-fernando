@@ -55,6 +55,7 @@ import { isMapFreeCameraEnabled } from '../../config/mapCamera'
 import { MapTreeDebugStack } from '../debug/MapTreeDebugOverlay'
 import { recordMapNavStep } from '../debug/mapNavAudit'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
+import { appBuildInfo } from '../../build/appBuildInfo'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -416,6 +417,7 @@ function LeafletMapViewInner({
   const freePanMode = isMapFreeCameraEnabled()
 
   useEffect(() => {
+    console.log('REAL MAP COMPONENT MOUNTED')
     recordMapNavStep('LeafletMapView mount', {
       pathname: typeof window !== 'undefined' ? window.location.pathname : '/map',
       search: typeof window !== 'undefined' ? window.location.search : '',
@@ -770,6 +772,22 @@ function LeafletMapViewInner({
         className="map-container absolute inset-0 h-full w-full"
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}
       >
+        <div
+          className="flex flex-col items-center justify-center text-center font-sans font-bold text-white"
+          style={{
+            position: 'fixed',
+            top: '100px',
+            left: 0,
+            right: 0,
+            height: '120px',
+            background: 'magenta',
+            zIndex: 2147483647,
+          }}
+          role="status"
+        >
+          <p className="text-xl leading-tight">REAL MAP COMPONENT</p>
+          <p className="text-lg">SHA: {appBuildInfo.shaShort}</p>
+        </div>
         <MapContainer
           key={mapInstanceKey}
           center={DEFAULT_CENTER}
