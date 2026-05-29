@@ -52,6 +52,8 @@ import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
+import { isMapFreeCameraEnabled } from '../../config/mapCamera'
+import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -163,6 +165,7 @@ function MapFlyController({
   userControlledRef,
   mapGestureActiveRef,
   explorationActive = false,
+  freePanMode = false,
 }) {
   const map = useMap()
   const lastCenteredRef = useRef(null)
@@ -190,6 +193,24 @@ function MapFlyController({
     const manualRecenter = recenterTick > prevRecenterTickRef.current
 
     if (manualRecenter) prevRecenterTickRef.current = recenterTick
+
+    if (freePanMode) {
+      if (explorationActive && !manualRecenter) return
+      if (userControlledRef?.current && !manualRecenter) return
+      if (!isFirst && !manualRecenter) return
+
+      lastCenteredRef.current = { lat, lng }
+      if (accuracy != null) lastAccuracyRef.current = accuracy
+
+      if (isFirst || manualRecenter) {
+        panningRef.current = true
+        map.flyTo([lat, lng], zoom, {
+          animate: !reducedMotion,
+          duration: reducedMotion ? 0 : 1.1,
+        })
+      }
+      return
+    }
 
     const followLocked =
       explorationActive ||
@@ -238,6 +259,7 @@ function MapFlyController({
     explorationActive,
     followPaused,
     followPausedRef,
+    freePanMode,
     map,
     missionFollow,
     moveThreshold,
@@ -477,6 +499,7 @@ function LeafletMapViewInner({
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const explorationActive = useExplorationStore((state) => state.active)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
+  const freePanMode = isMapFreeCameraEnabled()
   const {
     mapPosition,
     position,
@@ -832,7 +855,11 @@ function LeafletMapViewInner({
             userControlledRef={userControlledMapRef}
             mapGestureActiveRef={mapGestureActiveRef}
             explorationActive={explorationActive}
+            freePanMode={freePanMode}
           />
+          {freePanMode ? (
+            <MapCameraGestureBridge userControlledCameraRef={userControlledMapRef} />
+          ) : null}
           {explorationActive && (
             <ExplorationController
               userPosition={mapPosition}
@@ -841,7 +868,7 @@ function LeafletMapViewInner({
             />
           )}
           <MapInteractionBridge
-            autoResumeFollow={Boolean(activeTargetFigureId)}
+            autoResumeFollow={freePanMode ? false : Boolean(activeTargetFigureId)}
             userControlledRef={userControlledMapRef}
             mapGestureActiveRef={mapGestureActiveRef}
             gestureEndHoldMs={MAP_GESTURE_END_HOLD_MS}
@@ -967,8 +994,17 @@ function LeafletMapViewInner({
         <button
           type="button"
           onClick={handleRecenter}
-          className="gpu-layer absolute right-4 top-4 z-[500] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-zinc-900/90 text-white shadow-md active:scale-95"
+          className={`gpu-layer absolute right-4 top-4 z-[500] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full shadow-md active:scale-95 ${
+            freePanMode
+              ? 'bg-emerald-900/95 ring-1 ring-emerald-400/50 text-emerald-100'
+              : 'bg-zinc-900/90 text-white'
+          }`}
           aria-label="Centrar en mi ubicación"
+          title={
+            freePanMode
+              ? 'Modo cámara libre: solo este botón recentra'
+              : 'Centrar en mi ubicación'
+          }
         >
           <FaLocationCrosshairs size={18} />
         </button>
