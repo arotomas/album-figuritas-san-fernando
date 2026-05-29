@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
 import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
+import { registerMapRotationDragFreeze } from '../../utils/mapRotationDragFreeze'
 
 /**
  * Pausa el pan automático y/o la rotación cinematográfica tras gestos manuales en el mapa.
@@ -50,6 +51,7 @@ export function MapInteractionBridge({
 
     const markUserControl = (source) => {
       registerUserDragStart(source)
+      registerMapRotationDragFreeze()
       if (userControlledRef) userControlledRef.current = true
       markGestureActive()
     }

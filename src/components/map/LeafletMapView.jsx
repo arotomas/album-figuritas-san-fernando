@@ -56,6 +56,10 @@ import {
   MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA,
   MAP_ISOLATION_DISABLE_MAP_ROTATION,
 } from '../../config/mapIsolationPreview'
+import {
+  isMapRotationDragFrozen,
+  subscribeMapRotationDragFreeze,
+} from '../../utils/mapRotationDragFreeze'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 import {
   isUserDragAutoCenterBlocked,
@@ -443,6 +447,13 @@ function LeafletMapViewInner({
   const [pendingTargetFigure, setPendingTargetFigure] = useState(null)
   const [missionFollowPaused, setMissionFollowPaused] = useState(false)
   const [mapRotationPaused, setMapRotationPaused] = useState(false)
+  const [rotationDragFrozen, setRotationDragFrozen] = useState(() =>
+    isMapRotationDragFrozen(),
+  )
+
+  useEffect(() => subscribeMapRotationDragFreeze(() => {
+    setRotationDragFrozen(isMapRotationDragFrozen())
+  }), [])
   const reducedMotion = prefersReducedMotion()
   const activeTargetFigureId = useAppStore((state) => state.activeTargetFigureId)
   const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
@@ -557,16 +568,20 @@ function LeafletMapViewInner({
     !MAP_ISOLATION_DISABLE_MAP_ROTATION &&
     !reducedMotion &&
     !prefersTouchMap
+  const rotationPausedOrFrozen = mapRotationPaused || rotationDragFrozen
+
   const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
     mapPosition,
     {
       enabled: cinematicRotationEnabled,
-      paused: mapRotationPaused,
+      paused: rotationPausedOrFrozen,
     },
   )
 
   const cinematicModeActive =
-    cinematicRotationEnabled && cinematicBearing != null && !mapRotationPaused
+    cinematicRotationEnabled &&
+    cinematicBearing != null &&
+    !rotationPausedOrFrozen
 
   const showFocusOverlay = useStableBoolean(isFocusNear, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
@@ -832,7 +847,8 @@ function LeafletMapViewInner({
             <MapRotationController
               position={mapPosition}
               bearing={cinematicBearing}
-              enabled={cinematicModeActive}
+              enabled={cinematicRotationEnabled && cinematicBearing != null}
+              freeze={rotationDragFrozen}
             />
           ) : null}
           <FigureMarkersLayer

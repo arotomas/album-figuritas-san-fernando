@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useMap } from 'react-leaflet'
 import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
+import { registerMapRotationDragFreeze } from '../../utils/mapRotationDragFreeze'
 
 /**
  * Marca control manual de cámara en drag/zoom del usuario.
@@ -14,6 +15,7 @@ export function MapCameraGestureBridge({ userControlledCameraRef }) {
 
     const lockCamera = (source) => {
       registerUserDragStart(source)
+      registerMapRotationDragFreeze()
       userControlledCameraRef.current = true
     }
 
