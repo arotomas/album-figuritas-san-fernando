@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
-import { isMapRotationInteractionActive } from '../../config/mapRotationFlags'
 import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
 import { registerMapRotationDragFreeze } from '../../utils/mapRotationDragFreeze'
 
 /**
- * Pausa el pan automático y/o la rotación cinematográfica tras gestos manuales en el mapa.
+ * Pausa el pan automático y la rotación de overlays tras gestos manuales en el mapa.
  * Con autoResumeFollow, el pan vuelve solo tras una pausa (modo misión).
  */
 export function MapInteractionBridge({
@@ -52,9 +51,7 @@ export function MapInteractionBridge({
 
     const markUserControl = (source) => {
       registerUserDragStart(source)
-      if (isMapRotationInteractionActive()) {
-        registerMapRotationDragFreeze()
-      }
+      registerMapRotationDragFreeze()
       if (userControlledRef) userControlledRef.current = true
       markGestureActive()
     }
@@ -66,18 +63,14 @@ export function MapInteractionBridge({
       resumeTimerRef.current = setTimeout(() => {
         resumeTimerRef.current = null
         if (userControlledRef?.current) return
-        if (isMapRotationInteractionActive()) {
-          onRotationPausedChange?.(false)
-        }
+        onRotationPausedChange?.(false)
         onFollowPausedChange?.(false)
       }, rotationPauseResumeMs)
     }
 
     const pause = ({ fromUser = true, source = 'unknown' } = {}) => {
       clearResumeTimer()
-      if (isMapRotationInteractionActive()) {
-        onRotationPausedChange?.(true)
-      }
+      onRotationPausedChange?.(true)
       onFollowPausedChange?.(true)
       if (fromUser) {
         markUserControl(source)

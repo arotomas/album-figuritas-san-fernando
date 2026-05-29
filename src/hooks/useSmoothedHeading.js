@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { isValidHeading, lerpAngle, shortestAngleDelta } from '../utils/mapBearing'
-import { logRotationDelta } from '../utils/rotationDeltaLog'
 
 const MIN_WALK_SPEED_MPS = 1.05
 const MIN_HEADING_DELTA_DEG = 16
@@ -27,15 +26,6 @@ export function useSmoothedHeading(position) {
     if (smoothedRef.current == null) {
       smoothedRef.current = raw
       lastAppliedRef.current = raw
-      logRotationDelta({
-        file: 'useSmoothedHeading.js',
-        fn: 'useEffect',
-        line: 29,
-        field: 'compassHeading',
-        reason: 'initial-heading',
-        prev: null,
-        next: raw,
-      })
       setHeading(raw)
       return undefined
     }
@@ -48,16 +38,6 @@ export function useSmoothedHeading(position) {
       return undefined
     }
 
-    logRotationDelta({
-      file: 'useSmoothedHeading.js',
-      fn: 'useEffect',
-      line: 42,
-      field: 'compassHeading',
-      reason: 'smoothed-heading',
-      prev: lastAppliedRef.current,
-      next,
-      meta: { delta: Math.round(delta * 10) / 10 },
-    })
     lastAppliedRef.current = next
     setHeading(next)
     return undefined
@@ -65,15 +45,6 @@ export function useSmoothedHeading(position) {
 
   useEffect(() => {
     if (position?.lat == null || position?.lng == null) {
-      logRotationDelta({
-        file: 'useSmoothedHeading.js',
-        fn: 'useEffect',
-        line: 50,
-        field: 'compassHeading',
-        reason: 'position-lost-reset',
-        prev: lastAppliedRef.current,
-        next: null,
-      })
       smoothedRef.current = null
       lastAppliedRef.current = null
       setHeading(null)

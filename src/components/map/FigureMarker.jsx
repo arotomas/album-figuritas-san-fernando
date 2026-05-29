@@ -1,5 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
-import { logRotationDelta } from '../../utils/rotationDeltaLog'
+import { memo } from 'react'
 import { getRarity } from '../../theme/rarity'
 import { RarityBadge } from '../ui/RarityBadge'
 import { prefersReducedMotion } from '../../utils/performance'
@@ -46,24 +45,6 @@ function FigureMarkerInner({
 
   const hasBearing =
     counterBearing != null && Number.isFinite(counterBearing)
-
-  const prevTransformRef = useRef(null)
-  useEffect(() => {
-    const next = hasBearing ? `rotate(${counterBearing}deg)` : null
-    const prev = prevTransformRef.current
-    if (prev === next) return
-    prevTransformRef.current = next
-    logRotationDelta({
-      file: 'FigureMarker.jsx',
-      fn: 'useEffect',
-      line: 56,
-      field: 'figureMarker.transform',
-      reason: 'counterBearing',
-      prev,
-      next,
-      meta: { figureId: figure?.id, counterBearing },
-    })
-  }, [counterBearing, figure?.id, hasBearing])
 
   return (
     <div

@@ -11,9 +11,6 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
 import { useAppStore } from './store/useAppStore'
-import { BuildShaBadge } from './components/layout/BuildShaBadge'
-import { MAP_DIAGNOSTIC_UI_CLEAN } from './config/mapDiagnosticUi'
-import { MapDiagnosticOverlay } from './components/map/MapDiagnosticOverlay'
 
 function App() {
   const { isBooting, bootPhase } = useAppBootGate()
@@ -29,9 +26,6 @@ function App() {
   const authBootstrapped = useAppStore((state) => state.authBootstrapped)
   const wasAuthenticatedRef = useRef(null)
   const isAdminRoute = location.pathname.startsWith('/admin')
-  const isMapRoute =
-    location.pathname === '/map' || location.pathname.startsWith('/map/')
-  const mapDiagnosticClean = MAP_DIAGNOSTIC_UI_CLEAN && isMapRoute
 
   useEffect(() => {
     if (!authBootstrapped) return
@@ -62,7 +56,6 @@ function App() {
   if (isBooting) {
     return (
       <ViewportProvider>
-        <BuildShaBadge />
         <div className="app-shell bg-app h-app overflow-hidden text-ink">
           <AppBootScreen phase={bootPhase} />
         </div>
@@ -73,7 +66,6 @@ function App() {
   if (!splashComplete) {
     return (
       <ViewportProvider>
-        <BuildShaBadge />
         <SplashScreen onComplete={handleSplashComplete} />
       </ViewportProvider>
     )
@@ -81,16 +73,14 @@ function App() {
 
   return (
     <ViewportProvider>
-      {mapDiagnosticClean ? <BuildShaBadge /> : !MAP_DIAGNOSTIC_UI_CLEAN ? <BuildShaBadge /> : null}
-      {mapDiagnosticClean ? <MapDiagnosticOverlay /> : null}
       <LazyMotion features={domAnimation} strict>
         <div
           className={`app-shell h-app overflow-hidden text-ink ${
             isAdminRoute ? 'app-shell-admin' : ''
           }`}
         >
-          {!mapDiagnosticClean ? <ConnectionStatus /> : null}
-          {!mapDiagnosticClean ? <QaDevShell /> : null}
+          <ConnectionStatus />
+          <QaDevShell />
           <Suspense fallback={<AppSkeleton />}>
             <AppRoutes />
           </Suspense>

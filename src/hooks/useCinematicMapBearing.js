@@ -13,7 +13,6 @@ import {
   MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
   MAP_ROTATION_WAKE_SPEED_MPS,
 } from '../config/mapRotation'
-import { MAP_ROTATION_BINARY } from '../config/mapRotationBinaryTest'
 import { getDistanceMeters } from '../utils/geo'
 import {
   computeCourseOverGround,
@@ -22,8 +21,6 @@ import {
   resolveWalkSpeedMps,
   shortestAngleDelta,
 } from '../utils/mapBearing'
-import { rotationTrace } from '../utils/rotationTrace'
-import { logRotationDelta } from '../utils/rotationDeltaLog'
 
 const DEV = import.meta.env.DEV
 
@@ -33,7 +30,8 @@ function syncDebug(setDebug, patch) {
 }
 
 /**
- * Bearing suavizado para rotar el mapa según movimiento real (COG primero, compass fallback).
+ * Bearing suavizado para orientar overlays (COG primero, compass fallback).
+ * El mapa permanece norte-arriba; no modifica mapPane.
  */
 export function useCinematicMapBearing(position, { enabled = true, paused = false } = {}) {
   const [bearing, setBearing] = useState(null)
@@ -46,7 +44,6 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
   const lastPublishedRef = useRef(null)
   const lastCogRef = useRef(null)
   const lastSpeedRef = useRef(null)
-  const pausedLoggedRef = useRef(false)
 
   const walkingRef = useRef(false)
   const quietLockedRef = useRef(false)
@@ -62,16 +59,9 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
     quietLockAnchorRef.current = anchorPosition
       ? { lat: anchorPosition.lat, lng: anchorPosition.lng }
       : null
-    if (DEV) {
-      rotationTrace('enter quiet', {
-        published: lastPublishedRef.current,
-        anchor: quietLockAnchorRef.current,
-        holdMs: MAP_ROTATION_QUIET_LOCK_MS,
-      })
-    }
   }
 
-  function exitQuietLock(reason, detail = {}) {
+  function exitQuietLock() {
     if (!quietLockedRef.current && !lowSpeedSinceRef.current) return
     quietLockedRef.current = false
     quietLockAnchorRef.current = null
@@ -79,20 +69,9 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
     wakeSpeedSinceRef.current = null
     walkingRef.current = true
     cogAnchorRef.current = null
-    if (DEV) {
-      rotationTrace('exit quiet', { reason, ...detail })
-    }
   }
 
   useEffect(() => {
-    if (!enabled || paused) {
-      if (DEV && paused && !pausedLoggedRef.current) {
-        pausedLoggedRef.current = true
-        rotationTrace('paused by interaction')
-      }
-      if (!paused) pausedLoggedRef.current = false
-    }
-
     if (!enabled || paused || !position?.lat || !position?.lng) {
       if (!enabled || paused) {
         targetRef.current = null
@@ -167,54 +146,18 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
           : 0
 
       if (distFromLock >= MAP_ROTATION_WAKE_DISTANCE_M) {
-        exitQuietLock('movement confirmed — distance', {
-          distM: Math.round(distFromLock * 10) / 10,
-          speed,
-        })
+        exitQuietLock()
       } else if (speed != null && speed >= MAP_ROTATION_WAKE_SPEED_MPS) {
         if (!wakeSpeedSinceRef.current) {
           wakeSpeedSinceRef.current = Date.now()
-          if (DEV) {
-            rotationTrace('wake pending — speed high', {
-              speed,
-              threshold: MAP_ROTATION_WAKE_SPEED_MPS,
-            })
-          }
         } else if (
           Date.now() - wakeSpeedSinceRef.current >=
           MAP_ROTATION_WAKE_SPEED_CONFIRM_MS
         ) {
-          exitQuietLock('movement confirmed — speed', {
-            speed,
-            sustainMs: MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
-          })
+          exitQuietLock()
         }
-      } else {
-        if (wakeSpeedSinceRef.current) {
-          if (DEV && speed != null && speed > MAP_ROTATION_STOP_SPEED_MPS) {
-            rotationTrace('wake rejected', {
-              reason: 'speed not sustained long enough',
-              speed,
-              required: MAP_ROTATION_WAKE_SPEED_MPS,
-              sustainMs: MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
-            })
-          }
-          wakeSpeedSinceRef.current = null
-        }
-
-        if (
-          DEV &&
-          speed != null &&
-          speed >= MAP_ROTATION_MIN_SPEED_MPS &&
-          distFromLock < MAP_ROTATION_WAKE_DISTANCE_M
-        ) {
-          rotationTrace('drift ignored', {
-            reason: 'quiet locked — micro speed without displacement',
-            speed,
-            distFromLock: Math.round(distFromLock * 10) / 10,
-            stepDistanceM: Math.round(stepDistanceM * 10) / 10,
-          })
-        }
+      } else if (wakeSpeedSinceRef.current) {
+        wakeSpeedSinceRef.current = null
       }
 
       syncDebug(setDebug, {
@@ -233,26 +176,12 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       impliedSpeedMps < MAP_ROTATION_STOP_SPEED_MPS &&
       (speed == null || speed > MAP_ROTATION_STOP_SPEED_MPS)
     ) {
-      if (DEV) {
-        rotationTrace('drift ignored', {
-          reason: 'displacement contradicts reported speed',
-          stepDistanceM: Math.round(stepDistanceM * 10) / 10,
-          impliedSpeedMps: Math.round(impliedSpeedMps * 100) / 100,
-          reportedSpeed: speed,
-        })
-      }
       speed = impliedSpeedMps
     }
 
     if (speed == null || speed < MAP_ROTATION_STOP_SPEED_MPS) {
       if (!lowSpeedSinceRef.current) {
         lowSpeedSinceRef.current = Date.now()
-        if (DEV) {
-          rotationTrace('enter quiet — low speed', {
-            speed,
-            threshold: MAP_ROTATION_STOP_SPEED_MPS,
-          })
-        }
       }
       walkingRef.current = false
       wakeSpeedSinceRef.current = null
@@ -293,7 +222,6 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
     )
 
     if (cog != null) {
-      const prevCog = lastCogRef.current
       lastCogRef.current = cog
       cogAnchorRef.current = {
         lat: position.lat,
@@ -301,13 +229,6 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
         timestamp: position.timestamp ?? Date.now(),
       }
       targetRef.current = cog
-      if (DEV && (prevCog == null || Math.abs(shortestAngleDelta(prevCog, cog)) >= 2)) {
-        rotationTrace('raw COG', {
-          cog: Math.round(cog * 10) / 10,
-          speed,
-          stepDistanceM: Math.round(stepDistanceM * 10) / 10,
-        })
-      }
       syncDebug(setDebug, {
         ...debugBase,
         rawCog: cog,
@@ -320,12 +241,6 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
     const rawHeading = position.heading
     if (isValidHeading(rawHeading)) {
       targetRef.current = rawHeading
-      if (DEV) {
-        rotationTrace('compass fallback target', {
-          heading: Math.round(rawHeading * 10) / 10,
-          speed,
-        })
-      }
       syncDebug(setDebug, {
         ...debugBase,
         target: rawHeading,
@@ -357,17 +272,6 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       quietLockAnchorRef.current = null
       lowSpeedSinceRef.current = null
       wakeSpeedSinceRef.current = null
-      if (MAP_ROTATION_BINARY.cinematicBearingHook) {
-        logRotationDelta({
-          file: 'useCinematicMapBearing.js',
-          fn: 'useEffect[tick]',
-          line: 358,
-          field: 'bearing',
-          reason: 'enabled:false-reset',
-          prev: lastPublishedRef.current,
-          next: null,
-        })
-      }
       setBearing(null)
       if (DEV) setDebug(null)
       return undefined
@@ -427,35 +331,8 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
         )
 
         if (lastPublishedRef.current == null || delta >= MAP_ROTATION_MIN_DELTA_DEG) {
-          const prevPublished = lastPublishedRef.current
           lastPublishedRef.current = displayRef.current
-          logRotationDelta({
-            file: 'useCinematicMapBearing.js',
-            fn: 'tick',
-            line: 418,
-            field: 'bearing',
-            reason: 'publish:interval',
-            prev: prevPublished,
-            next: displayRef.current,
-            meta: {
-              target,
-              delta: Math.round(delta * 10) / 10,
-              intervalMs: MAP_ROTATION_UPDATE_MS,
-            },
-          })
           setBearing(displayRef.current)
-          if (DEV) {
-            rotationTrace('publish bearing', {
-              published: Math.round(displayRef.current * 10) / 10,
-              target: Math.round(target * 10) / 10,
-              delta: Math.round(delta * 10) / 10,
-            })
-          }
-        } else if (DEV && delta > 0.2) {
-          rotationTrace('ignored delta', {
-            delta: Math.round(delta * 10) / 10,
-            minDelta: MAP_ROTATION_MIN_DELTA_DEG,
-          })
         }
         return
       }

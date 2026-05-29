@@ -255,7 +255,7 @@
   }
 
   .map-container .leaflet-map-pane {
-    /* Rotación cinematográfica — transform aplicado por MapRotationController */
+    /* Mapa norte-arriba; bearing aplicado solo en overlays (marcadores / punto azul) */
     backface-visibility: hidden;
   }
 

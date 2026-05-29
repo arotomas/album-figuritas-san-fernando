@@ -1,4 +1,4 @@
-/** Congela rotación del mapPane durante y tras drag manual del usuario. */
+/** Congela actualización de bearing tras drag manual del usuario. */
 export const MAP_ROTATION_DRAG_FREEZE_MS = 10_000
 
 let freezeUntilMs = 0

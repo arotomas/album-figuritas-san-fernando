@@ -1,4 +1,3 @@
-import { MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA } from '../config/mapIsolationPreview'
 import {
   EXPLORATION_BOUNDS_PADDING,
   EXPLORATION_DISTANCE_NEAR_M,
@@ -45,7 +44,6 @@ export function fitBoundsBetweenUserAndTarget(
   target,
   { reducedMotion = false } = {},
 ) {
-  if (MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA) return
   if (!map || !user?.lat || !user?.lng || !target?.lat || !target?.lng) return
 
   const distanceM = measureExplorationDistanceMeters(user, target)
@@ -69,7 +67,6 @@ export function fitBoundsBetweenUserAndTarget(
 
 /** Si aún no hay GPS, al menos centra el destino. */
 export function flyToExplorationTarget(map, target, { reducedMotion = false } = {}) {
-  if (MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA) return
   if (!map || !target?.lat || !target?.lng) return
 
   map.flyTo([target.lat, target.lng], EXPLORATION_MAX_ZOOM, {
@@ -84,7 +81,6 @@ export function runExplorationCamera(
   target,
   { reducedMotion = false } = {},
 ) {
-  if (MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA) return false
   if (!map || !target?.lat || !target?.lng) return false
 
   let attempts = 0

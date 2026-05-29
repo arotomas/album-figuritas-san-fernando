@@ -21,8 +21,6 @@ import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
 import { useCinematicMapBearing } from '../../hooks/useCinematicMapBearing'
 import { useSmoothedHeading } from '../../hooks/useSmoothedHeading'
 import { MapInteractionBridge } from './MapInteractionBridge'
-import { MapRotationController } from './MapRotationController'
-import { MapRotationDebugOverlay } from './MapRotationDebugOverlay'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
 import {
@@ -53,11 +51,6 @@ import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
 import {
-  MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA,
-  isMapRotationControllerMounted,
-} from '../../config/mapIsolationPreview'
-import { MAP_ROTATION_BINARY } from '../../config/mapRotationBinaryTest'
-import {
   isMapRotationDragFrozen,
   subscribeMapRotationDragFreeze,
 } from '../../utils/mapRotationDragFreeze'
@@ -66,8 +59,6 @@ import {
   isUserDragAutoCenterBlocked,
   logAutoCenterBlocked,
 } from '../../utils/mapUserDragFollowIsolation'
-import { installMapCameraInstrumentation } from '../../utils/mapCameraInstrumentation'
-import { MAP_DIAGNOSTIC_UI_CLEAN } from '../../config/mapDiagnosticUi'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -76,7 +67,6 @@ function MapInstanceBridge({ mapRef }) {
 
   useEffect(() => {
     mapRef.current = map
-    installMapCameraInstrumentation(map)
   }, [map, mapRef])
 
   return null
@@ -568,41 +558,20 @@ function LeafletMapViewInner({
     typeof window !== 'undefined' &&
     (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
 
-  const cinematicRotationEnabled =
-    MAP_ROTATION_BINARY.cinematicBearingHook &&
-    !reducedMotion &&
-    !prefersTouchMap
+  const cinematicRotationEnabled = !reducedMotion && !prefersTouchMap
   const rotationPausedOrFrozen = mapRotationPaused || rotationDragFrozen
 
-  const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
-    mapPosition,
-    {
-      enabled: cinematicRotationEnabled,
-      paused: rotationPausedOrFrozen,
-    },
-  )
+  const { bearing: cinematicBearing } = useCinematicMapBearing(mapPosition, {
+    enabled: cinematicRotationEnabled,
+    paused: rotationPausedOrFrozen,
+  })
 
   const cinematicModeActive =
     cinematicRotationEnabled &&
     cinematicBearing != null &&
     !rotationPausedOrFrozen
 
-  const rotationControllerBearing = MAP_ROTATION_BINARY.cinematicBearingHook
-    ? cinematicBearing
-    : MAP_ROTATION_BINARY.mapRotationController
-      ? 0
-      : null
-
-  const rotationControllerEnabled =
-    isMapRotationControllerMounted() &&
-    Boolean(mapPosition?.lat && mapPosition?.lng) &&
-    (MAP_ROTATION_BINARY.cinematicBearingHook ? cinematicBearing != null : true)
-
-  const markerUsesCounterBearing =
-    MAP_ROTATION_BINARY.markerCounterBearing && !explorationActive
-
-  const userUsesCinematicBearing = MAP_ROTATION_BINARY.cinematicBearingHook
-  const userUsesTrackHeading = MAP_ROTATION_BINARY.userTrackHeading
+  const markerUsesCounterBearing = !explorationActive
 
   const showFocusOverlay = useStableBoolean(isFocusNear, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
@@ -849,7 +818,7 @@ function LeafletMapViewInner({
           {freePanMode ? (
             <MapCameraGestureBridge userControlledCameraRef={userControlledMapRef} />
           ) : null}
-          {!MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA && explorationActive ? (
+          {explorationActive ? (
             <ExplorationController
               userPosition={mapPosition}
               reducedMotion={reducedMotion}
@@ -864,14 +833,6 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          {isMapRotationControllerMounted() ? (
-            <MapRotationController
-              position={mapPosition}
-              bearing={rotationControllerBearing}
-              enabled={rotationControllerEnabled}
-              freeze={rotationDragFrozen}
-            />
-          ) : null}
           <FigureMarkersLayer
             figures={markerFigures}
             figuresSignature={markerFiguresSignature}
@@ -887,15 +848,15 @@ function LeafletMapViewInner({
             <UserLocationMarker
               position={mapPosition}
               isCoarse={!trustedPosition || !hasUsablePosition}
-              cinematicBearing={userUsesCinematicBearing ? cinematicBearing : null}
-              cinematicActive={userUsesCinematicBearing && cinematicModeActive}
-              trackHeading={userUsesTrackHeading}
+              cinematicBearing={cinematicBearing}
+              cinematicActive={cinematicModeActive}
+              trackHeading
             />
           )}
         </MapContainer>
       </div>
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && showAcquisitionBanner && (
+      {showAcquisitionBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
           phase={
@@ -908,23 +869,23 @@ function LeafletMapViewInner({
         />
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN ? <GeoPolicyBanner position={mapPosition} /> : null}
+      <GeoPolicyBanner position={mapPosition} />
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && showGpsBanner && (
+      {showGpsBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
           phase={showSoftWarning ? 'warn' : 'searching'}
         />
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && showRefiningBanner && (
+      {showRefiningBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
           phase={showSoftWarning ? 'warn' : 'refining'}
         />
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && showNoFixBanner && (
+      {showNoFixBanner && (
         <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-red-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
           <p className="text-sm font-semibold text-red-200">{acquisitionMessage}</p>
           <p className="mt-2 text-xs leading-relaxed text-red-200/90">{error}</p>
@@ -938,7 +899,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && showApproximateBanner && (
+      {showApproximateBanner && (
         <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-amber-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
           <p className="text-sm leading-relaxed text-amber-100">{approximateMessage}</p>
           {showPreciseLocationHelp && (
@@ -956,7 +917,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && showHardError && (
+      {showHardError && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500] rounded-xl bg-red-950/90 px-4 py-3 text-center">
           <p className="text-sm text-red-200">{error}</p>
           <p className="mt-1 text-xs text-red-300/80">
@@ -972,7 +933,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN && error && !showHardError && !showApproximateBanner && !showNoFixBanner && (
+      {error && !showHardError && !showApproximateBanner && !showNoFixBanner && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500]">
           <MapGpsStatus label={error} phase="warn" />
           <button
@@ -996,34 +957,24 @@ function LeafletMapViewInner({
         </button>
       )}
 
-      {!MAP_DIAGNOSTIC_UI_CLEAN ? (
-        <MapRotationDebugOverlay
-          debug={rotationDebug}
-          paused={mapRotationPaused}
-          cinematicActive={cinematicModeActive}
-        />
-      ) : null}
-
-      {!MAP_DIAGNOSTIC_UI_CLEAN ? (
-        <MapQaOverlay
-          geolocationAvailable={geolocationAvailable}
-          permission={permission}
-          trustedPosition={trustedPosition}
-          onRequestSingleFix={requestSingleFix}
-          onRetryPrecise={retryPreciseLocation}
-          onStartTracking={startTracking}
-          onStopTracking={stopTracking}
-          onRecenter={handleRecenter}
-          hasMapPosition={Boolean(mapPosition)}
-          proximityNearest={proximityNearest}
-          rawNearest={rawNearest}
-          isNearFigure={isNearFigure}
-          nearFigure={nearFigure}
-          mapPosition={mapPosition}
-          isWatching={isWatching}
-          figures={figures}
-        />
-      ) : null}
+      <MapQaOverlay
+        geolocationAvailable={geolocationAvailable}
+        permission={permission}
+        trustedPosition={trustedPosition}
+        onRequestSingleFix={requestSingleFix}
+        onRetryPrecise={retryPreciseLocation}
+        onStartTracking={startTracking}
+        onStopTracking={stopTracking}
+        onRecenter={handleRecenter}
+        hasMapPosition={Boolean(mapPosition)}
+        proximityNearest={proximityNearest}
+        rawNearest={rawNearest}
+        isNearFigure={isNearFigure}
+        nearFigure={nearFigure}
+        mapPosition={mapPosition}
+        isWatching={isWatching}
+        figures={figures}
+      />
 
       {activeTargetFigure && !explorationActive && (
         <ActiveTargetPill

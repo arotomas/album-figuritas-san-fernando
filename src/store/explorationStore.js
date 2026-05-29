@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA } from '../config/mapIsolationPreview'
 
 const initialState = {
   active: false,
@@ -28,7 +27,7 @@ export const useExplorationStore = create((set) => ({
       targetName: figure?.nombre ?? 'Destino',
       distanceMeters: null,
       hasUserLocation: false,
-      pendingCamera: !MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA,
+      pendingCamera: true,
     })
     return true
   },

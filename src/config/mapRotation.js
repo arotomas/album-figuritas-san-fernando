@@ -1,6 +1,6 @@
 /**
- * Rotación cinematográfica del mapa (dirección de movimiento real).
- * Calibración perceptual — ajustar aquí sin tocar arquitectura.
+ * Bearing cinematográfico para overlays (punto azul y figuritas).
+ * Mapa norte-arriba; calibración perceptual — ajustar aquí sin tocar arquitectura.
  */
 
 /** Intervalo de publicación visual del bearing (ms). */
@@ -44,5 +44,5 @@ export const MAP_ROTATION_EMA_ALPHA = 0.12
 /** Delta angular mínimo para publicar (°). */
 export const MAP_ROTATION_MIN_DELTA_DEG = 3.5
 
-/** Transición CSS del pane — alineada con UPDATE_MS + EMA. */
+/** Transición CSS de overlays — alineada con UPDATE_MS + EMA. */
 export const MAP_ROTATION_CSS_MS = 640
