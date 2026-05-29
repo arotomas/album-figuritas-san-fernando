@@ -5,11 +5,11 @@
 export const MAP_ROTATION_BINARY = {
   mapRotationController: true,
   cinematicBearingHook: true,
-  markerCounterBearing: false,
-  userTrackHeading: false,
+  markerCounterBearing: true,
+  userTrackHeading: true,
 }
 
-export const MAP_ROTATION_BINARY_LABEL = 'bin-02-cinematic-bearing'
+export const MAP_ROTATION_BINARY_LABEL = 'bin-04-track-heading'
 
 export function isMapRotationInteractionActive() {
   return (
