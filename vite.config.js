@@ -2,8 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { resolveBuildInfo } from './src/build/resolveBuildInfo.js'
+
+const appBuildInfo = resolveBuildInfo()
 
 export default defineConfig({
+  define: {
+    __APP_BUILD_INFO__: JSON.stringify(appBuildInfo),
+  },
   plugins: [
     react(),
     tailwindcss(),

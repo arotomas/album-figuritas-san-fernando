@@ -66,6 +66,9 @@ const PrivacyPage = lazy(() =>
 const TermsPage = lazy(() =>
   import('../pages/TermsPage').then((m) => ({ default: m.TermsPage })),
 )
+const BuildInfoPage = lazy(() =>
+  import('../pages/BuildInfoPage').then((m) => ({ default: m.BuildInfoPage })),
+)
 
 function LazyPageFallback({ label }) {
   routeTrace('suspense fallback', { label: label ?? 'unknown' })
@@ -105,6 +108,14 @@ export function AppRoutes() {
           element={
             <LazyPage>
               <TermsPage />
+            </LazyPage>
+          }
+        />
+        <Route
+          path="/build-info"
+          element={
+            <LazyPage label="build-info">
+              <BuildInfoPage />
             </LazyPage>
           }
         />

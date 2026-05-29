@@ -11,6 +11,7 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
 import { useAppStore } from './store/useAppStore'
+import { BuildShaBadge } from './components/layout/BuildShaBadge'
 
 function App() {
   const { isBooting, bootPhase } = useAppBootGate()
@@ -56,6 +57,7 @@ function App() {
   if (isBooting) {
     return (
       <ViewportProvider>
+        <BuildShaBadge />
         <div className="app-shell bg-app h-app overflow-hidden text-ink">
           <AppBootScreen phase={bootPhase} />
         </div>
@@ -66,6 +68,7 @@ function App() {
   if (!splashComplete) {
     return (
       <ViewportProvider>
+        <BuildShaBadge />
         <SplashScreen onComplete={handleSplashComplete} />
       </ViewportProvider>
     )
@@ -73,6 +76,7 @@ function App() {
 
   return (
     <ViewportProvider>
+      <BuildShaBadge />
       <LazyMotion features={domAnimation} strict>
         <div
           className={`app-shell h-app overflow-hidden text-ink ${
