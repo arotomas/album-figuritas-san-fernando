@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
+import { MAP_ISOLATION_DISABLE_MAP_ROTATION } from '../../config/mapIsolationPreview'
 import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
 import { registerMapRotationDragFreeze } from '../../utils/mapRotationDragFreeze'
 
@@ -51,7 +52,9 @@ export function MapInteractionBridge({
 
     const markUserControl = (source) => {
       registerUserDragStart(source)
-      registerMapRotationDragFreeze()
+      if (!MAP_ISOLATION_DISABLE_MAP_ROTATION) {
+        registerMapRotationDragFreeze()
+      }
       if (userControlledRef) userControlledRef.current = true
       markGestureActive()
     }
@@ -63,14 +66,18 @@ export function MapInteractionBridge({
       resumeTimerRef.current = setTimeout(() => {
         resumeTimerRef.current = null
         if (userControlledRef?.current) return
-        onRotationPausedChange?.(false)
+        if (!MAP_ISOLATION_DISABLE_MAP_ROTATION) {
+          onRotationPausedChange?.(false)
+        }
         onFollowPausedChange?.(false)
       }, rotationPauseResumeMs)
     }
 
     const pause = ({ fromUser = true, source = 'unknown' } = {}) => {
       clearResumeTimer()
-      onRotationPausedChange?.(true)
+      if (!MAP_ISOLATION_DISABLE_MAP_ROTATION) {
+        onRotationPausedChange?.(true)
+      }
       onFollowPausedChange?.(true)
       if (fromUser) {
         markUserControl(source)
