@@ -12,20 +12,10 @@ import {
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 import { useExplorationStore } from '../store/explorationStore'
 import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
-import { isMapFreeCameraEnabled } from '../config/mapCamera'
-import { MapTreeDebugStack } from '../components/debug/MapTreeDebugOverlay'
-import { recordMapNavStep } from '../components/debug/mapNavAudit'
+import { appBuildInfo } from '../build/appBuildInfo'
 
 export function MapScreen() {
   const navigate = useNavigate()
-  const freePanMode = isMapFreeCameraEnabled()
-
-  useEffect(() => {
-    recordMapNavStep('MapScreen mount', {
-      pathname: '/map',
-      search: typeof window !== 'undefined' ? window.location.search : '',
-    })
-  }, [])
   const figures = useAppStore((state) => state.figures)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
@@ -105,12 +95,10 @@ export function MapScreen() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
-      <MapTreeDebugStack
-        source="MapScreen"
-        placement="left"
-        freePanMode={freePanMode}
-        stackIndex={1}
-      />
+      <div className="flex h-20 w-full shrink-0 flex-col items-center justify-center bg-red-600 text-center font-sans font-bold text-white">
+        <p className="text-lg leading-tight">TEST NO INVALIDATE SIZE</p>
+        <p className="text-base">SHA: {appBuildInfo.shaShort}</p>
+      </div>
       <ExplorationDistanceBadge
         visible={explorationActive}
         targetName={explorationTargetName}
