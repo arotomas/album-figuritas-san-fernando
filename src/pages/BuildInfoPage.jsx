@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { appBuildInfo } from '../build/appBuildInfo'
+import { MapFreeCameraUrlDebug } from '../components/debug/MapFreeCameraUrlDebug'
 
 function Row({ label, value }) {
   return (
@@ -12,7 +13,8 @@ function Row({ label, value }) {
 
 export function BuildInfoPage() {
   return (
-    <div className="min-h-app bg-zinc-950 px-4 py-8 text-white">
+    <div className="relative min-h-app bg-zinc-950 px-4 py-8 text-white">
+      <MapFreeCameraUrlDebug label="/build-info" />
       <div className="mx-auto max-w-lg">
         <p className="font-mono text-xs uppercase tracking-wide text-amber-300">
           Deploy audit

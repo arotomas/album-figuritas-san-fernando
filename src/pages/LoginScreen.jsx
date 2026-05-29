@@ -8,6 +8,7 @@ import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
 import { authLog } from '../utils/authLog'
+import { MapFreeCameraUrlDebug } from '../components/debug/MapFreeCameraUrlDebug'
 
 export function LoginScreen() {
   const { signIn, signInGoogle, completeOAuthIfNeeded, isSubmitting } = useAuth()
@@ -40,7 +41,8 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-between px-8 pb-10 pt-1">
+    <div className="relative flex min-h-0 flex-1 flex-col justify-between px-8 pb-10 pt-1">
+      <MapFreeCameraUrlDebug label="/login" />
       <AuthBrandHeader className="mb-6" />
 
       <motion.div

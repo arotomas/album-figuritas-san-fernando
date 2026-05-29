@@ -12,6 +12,7 @@ import {
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 import { useExplorationStore } from '../store/explorationStore'
 import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
+import { MapFreeCameraUrlDebug } from '../components/debug/MapFreeCameraUrlDebug'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -94,6 +95,7 @@ export function MapScreen() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
+      <MapFreeCameraUrlDebug label="/map" />
       <ExplorationDistanceBadge
         visible={explorationActive}
         targetName={explorationTargetName}
