@@ -10,9 +10,9 @@
  * 6 = + syncOrigin moveend
  * 7 = + syncOrigin zoomend
  */
-export const MAP_ROTATION_PROGRESSIVE_STEP = 0
+export const MAP_ROTATION_PROGRESSIVE_STEP = 1
 
-export const MAP_ROTATION_PROGRESSIVE_LABEL = 'prog-00-baseline'
+export const MAP_ROTATION_PROGRESSIVE_LABEL = 'prog-01-mount-only'
 
 export function getMapRotationProgressiveFlags(step = MAP_ROTATION_PROGRESSIVE_STEP) {
   return {
