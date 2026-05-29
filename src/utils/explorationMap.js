@@ -6,7 +6,8 @@ import {
   EXPLORATION_MAX_ZOOM_NEAR,
 } from '../config/exploration'
 import { formatDistance, getDistanceMeters } from './geo'
-import { mapDebugLog } from './mapDebugLog'
+import { isMapDebugFlagEnabled, MAP_DEBUG_FLAG } from '../config/mapDebug'
+import { logCameraMove } from './cameraMoveLog'
 
 export function measureExplorationDistanceMeters(user, target) {
   if (!user?.lat || !user?.lng || !target?.lat || !target?.lng) return null
@@ -58,7 +59,11 @@ export function fitBoundsBetweenUserAndTarget(
     [target.lat, target.lng],
   ]
 
-  mapDebugLog('flyTo', 'exploration flyToBounds', { maxZoom, distanceM })
+  logCameraMove('explorationMap.fitBoundsBetweenUserAndTarget', {
+    method: 'flyToBounds',
+    maxZoom,
+    distanceM,
+  })
   map.flyToBounds(bounds, {
     padding: EXPLORATION_BOUNDS_PADDING,
     maxZoom,
@@ -71,7 +76,10 @@ export function fitBoundsBetweenUserAndTarget(
 export function flyToExplorationTarget(map, target, { reducedMotion = false } = {}) {
   if (!map || !target?.lat || !target?.lng) return
 
-  mapDebugLog('flyTo', 'exploration flyTo target', { target })
+  logCameraMove('explorationMap.flyToExplorationTarget', {
+    method: 'flyTo',
+    latlng: [target.lat, target.lng],
+  })
   map.flyTo([target.lat, target.lng], EXPLORATION_MAX_ZOOM, {
     duration: reducedMotion ? 0 : EXPLORATION_FLY_DURATION_S,
     easeLinearity: 0.24,
@@ -84,6 +92,13 @@ export function runExplorationCamera(
   target,
   { reducedMotion = false } = {},
 ) {
+  if (isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW)) {
+    logCameraMove('runExplorationCamera.skipped', {
+      reason: 'MAP_DEBUG_DISABLE_AUTO_FOLLOW',
+    })
+    return false
+  }
+
   if (!map || !target?.lat || !target?.lng) return false
 
   let attempts = 0

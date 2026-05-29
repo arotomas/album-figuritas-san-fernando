@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
 import { mapDebugLog } from '../../utils/mapDebugLog'
+import { logCameraMove } from '../../utils/cameraMoveLog'
 import { setMapDebugGesturePhase } from '../../utils/mapDebugSession'
 
 /**
@@ -70,6 +71,11 @@ export function MapInteractionBridge({
           mapDebugLog('autoFollow', 'mission follow resume cancelled (user control)')
           return
         }
+        logCameraMove('MapInteractionBridge.missionFollowResume', {
+          method: 'resumeFollow',
+          ms: rotationPauseResumeMs,
+          note: 'despausa follow; MapFlyController puede mover cámara en el próximo tick GPS',
+        })
         mapDebugLog('autoFollow', 'mission follow resume → follow unpaused')
         onRotationPausedChange?.(false)
         onFollowPausedChange?.(false)
@@ -81,8 +87,11 @@ export function MapInteractionBridge({
       mapDebugLog('gesture', 'map interaction pause', { fromUser })
       onRotationPausedChange?.(true)
       onFollowPausedChange?.(true)
-      if (fromUser) markUserControl()
-      scheduleResume()
+      if (fromUser) {
+        markUserControl()
+      } else {
+        scheduleResume()
+      }
     }
 
     const onMoveStart = (event) => {
@@ -101,8 +110,23 @@ export function MapInteractionBridge({
     }
 
     const onDragStart = () => {
+      logCameraMove('MapInteractionBridge.dragstart', { method: 'dragstart' })
+      mapDebugLog('gesture', 'dragstart — user control locked')
       markGestureActive('drag')
       pause({ fromUser: true })
+    }
+
+    const onDragEnd = () => {
+      logCameraMove('MapInteractionBridge.dragend', {
+        method: 'dragend',
+        userControlled: userControlledRef?.current,
+        autoResumeFollow,
+      })
+      mapDebugLog('gesture', 'dragend', {
+        userControlled: userControlledRef?.current,
+        autoResumeFollow,
+      })
+      markGestureEnded()
     }
 
     const onGestureStart = () => {
@@ -117,6 +141,7 @@ export function MapInteractionBridge({
     }
 
     map.on('dragstart', onDragStart)
+    map.on('dragend', onDragEnd)
     map.on('movestart', onMoveStart)
     map.on('zoomstart', onZoomStart)
     map.on('touchstart', onGestureStart)
@@ -126,6 +151,7 @@ export function MapInteractionBridge({
 
     return () => {
       map.off('dragstart', onDragStart)
+      map.off('dragend', onDragEnd)
       map.off('movestart', onMoveStart)
       map.off('zoomstart', onZoomStart)
       map.off('touchstart', onGestureStart)

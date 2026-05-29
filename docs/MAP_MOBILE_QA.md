@@ -72,6 +72,15 @@ Ver `__mapDebug.audit().residual`:
 
 Si ves `invalidateSize` con `duringGesture: true` → **bug confirmado** aunque flags estén off.
 
+### Recentrado automático (síntoma reportado)
+
+Si el mapa **vuelve al centro solo** tras unos segundos:
+
+1. Banner debe decir **`MapFlyController: OFF`** con `leaflet-pure`.
+2. Filtrar consola: **`[CAMERA_MOVE]`** — el `origen` identifica al culpable.
+3. Sospecha fuerte si tarda **~4.5s**: `MapInteractionBridge.missionFollowResume` + `MapFlyController` (misión activa).
+4. Ver [`MAP_CAMERA_AUDIT.md`](./MAP_CAMERA_AUDIT.md).
+
 ### Checklist paso 0
 
 - [ ] Mapa estable al cargar

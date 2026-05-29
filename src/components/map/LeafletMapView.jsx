@@ -53,12 +53,15 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import {
+  getActiveMapDebugFlagLabels,
+  isMapDebugActive,
   isMapDebugFlagEnabled,
   isMapDebugLoggingEnabled,
   MAP_DEBUG_FLAG,
 } from '../../config/mapDebug'
 import { mapDebugLog } from '../../utils/mapDebugLog'
-import { MapDebugInstrument } from './MapDebugInstrument'
+import { MapCameraInstrument } from './MapCameraInstrument'
+import { logCameraMove } from '../../utils/cameraMoveLog'
 import { MapDebugStatusBanner } from './MapDebugStatusBanner'
 
 import 'leaflet/dist/leaflet.css'
@@ -196,6 +199,16 @@ function MapFlyController({
   }, [map])
 
   useEffect(() => {
+    logCameraMove('MapFlyController.MOUNTED', {
+      missionFollow,
+      autoFollowFlagOff: isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW),
+    })
+    return () => {
+      logCameraMove('MapFlyController.UNMOUNTED', { missionFollow })
+    }
+  }, [missionFollow])
+
+  useEffect(() => {
     if (isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW)) return
 
     if (!position) return
@@ -247,13 +260,15 @@ function MapFlyController({
 
     if (isFirst || manualRecenter) {
       panningRef.current = true
-      mapDebugLog('autoFollow', 'flyTo', {
-        lat,
-        lng,
+      logCameraMove('MapFlyController.flyTo', {
+        method: 'flyTo',
+        latlng: [lat, lng],
         zoom,
         isFirst,
         manualRecenter,
         missionFollow,
+        followPaused,
+        userControlled: userControlledRef?.current,
       })
       map.flyTo([lat, lng], zoom, {
         animate: !reducedMotion,
@@ -263,7 +278,13 @@ function MapFlyController({
     }
 
     panningRef.current = true
-    mapDebugLog('autoFollow', 'panTo', { lat, lng, missionFollow })
+    logCameraMove('MapFlyController.panTo', {
+      method: 'panTo',
+      latlng: [lat, lng],
+      missionFollow,
+      followPaused,
+      userControlled: userControlledRef?.current,
+    })
     map.panTo([lat, lng], {
       animate: !reducedMotion,
       duration: reducedMotion ? 0 : missionFollow ? 1.05 : 0.55,
@@ -511,6 +532,20 @@ function LeafletMapViewInner({
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const explorationActive = useExplorationStore((state) => state.active)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
+
+  useEffect(() => {
+    if (!isMapDebugActive()) return
+    logCameraMove('LeafletMapView.boot', {
+      method: 'config',
+      autoFollowDisabled: isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW),
+      explorationActive,
+      activeTargetFigureId,
+      missionFollowPaused,
+      userControlled: userControlledMapRef.current,
+      flags: getActiveMapDebugFlagLabels(),
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- snapshot al montar mapa (debug)
+
   const {
     mapPosition,
     position,
@@ -582,7 +617,8 @@ function LeafletMapViewInner({
         [mapPosition.lat, mapPosition.lng],
         [pendingTargetFigure.lat, pendingTargetFigure.lng],
       ])
-      mapDebugLog('fitBounds', 'confirm mission target', {
+      logCameraMove('handleConfirmTarget.fitBounds', {
+        method: 'fitBounds',
         figureId: pendingTargetFigure.id,
       })
       mapRef.current.fitBounds(bounds, {
@@ -714,9 +750,9 @@ function LeafletMapViewInner({
     mapFollowPausedRef.current = false
     setMissionFollowPaused(false)
     setMapRotationPaused(false)
-    mapDebugLog('flyTo', 'handleRecenter button', {
-      lat: mapPosition.lat,
-      lng: mapPosition.lng,
+    logCameraMove('handleRecenter.flyTo', {
+      method: 'flyTo',
+      latlng: [mapPosition.lat, mapPosition.lng],
     })
     mapRef.current.flyTo([mapPosition.lat, mapPosition.lng], USER_ZOOM, {
       animate: !reducedMotion,
@@ -869,7 +905,7 @@ function LeafletMapViewInner({
             {...TILE_OPTIONS}
           />
           <MapInstanceBridge mapRef={mapRef} />
-          {isMapDebugLoggingEnabled() && <MapDebugInstrument />}
+          <MapCameraInstrument />
           <MapResizeHandler mapGestureActiveRef={mapGestureActiveRef} />
           {!isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW) && (
           <MapFlyController
@@ -885,7 +921,8 @@ function LeafletMapViewInner({
             explorationActive={explorationActive}
           />
           )}
-          {explorationActive && (
+          {explorationActive &&
+            !isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW) && (
             <ExplorationController
               userPosition={mapPosition}
               reducedMotion={reducedMotion}

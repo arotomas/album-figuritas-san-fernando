@@ -225,7 +225,7 @@ export function getLeafletPureResidualLayers() {
     'Leaflet MapContainer + TileLayer (OSM)',
     'FigureMarkersLayer (divIcon + createRoot) — sin animaciones si flags ON',
     'UserLocationMarker + UserLocationDot (transiciones CSS propias, sin flag)',
-    'ExplorationController flyTo/fitBounds si modo exploración activo',
+    'ExplorationController (OFF si AUTO_FOLLOW flag; si no, solo pendingCamera)',
     'handleRecenter / fitBounds misión (acción explícita usuario)',
     'MapInteractionBridge (pausa follow; no mueve cámara)',
     'preferCanvas en MapContainer',
