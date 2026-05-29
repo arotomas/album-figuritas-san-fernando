@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MAP_ROTATION_CSS_MS } from '../../config/mapRotation'
 import { prefersReducedMotion } from '../../utils/performance'
-import { MAP_ROTATION_DISABLE_SYNC_ORIGIN_MOVEEND } from '../../config/mapIsolationPreview'
+import { MAP_RC_BINARY } from '../../config/mapRotationControllerBinaryTest'
 import { logRotationDelta, readPaneRotation } from '../../utils/rotationDeltaLog'
 
 /**
@@ -18,9 +18,19 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   useEffect(() => {
     const pane = map.getPane('mapPane')
     if (!pane) return undefined
-
     paneRef.current = pane
   }, [map])
+
+  const resolvePivot = () => {
+    if (MAP_RC_BINARY.usePivotFromGps) {
+      if (!position?.lat || !position?.lng) return null
+      const center = map.latLngToContainerPoint([position.lat, position.lng])
+      return { originX: center.x, originY: center.y }
+    }
+
+    const size = map.getSize()
+    return { originX: size.x / 2, originY: size.y / 2 }
+  }
 
   const paintPane = (reason, originX, originY, bearingDeg) => {
     const pane = paneRef.current
@@ -30,11 +40,20 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
     const nextOrigin = `${originX}px ${originY}px`
     const nextTransform = `rotate(${-bearingDeg}deg)`
 
-    pane.style.transformOrigin = nextOrigin
-    pane.style.transform = nextTransform
+    if (MAP_RC_BINARY.applyTransformOrigin) {
+      pane.style.transformOrigin = nextOrigin
+    }
+
+    if (MAP_RC_BINARY.applyMapPaneTransform) {
+      pane.style.transform = nextTransform
+    }
+
     lastBearingRef.current = bearingDeg
 
-    if (before.transformOrigin !== nextOrigin) {
+    if (
+      MAP_RC_BINARY.applyTransformOrigin &&
+      before.transformOrigin !== nextOrigin
+    ) {
       logRotationDelta({
         file: 'MapRotationController.jsx',
         fn: 'paintPane',
@@ -43,17 +62,10 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
         reason,
         prev: before.transformOrigin,
         next: nextOrigin,
-        meta: {
-          originX,
-          originY,
-          position: position
-            ? { lat: position.lat, lng: position.lng }
-            : null,
-        },
       })
     }
 
-    if (before.transform !== nextTransform) {
+    if (MAP_RC_BINARY.applyMapPaneTransform && before.transform !== nextTransform) {
       logRotationDelta({
         file: 'MapRotationController.jsx',
         fn: 'paintPane',
@@ -72,15 +84,20 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
     if (!pane) return
 
     const before = readPaneRotation(pane)
-    pane.style.transform = ''
-    pane.style.transformOrigin = ''
-    lastBearingRef.current = null
+
+    if (MAP_RC_BINARY.applyMapPaneTransform) {
+      pane.style.transform = ''
+      lastBearingRef.current = null
+    }
+
+    if (MAP_RC_BINARY.applyTransformOrigin) {
+      pane.style.transformOrigin = ''
+    }
 
     if (before.transformOrigin || before.transform) {
       logRotationDelta({
         file: 'MapRotationController.jsx',
         fn: 'clearPane',
-        line: 54,
         field: 'mapPane.transform+transformOrigin',
         reason,
         prev: before,
@@ -106,12 +123,14 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
       }
     }
 
-    if (!position?.lat || !position?.lng || activeBearing == null) return null
+    if (activeBearing == null) return null
 
-    const center = map.latLngToContainerPoint([position.lat, position.lng])
+    const pivot = resolvePivot()
+    if (!pivot) return null
+
     return {
-      originX: center.x,
-      originY: center.y,
+      originX: pivot.originX,
+      originY: pivot.originY,
       bearing: activeBearing,
     }
   }
@@ -142,26 +161,43 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
         : `transform ${MAP_ROTATION_CSS_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
 
     pane.style.transition = transition
-    pane.style.willChange = enabled && bearing != null ? 'transform' : 'auto'
+    pane.style.willChange =
+      enabled && bearing != null && MAP_RC_BINARY.applyMapPaneTransform
+        ? 'transform'
+        : 'auto'
 
-    if (!enabled || bearing == null || !position?.lat || !position?.lng) {
+    if (!enabled || bearing == null) {
       clearPane('effect:disable-or-no-bearing')
       return
     }
 
-    const center = map.latLngToContainerPoint([position.lat, position.lng])
-    paintPane(
-      'effect:positionOrBearing',
-      center.x,
-      center.y,
-      bearing,
-    )
+    if (!MAP_RC_BINARY.effectPositionOrBearing) {
+      return
+    }
+
+    const pivot = resolvePivot()
+    if (!pivot) {
+      clearPane('effect:no-pivot')
+      return
+    }
+
+    paintPane('effect:positionOrBearing', pivot.originX, pivot.originY, bearing)
   }, [bearing, enabled, freeze, map, position?.lat, position?.lng])
 
   useEffect(() => {
     if (freeze) return undefined
 
-    if (!enabled || bearing == null || !position?.lat || !position?.lng) {
+    if (!enabled || bearing == null) {
+      return undefined
+    }
+
+    if (bearing != null) {
+      lastBearingRef.current = bearing
+    }
+
+    const hasSyncListener =
+      MAP_RC_BINARY.syncOriginMoveend || MAP_RC_BINARY.syncOriginZoomend
+    if (!hasSyncListener) {
       return undefined
     }
 
@@ -169,52 +205,37 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
       const pane = paneRef.current
       if (!pane || lastBearingRef.current == null) return
 
-      const center = map.latLngToContainerPoint([position.lat, position.lng])
-      const draggingMoved =
-        typeof map.dragging?.moved === 'function' ? map.dragging.moved() : null
+      const pivot = resolvePivot()
+      if (!pivot) return
 
-      paintPane(`syncOrigin:${eventName}`, center.x, center.y, lastBearingRef.current)
+      paintPane(`syncOrigin:${eventName}`, pivot.originX, pivot.originY, lastBearingRef.current)
 
       logRotationDelta({
         file: 'MapRotationController.jsx',
         fn: 'syncOrigin',
-        line: 149,
         field: 'syncOrigin.invoked',
         reason: `syncOrigin:${eventName}`,
         prev: null,
-        next: { eventName, originX: center.x, originY: center.y },
-        meta: {
-          bearing: lastBearingRef.current,
-          draggingMoved,
-          mapCenter: map.getCenter?.()
-            ? { lat: map.getCenter().lat, lng: map.getCenter().lng }
-            : null,
-        },
+        next: { eventName, originX: pivot.originX, originY: pivot.originY },
       })
     }
 
-    const onZoomEnd = syncOrigin('zoomend')
+    const cleanups = []
 
-    const onMoveEnd = MAP_ROTATION_DISABLE_SYNC_ORIGIN_MOVEEND
-      ? () => {
-          logRotationDelta({
-            file: 'MapRotationController.jsx',
-            fn: 'onMoveEnd',
-            line: 198,
-            field: 'syncOrigin.moveend',
-            reason: 'syncOrigin:moveend:SKIPPED',
-            prev: readPaneRotation(paneRef.current).transformOrigin,
-            next: readPaneRotation(paneRef.current).transformOrigin,
-            meta: { flag: 'MAP_ROTATION_DISABLE_SYNC_ORIGIN_MOVEEND' },
-          })
-        }
-      : syncOrigin('moveend')
+    if (MAP_RC_BINARY.syncOriginZoomend) {
+      const onZoomEnd = syncOrigin('zoomend')
+      map.on('zoomend', onZoomEnd)
+      cleanups.push(() => map.off('zoomend', onZoomEnd))
+    }
 
-    map.on('moveend', onMoveEnd)
-    map.on('zoomend', onZoomEnd)
+    if (MAP_RC_BINARY.syncOriginMoveend) {
+      const onMoveEnd = syncOrigin('moveend')
+      map.on('moveend', onMoveEnd)
+      cleanups.push(() => map.off('moveend', onMoveEnd))
+    }
+
     return () => {
-      map.off('moveend', onMoveEnd)
-      map.off('zoomend', onZoomEnd)
+      cleanups.forEach((off) => off())
     }
   }, [bearing, enabled, freeze, map, position?.lat, position?.lng])
 

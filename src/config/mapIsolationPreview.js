@@ -3,8 +3,9 @@
  */
 
 export { MAP_ROTATION_BINARY, MAP_ROTATION_BINARY_LABEL } from './mapRotationBinaryTest'
+export {
+  MAP_RC_BINARY,
+  MAP_RC_BINARY_LABEL,
+} from './mapRotationControllerBinaryTest'
 
 export const MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA = false
-
-/** Prueba controlada: no ejecutar syncOrigin en moveend (zoomend sigue activo). */
-export const MAP_ROTATION_DISABLE_SYNC_ORIGIN_MOVEEND = false
