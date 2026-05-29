@@ -77,9 +77,10 @@ Si ves `invalidateSize` con `duringGesture: true` → **bug confirmado** aunque 
 Si el mapa **vuelve al centro solo** tras unos segundos:
 
 1. Banner debe decir **`MapFlyController: OFF`** con `leaflet-pure`.
-2. Filtrar consola: **`[CAMERA_MOVE]`** — el `origen` identifica al culpable.
-3. Sospecha fuerte si tarda **~4.5s**: `MapInteractionBridge.missionFollowResume` + `MapFlyController` (misión activa).
-4. Ver [`MAP_CAMERA_AUDIT.md`](./MAP_CAMERA_AUDIT.md).
+2. **Overlay en pantalla** (sin consola): `/map?map_debug_log=1` — panel verde con último `CAMERA_MOVE`, historial de 10, y flags (`autoFollow`, `MapFlyController`, `missionFollowResume`, `userControlledRef`, `followPaused`, `activeTargetFigureId`). Cuando el mapa salte solo, leé **`origin`** del último movimiento.
+3. Desktop opcional: filtrar consola **`[CAMERA_MOVE]`**.
+4. Sospecha fuerte si tarda **~4.5s**: `MapInteractionBridge.missionFollowResume` + `MapFlyController` (misión activa).
+5. Ver [`MAP_CAMERA_AUDIT.md`](./MAP_CAMERA_AUDIT.md).
 
 ### Checklist paso 0
 

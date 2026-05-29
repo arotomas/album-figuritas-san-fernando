@@ -1,4 +1,5 @@
 import { isMapDebugLoggingEnabled } from '../config/mapDebug'
+import { useMapCameraDebugStore } from '../store/mapCameraDebugStore'
 import { recordMapDebugSession } from './mapDebugSession'
 
 export function isCameraMoveLoggingEnabled() {
@@ -55,6 +56,8 @@ export function logCameraMove(origen, detail = {}) {
     origen,
     payload,
   )
+
+  useMapCameraDebugStore.getState().pushCameraMove(origen, payload)
 
   console.info('[CAMERA_MOVE]', payload)
 }

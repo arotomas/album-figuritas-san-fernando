@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
 import { mapDebugLog } from '../../utils/mapDebugLog'
+import { isCameraMoveLoggingEnabled } from '../../utils/cameraMoveLog'
 import { logCameraMove } from '../../utils/cameraMoveLog'
+import { useMapCameraDebugStore } from '../../store/mapCameraDebugStore'
 import { setMapDebugGesturePhase } from '../../utils/mapDebugSession'
 
 /**
@@ -23,11 +25,17 @@ export function MapInteractionBridge({
   const gestureEndTimerRef = useRef(null)
 
   useEffect(() => {
+    const setResumePending = (pending) => {
+      if (!isCameraMoveLoggingEnabled()) return
+      useMapCameraDebugStore.getState().setRuntime({ missionFollowResumePending: pending })
+    }
+
     const clearResumeTimer = () => {
       if (resumeTimerRef.current) {
         clearTimeout(resumeTimerRef.current)
         resumeTimerRef.current = null
       }
+      setResumePending(false)
     }
 
     const clearGestureEndTimer = () => {
@@ -55,6 +63,9 @@ export function MapInteractionBridge({
 
     const markUserControl = () => {
       if (userControlledRef) userControlledRef.current = true
+      if (isCameraMoveLoggingEnabled()) {
+        useMapCameraDebugStore.getState().setRuntime({ userControlled: true })
+      }
       markGestureActive()
     }
 
@@ -65,6 +76,7 @@ export function MapInteractionBridge({
       mapDebugLog('autoFollow', 'mission follow resume scheduled', {
         ms: rotationPauseResumeMs,
       })
+      setResumePending(true)
       resumeTimerRef.current = setTimeout(() => {
         resumeTimerRef.current = null
         if (userControlledRef?.current) {

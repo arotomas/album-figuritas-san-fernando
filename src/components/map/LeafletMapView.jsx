@@ -63,6 +63,9 @@ import { mapDebugLog } from '../../utils/mapDebugLog'
 import { MapCameraInstrument } from './MapCameraInstrument'
 import { logCameraMove } from '../../utils/cameraMoveLog'
 import { MapDebugStatusBanner } from './MapDebugStatusBanner'
+import { MapCameraDebugOverlay } from './MapCameraDebugOverlay'
+import { isCameraMoveLoggingEnabled } from '../../utils/cameraMoveLog'
+import { useMapCameraDebugStore } from '../../store/mapCameraDebugStore'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -669,6 +672,32 @@ function LeafletMapViewInner({
   const cinematicModeActive =
     cinematicRotationEnabled && cinematicBearing != null && !mapRotationPaused
 
+  const mapFlyControllerOn = !isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW)
+
+  useEffect(() => {
+    if (!isCameraMoveLoggingEnabled()) return undefined
+    useMapCameraDebugStore.getState().reset()
+    const sync = () => {
+      useMapCameraDebugStore.getState().setRuntime({
+        mapFlyControllerOn,
+        autoFollowDisabled: isMapDebugFlagEnabled(MAP_DEBUG_FLAG.AUTO_FOLLOW),
+        missionFollowResumeOn: Boolean(activeTargetFigureId),
+        activeTargetFigureId: activeTargetFigureId ?? null,
+        userControlled: userControlledMapRef.current,
+        followPaused: missionFollowPaused || mapFollowPausedRef.current,
+        explorationActive,
+      })
+    }
+    sync()
+    const id = window.setInterval(sync, 300)
+    return () => window.clearInterval(id)
+  }, [
+    activeTargetFigureId,
+    explorationActive,
+    mapFlyControllerOn,
+    missionFollowPaused,
+  ])
+
   const showFocusOverlay = useStableBoolean(isFocusNear, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
     holdOffMs: TARGET_LOCK_FOCUS_NEAR_HOLD_MS,
@@ -748,6 +777,12 @@ function LeafletMapViewInner({
     stopExploration()
     userControlledMapRef.current = false
     mapFollowPausedRef.current = false
+    if (isCameraMoveLoggingEnabled()) {
+      useMapCameraDebugStore.getState().setRuntime({
+        userControlled: false,
+        followPaused: false,
+      })
+    }
     setMissionFollowPaused(false)
     setMapRotationPaused(false)
     logCameraMove('handleRecenter.flyTo', {
@@ -1102,6 +1137,8 @@ function LeafletMapViewInner({
         onConfirm={handleConfirmTarget}
         onDismiss={() => setPendingTargetFigure(null)}
       />
+
+      <MapCameraDebugOverlay />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">
         {activeTargetFigureId && showSecondaryHint && (
