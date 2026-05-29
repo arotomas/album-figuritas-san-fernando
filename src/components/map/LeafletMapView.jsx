@@ -53,7 +53,8 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
-import { MapFreeCameraUrlDebug } from '../debug/MapFreeCameraUrlDebug'
+import { MapTreeDebugStack } from '../debug/MapTreeDebugOverlay'
+import { recordMapNavStep } from '../debug/mapNavAudit'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 
 import 'leaflet/dist/leaflet.css'
@@ -501,6 +502,14 @@ function LeafletMapViewInner({
   const explorationActive = useExplorationStore((state) => state.active)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
   const freePanMode = isMapFreeCameraEnabled()
+
+  useEffect(() => {
+    recordMapNavStep('LeafletMapView mount', {
+      pathname: typeof window !== 'undefined' ? window.location.pathname : '/map',
+      search: typeof window !== 'undefined' ? window.location.search : '',
+    })
+  }, [])
+
   const {
     mapPosition,
     position,
@@ -824,13 +833,11 @@ function LeafletMapViewInner({
 
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
-      <MapFreeCameraUrlDebug
-        label="LeafletMapView"
-        placement="map-bottom-right"
-        extraLines={[
-          `freePanMode (local) = ${String(freePanMode)}`,
-          `banner verde monta = ${String(freePanMode)}`,
-        ]}
+      <MapTreeDebugStack
+        source="LeafletMapView"
+        placement="right"
+        freePanMode={freePanMode}
+        stackIndex={2}
       />
       {freePanMode ? (
         <div

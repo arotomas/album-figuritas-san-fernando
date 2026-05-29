@@ -8,7 +8,8 @@ import { Input } from '../components/Input'
 import { useAuth } from '../hooks/useAuth'
 import { staggerContainer, staggerItem } from '../animations/pageTransition'
 import { authLog } from '../utils/authLog'
-import { MapFreeCameraUrlDebug } from '../components/debug/MapFreeCameraUrlDebug'
+import { MapTreeDebugPanel } from '../components/debug/MapTreeDebugOverlay'
+import { recordMapNavStep } from '../components/debug/mapNavAudit'
 
 export function LoginScreen() {
   const { signIn, signInGoogle, completeOAuthIfNeeded, isSubmitting } = useAuth()
@@ -16,6 +17,13 @@ export function LoginScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [oauthHandled, setOauthHandled] = useState(false)
+
+  useEffect(() => {
+    recordMapNavStep('LoginScreen mount', {
+      pathname: '/login',
+      search: typeof window !== 'undefined' ? window.location.search : '',
+    })
+  }, [])
 
   useEffect(() => {
     if (oauthHandled) return
@@ -42,7 +50,7 @@ export function LoginScreen() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col justify-between px-8 pb-10 pt-1">
-      <MapFreeCameraUrlDebug label="/login" />
+      <MapTreeDebugPanel source="/login" placement="right" stackIndex={0} />
       <AuthBrandHeader className="mb-6" />
 
       <motion.div

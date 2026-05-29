@@ -12,6 +12,8 @@ import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
 import { useAppStore } from './store/useAppStore'
 import { BuildShaBadge } from './components/layout/BuildShaBadge'
+import { MapRouteAppAudit } from './components/debug/MapRouteAppAudit'
+import { recordMapNavStep } from './components/debug/mapNavAudit'
 
 function App() {
   const { isBooting, bootPhase } = useAppBootGate()
@@ -49,6 +51,10 @@ function App() {
   }, [location.pathname, location.search])
 
   useEffect(() => {
+    recordMapNavStep(`App: ${location.pathname}`, location)
+  }, [location.pathname, location.search, location.key])
+
+  useEffect(() => {
     if (!isQaShellActive() && useAppStore.getState().qaTestFigure) {
       clearQaTestFigure()
     }
@@ -77,6 +83,7 @@ function App() {
   return (
     <ViewportProvider>
       <BuildShaBadge />
+      <MapRouteAppAudit />
       <LazyMotion features={domAnimation} strict>
         <div
           className={`app-shell h-app overflow-hidden text-ink ${
