@@ -8,7 +8,6 @@ import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
   MAP_GESTURE_END_HOLD_MS,
-  MAP_RESIZE_MIN_DELTA_PX,
   MAP_TILE_FILTER,
   TILE_ATTRIBUTION,
   TILE_OPTIONS,
@@ -58,93 +57,6 @@ import { recordMapNavStep } from '../debug/mapNavAudit'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 
 import 'leaflet/dist/leaflet.css'
-
-function MapResizeHandler({ mapGestureActiveRef }) {
-  const map = useMap()
-  const frameRef = useRef(null)
-  const pendingRef = useRef(false)
-  const lastSizeRef = useRef({ w: 0, h: 0 })
-
-  useEffect(() => {
-    const container = map.getContainer()
-    const observeTarget = container.parentElement ?? container
-
-    const runInvalidate = () => {
-      if (frameRef.current != null) return
-      frameRef.current = requestAnimationFrame(() => {
-        frameRef.current = null
-        map.invalidateSize({ animate: false })
-      })
-    }
-
-    const invalidateIfLayoutChanged = ({ force = false } = {}) => {
-      const w = observeTarget.clientWidth
-      const h = observeTarget.clientHeight
-      if (w <= 0 || h <= 0) return
-
-      const last = lastSizeRef.current
-      const widthDelta = Math.abs(last.w - w)
-      const heightDelta = Math.abs(last.h - h)
-
-      if (
-        !force &&
-        last.w > 0 &&
-        widthDelta < MAP_RESIZE_MIN_DELTA_PX &&
-        heightDelta < MAP_RESIZE_MIN_DELTA_PX
-      ) {
-        return
-      }
-
-      if (!force && mapGestureActiveRef?.current) {
-        pendingRef.current = true
-        return
-      }
-
-      pendingRef.current = false
-      lastSizeRef.current = { w, h }
-      runInvalidate()
-    }
-
-    const flushPendingInvalidate = () => {
-      if (!pendingRef.current) return
-      invalidateIfLayoutChanged({ force: true })
-    }
-
-    lastSizeRef.current = {
-      w: observeTarget.clientWidth,
-      h: observeTarget.clientHeight,
-    }
-    invalidateIfLayoutChanged()
-    const timer = setTimeout(invalidateIfLayoutChanged, 120)
-
-    const resizeObserver =
-      typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(() => invalidateIfLayoutChanged())
-        : null
-    resizeObserver?.observe(observeTarget)
-    if (observeTarget !== container) resizeObserver?.observe(container)
-
-    const onWindowResize = () => invalidateIfLayoutChanged()
-    window.addEventListener('resize', onWindowResize)
-    window.addEventListener('viewport-update', onWindowResize)
-    window.addEventListener('orientationchange', onWindowResize)
-    map.on('moveend', flushPendingInvalidate)
-    map.on('zoomend', flushPendingInvalidate)
-
-    return () => {
-      clearTimeout(timer)
-      if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', onWindowResize)
-      window.removeEventListener('viewport-update', onWindowResize)
-      window.removeEventListener('orientationchange', onWindowResize)
-      map.off('moveend', flushPendingInvalidate)
-      map.off('zoomend', flushPendingInvalidate)
-    }
-  }, [map, mapGestureActiveRef])
-
-  return null
-}
 
 function MapInstanceBridge({ mapRef }) {
   const map = useMap()
@@ -874,7 +786,6 @@ function LeafletMapViewInner({
             {...TILE_OPTIONS}
           />
           <MapInstanceBridge mapRef={mapRef} />
-          <MapResizeHandler mapGestureActiveRef={mapGestureActiveRef} />
           <MapFlyController
             position={followCenter ?? mapPosition}
             zoom={USER_ZOOM}
