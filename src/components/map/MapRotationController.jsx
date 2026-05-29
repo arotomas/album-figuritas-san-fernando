@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MAP_ROTATION_CSS_MS } from '../../config/mapRotation'
 import { prefersReducedMotion } from '../../utils/performance'
-import { MAP_RC_BINARY } from '../../config/mapRotationControllerBinaryTest'
+import {
+  MAP_ROTATION_PROGRESSIVE_STEP,
+  canWriteMapPaneStyles,
+  getMapRotationProgressiveFlags,
+} from '../../config/mapRotationProgressive'
 import { logRotationDelta, readPaneRotation } from '../../utils/rotationDeltaLog'
 
 /**
@@ -14,6 +18,8 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   const paneRef = useRef(null)
   const lastBearingRef = useRef(null)
   const frozenSnapshotRef = useRef(null)
+  const flags = getMapRotationProgressiveFlags()
+  const writeStyles = canWriteMapPaneStyles()
 
   useEffect(() => {
     const pane = map.getPane('mapPane')
@@ -22,7 +28,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   }, [map])
 
   const resolvePivot = () => {
-    if (MAP_RC_BINARY.usePivotFromGps) {
+    if (flags.usePivotFromGps) {
       if (!position?.lat || !position?.lng) return null
       const center = map.latLngToContainerPoint([position.lat, position.lng])
       return { originX: center.x, originY: center.y }
@@ -33,6 +39,8 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   }
 
   const paintPane = (reason, originX, originY, bearingDeg) => {
+    if (!writeStyles) return
+
     const pane = paneRef.current
     if (!pane) return
 
@@ -40,24 +48,23 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
     const nextOrigin = `${originX}px ${originY}px`
     const nextTransform = `rotate(${-bearingDeg}deg)`
 
-    if (MAP_RC_BINARY.applyTransformOrigin) {
+    if (flags.applyTransformOrigin) {
       pane.style.transformOrigin = nextOrigin
     }
 
-    if (MAP_RC_BINARY.applyMapPaneTransform) {
+    if (flags.applyMapPaneTransform) {
       pane.style.transform = nextTransform
     }
 
     lastBearingRef.current = bearingDeg
 
     if (
-      MAP_RC_BINARY.applyTransformOrigin &&
+      flags.applyTransformOrigin &&
       before.transformOrigin !== nextOrigin
     ) {
       logRotationDelta({
         file: 'MapRotationController.jsx',
         fn: 'paintPane',
-        line: 31,
         field: 'mapPane.transformOrigin',
         reason,
         prev: before.transformOrigin,
@@ -65,11 +72,10 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
       })
     }
 
-    if (MAP_RC_BINARY.applyMapPaneTransform && before.transform !== nextTransform) {
+    if (flags.applyMapPaneTransform && before.transform !== nextTransform) {
       logRotationDelta({
         file: 'MapRotationController.jsx',
         fn: 'paintPane',
-        line: 32,
         field: 'mapPane.transform',
         reason,
         prev: before.transform,
@@ -80,17 +86,19 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   }
 
   const clearPane = (reason) => {
+    if (!writeStyles) return
+
     const pane = paneRef.current
     if (!pane) return
 
     const before = readPaneRotation(pane)
 
-    if (MAP_RC_BINARY.applyMapPaneTransform) {
+    if (flags.applyMapPaneTransform) {
       pane.style.transform = ''
       lastBearingRef.current = null
     }
 
-    if (MAP_RC_BINARY.applyTransformOrigin) {
+    if (flags.applyTransformOrigin) {
       pane.style.transformOrigin = ''
     }
 
@@ -107,6 +115,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
   }
 
   const applySnapshot = (pane, snapshot, reason) => {
+    if (!writeStyles) return
     pane.style.transition = 'none'
     pane.style.willChange = 'transform'
     paintPane(reason, snapshot.originX, snapshot.originY, snapshot.bearing)
@@ -140,6 +149,8 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
     if (!pane) return
 
     if (freeze) {
+      if (!writeStyles) return
+
       if (!frozenSnapshotRef.current) {
         const activeBearing = lastBearingRef.current ?? bearing
         const snapshot = captureSnapshot(pane, activeBearing)
@@ -162,7 +173,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
 
     pane.style.transition = transition
     pane.style.willChange =
-      enabled && bearing != null && MAP_RC_BINARY.applyMapPaneTransform
+      enabled && bearing != null && flags.applyMapPaneTransform
         ? 'transform'
         : 'auto'
 
@@ -171,7 +182,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
       return
     }
 
-    if (!MAP_RC_BINARY.effectPositionOrBearing) {
+    if (!flags.effectPositionOrBearing) {
       return
     }
 
@@ -182,7 +193,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
     }
 
     paintPane('effect:positionOrBearing', pivot.originX, pivot.originY, bearing)
-  }, [bearing, enabled, freeze, map, position?.lat, position?.lng])
+  }, [bearing, enabled, freeze, map, position?.lat, position?.lng, writeStyles])
 
   useEffect(() => {
     if (freeze) return undefined
@@ -195,8 +206,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
       lastBearingRef.current = bearing
     }
 
-    const hasSyncListener =
-      MAP_RC_BINARY.syncOriginMoveend || MAP_RC_BINARY.syncOriginZoomend
+    const hasSyncListener = flags.syncOriginMoveend || flags.syncOriginZoomend
     if (!hasSyncListener) {
       return undefined
     }
@@ -222,13 +232,13 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
 
     const cleanups = []
 
-    if (MAP_RC_BINARY.syncOriginZoomend) {
+    if (flags.syncOriginZoomend) {
       const onZoomEnd = syncOrigin('zoomend')
       map.on('zoomend', onZoomEnd)
       cleanups.push(() => map.off('zoomend', onZoomEnd))
     }
 
-    if (MAP_RC_BINARY.syncOriginMoveend) {
+    if (flags.syncOriginMoveend) {
       const onMoveEnd = syncOrigin('moveend')
       map.on('moveend', onMoveEnd)
       cleanups.push(() => map.off('moveend', onMoveEnd))
@@ -237,7 +247,7 @@ export function MapRotationController({ position, bearing, enabled, freeze = fal
     return () => {
       cleanups.forEach((off) => off())
     }
-  }, [bearing, enabled, freeze, map, position?.lat, position?.lng])
+  }, [bearing, enabled, freeze, map, position?.lat, position?.lng, writeStyles])
 
   useEffect(() => {
     return () => {

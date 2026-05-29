@@ -52,7 +52,10 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
-import { MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA } from '../../config/mapIsolationPreview'
+import {
+  MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA,
+  isMapRotationControllerMounted,
+} from '../../config/mapIsolationPreview'
 import { MAP_ROTATION_BINARY } from '../../config/mapRotationBinaryTest'
 import {
   isMapRotationDragFrozen,
@@ -591,7 +594,7 @@ function LeafletMapViewInner({
       : null
 
   const rotationControllerEnabled =
-    MAP_ROTATION_BINARY.mapRotationController &&
+    isMapRotationControllerMounted() &&
     Boolean(mapPosition?.lat && mapPosition?.lng) &&
     (MAP_ROTATION_BINARY.cinematicBearingHook ? cinematicBearing != null : true)
 
@@ -861,7 +864,7 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          {MAP_ROTATION_BINARY.mapRotationController ? (
+          {isMapRotationControllerMounted() ? (
             <MapRotationController
               position={mapPosition}
               bearing={rotationControllerBearing}

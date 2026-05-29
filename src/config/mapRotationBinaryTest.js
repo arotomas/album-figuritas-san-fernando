@@ -1,16 +1,18 @@
-/**
- * Reducción binaria rotación app (base estable: 496b6ae).
- * Series RC: solo mapRotationController; piezas en mapRotationControllerBinaryTest.js
- */
+import {
+  MAP_ROTATION_PROGRESSIVE_LABEL,
+  MAP_ROTATION_PROGRESSIVE_STEP,
+  isMapRotationControllerMounted,
+  isMapRotationInteractionActive,
+} from './mapRotationProgressive'
+
+/** Serie progresiva: sin hook cinemático ni counterBearing en marcadores. */
 export const MAP_ROTATION_BINARY = {
-  mapRotationController: true,
+  mapRotationController: isMapRotationControllerMounted(),
   cinematicBearingHook: false,
   markerCounterBearing: false,
   userTrackHeading: false,
 }
 
-export const MAP_ROTATION_BINARY_LABEL = 'rc01-d-pivot-gps'
+export const MAP_ROTATION_BINARY_LABEL = MAP_ROTATION_PROGRESSIVE_LABEL
 
-export function isMapRotationInteractionActive() {
-  return MAP_ROTATION_BINARY.mapRotationController
-}
+export { isMapRotationInteractionActive }

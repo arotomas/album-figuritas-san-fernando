@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
-import { isMapRotationInteractionActive } from '../../config/mapRotationBinaryTest'
+import { isMapRotationInteractionActive } from '../../config/mapRotationProgressive'
 import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
 import { registerMapRotationDragFreeze } from '../../utils/mapRotationDragFreeze'
 
