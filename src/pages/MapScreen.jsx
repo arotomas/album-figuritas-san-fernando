@@ -95,7 +95,7 @@ export function MapScreen() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
-      <MapFreeCameraUrlDebug label="/map" />
+      <MapFreeCameraUrlDebug label="/map (MapScreen)" placement="map-bottom" />
       <ExplorationDistanceBadge
         visible={explorationActive}
         targetName={explorationTargetName}

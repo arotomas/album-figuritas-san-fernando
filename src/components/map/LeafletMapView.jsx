@@ -53,6 +53,7 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
+import { MapFreeCameraUrlDebug } from '../debug/MapFreeCameraUrlDebug'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 
 import 'leaflet/dist/leaflet.css'
@@ -823,6 +824,14 @@ function LeafletMapViewInner({
 
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
+      <MapFreeCameraUrlDebug
+        label="LeafletMapView"
+        placement="map-bottom-right"
+        extraLines={[
+          `freePanMode (local) = ${String(freePanMode)}`,
+          `banner verde monta = ${String(freePanMode)}`,
+        ]}
+      />
       {freePanMode ? (
         <div
           className="pointer-events-none absolute inset-x-0 top-0 z-[99999] border-b-4 border-white/30 bg-green-600 px-3 py-4 text-center shadow-lg"
