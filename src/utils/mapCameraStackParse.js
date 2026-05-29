@@ -59,21 +59,45 @@ function findResolvedFunction(stack) {
   return null
 }
 
-function lineNumberFromUrl(urlPart) {
-  const match = urlPart.match(/:(\d+)(?::\d+)?$/)
-  return match ? Number(match[1]) : null
+function parsePositionFromUrl(urlPart) {
+  const triple = urlPart.match(/:(\d+):(\d+)$/)
+  if (triple) {
+    return {
+      line: Number(triple[1]),
+      column: Number(triple[2]),
+      path: urlPart.slice(0, -triple[0].length),
+    }
+  }
+
+  const pair = urlPart.match(/:(\d+)$/)
+  if (pair) {
+    return {
+      line: Number(pair[1]),
+      column: null,
+      path: urlPart.slice(0, -pair[0].length),
+    }
+  }
+
+  return { line: null, column: null, path: urlPart }
+}
+
+function bundleFileFromPath(path) {
+  const match = path.match(/\/([^/?#]+\.(?:jsx|js))(?:\?.*)?$/)
+  if (match) return match[1]
+  return path.split('/').pop()?.split('?')[0] ?? 'unknown'
 }
 
 function fileFromUrl(urlPart) {
-  const srcMatch = urlPart.match(/\/src\/(.+?)(?::\d+)?(?::\d+)?$/)
+  const { path } = parsePositionFromUrl(urlPart)
+  const srcMatch = path.match(/\/src\/(.+?)$/)
   if (srcMatch) return srcMatch[1]
 
   for (const [hint, logicalPath] of APP_FILE_HINTS) {
-    if (urlPart.includes(hint)) return logicalPath
+    if (path.includes(hint)) return logicalPath
   }
 
-  const baseMatch = urlPart.match(/\/([^/?#]+\.(?:jsx|js))(?::\d+)?(?::\d+)?$/)
-  return baseMatch ? baseMatch[1] : urlPart.split('/').pop()?.split(':')[0] ?? 'unknown'
+  const baseMatch = path.match(/\/([^/?#]+\.(?:jsx|js))$/)
+  return baseMatch ? baseMatch[1] : bundleFileFromPath(path)
 }
 
 function isAppChunkLine(line, parsed) {
@@ -89,10 +113,13 @@ function parseStackLine(line) {
   if (chrome) {
     const fn = chrome[1]
     const urlPart = chrome[2]
+    const { line: lineNo, column, path } = parsePositionFromUrl(urlPart)
     return {
       fn,
       file: fileFromUrl(urlPart),
-      line: lineNumberFromUrl(urlPart),
+      line: lineNo,
+      column,
+      bundleFile: bundleFileFromPath(path),
       raw: line.trim(),
     }
   }
@@ -101,10 +128,13 @@ function parseStackLine(line) {
   if (safari) {
     const fn = safari[1]
     const urlPart = safari[2]
+    const { line: lineNo, column, path } = parsePositionFromUrl(urlPart)
     return {
       fn,
       file: fileFromUrl(urlPart),
-      line: lineNumberFromUrl(urlPart),
+      line: lineNo,
+      column,
+      bundleFile: bundleFileFromPath(path),
       raw: line.trim(),
     }
   }
@@ -155,6 +185,17 @@ function formatCaller(frame) {
   return `${frame.fn} @ ${frame.file}${lineSuffix}`
 }
 
+function bundleFieldsFromFrame(frame) {
+  if (!frame) {
+    return { bundleFile: 'unknown', bundleLine: null, bundleColumn: null }
+  }
+  return {
+    bundleFile: frame.bundleFile ?? 'unknown',
+    bundleLine: frame.line ?? null,
+    bundleColumn: frame.column ?? null,
+  }
+}
+
 export function parseMapCameraStackOrigin(stack) {
   const unknown = {
     originFile: 'unknown',
@@ -165,6 +206,9 @@ export function parseMapCameraStackOrigin(stack) {
     caller: 'unknown',
     resolvedFunction: 'unknown',
     resolvedFile: 'unknown',
+    bundleFile: 'unknown',
+    bundleLine: null,
+    bundleColumn: null,
   }
 
   if (!stack) return unknown
@@ -187,6 +231,7 @@ export function parseMapCameraStackOrigin(stack) {
     'unknown'
 
   const caller = formatCaller(callerFrame)
+  const bundle = bundleFieldsFromFrame(callerFrame)
 
   if (srcFrame) {
     const fn = resolvedFunction ?? srcFrame.fn
@@ -204,6 +249,7 @@ export function parseMapCameraStackOrigin(stack) {
       caller,
       resolvedFunction: resolvedFunction ?? fn,
       resolvedFile,
+      ...bundle,
     }
   }
 
@@ -230,6 +276,7 @@ export function parseMapCameraStackOrigin(stack) {
       caller,
       resolvedFunction: resolvedFunction ?? fn,
       resolvedFile,
+      ...bundle,
     }
   }
 
@@ -243,6 +290,7 @@ export function parseMapCameraStackOrigin(stack) {
       caller,
       resolvedFunction,
       resolvedFile,
+      ...bundle,
     }
   }
 

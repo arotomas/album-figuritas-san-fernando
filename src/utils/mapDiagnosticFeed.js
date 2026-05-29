@@ -79,8 +79,25 @@ function isPinnedCameraApiCall(entry) {
   )
 }
 
+export function buildCameraDiagnosticSnapshot(row) {
+  return {
+    method: row.method ?? null,
+    caller: row.caller ?? 'unknown',
+    resolvedFunction: row.resolvedFunction ?? row.originFn ?? 'unknown',
+    resolvedFile: row.resolvedFile ?? row.originFile ?? 'unknown',
+    bundleFile: row.bundleFile ?? 'unknown',
+    bundleLine: row.bundleLine ?? null,
+    bundleColumn: row.bundleColumn ?? null,
+    before: row.centerBefore ?? null,
+    after: row.centerAfter ?? null,
+    timestamp: row.iso ?? new Date().toISOString(),
+    stack: row.stack ?? '',
+  }
+}
+
 function pinApiCall(row) {
-  pinnedApiCall = row
+  const diagnostic = buildCameraDiagnosticSnapshot(row)
+  pinnedApiCall = { ...row, diagnostic }
   pinnedUntilMs = Date.now() + PINNED_API_CALL_HOLD_MS
   schedulePinnedExpiry()
   startPinnedTick()
@@ -94,6 +111,10 @@ function mergeCenterAfter(row) {
     ...pinnedApiCall,
     centerAfter: row.centerAfter,
     afterIso: row.iso,
+    diagnostic: {
+      ...pinnedApiCall.diagnostic,
+      after: row.centerAfter ?? null,
+    },
   }
 }
 
@@ -127,6 +148,18 @@ export function getPinnedApiCall() {
   return pinnedApiCall
 }
 
+export function getPinnedDiagnosticSnapshot() {
+  const pinned = getPinnedApiCall()
+  if (!pinned?.diagnostic) return null
+  return pinned.diagnostic
+}
+
+export function getPinnedDiagnosticJson(pretty = true) {
+  const snapshot = getPinnedDiagnosticSnapshot()
+  if (!snapshot) return null
+  return pretty ? JSON.stringify(snapshot, null, 2) : JSON.stringify(snapshot)
+}
+
 export function getPinnedApiCallRemainingMs() {
   if (!pinnedApiCall) return 0
   return Math.max(0, pinnedUntilMs - Date.now())
@@ -151,6 +184,15 @@ export function formatDiagnosticCenter(value) {
   } catch {
     return String(value)
   }
+}
+
+export function formatDiagnosticAge(iso) {
+  if (!iso) return '—'
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 0) return '0ms'
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`
 }
 
 export function formatDiagnosticTime(iso) {
