@@ -52,10 +52,8 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
-import {
-  MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA,
-  MAP_ISOLATION_DISABLE_MAP_ROTATION,
-} from '../../config/mapIsolationPreview'
+import { MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA } from '../../config/mapIsolationPreview'
+import { MAP_ROTATION_BINARY } from '../../config/mapRotationBinaryTest'
 import {
   isMapRotationDragFrozen,
   subscribeMapRotationDragFreeze,
@@ -568,7 +566,7 @@ function LeafletMapViewInner({
     (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
 
   const cinematicRotationEnabled =
-    !MAP_ISOLATION_DISABLE_MAP_ROTATION &&
+    MAP_ROTATION_BINARY.cinematicBearingHook &&
     !reducedMotion &&
     !prefersTouchMap
   const rotationPausedOrFrozen = mapRotationPaused || rotationDragFrozen
@@ -585,6 +583,23 @@ function LeafletMapViewInner({
     cinematicRotationEnabled &&
     cinematicBearing != null &&
     !rotationPausedOrFrozen
+
+  const rotationControllerBearing = MAP_ROTATION_BINARY.cinematicBearingHook
+    ? cinematicBearing
+    : MAP_ROTATION_BINARY.mapRotationController
+      ? 0
+      : null
+
+  const rotationControllerEnabled =
+    MAP_ROTATION_BINARY.mapRotationController &&
+    Boolean(mapPosition?.lat && mapPosition?.lng) &&
+    (MAP_ROTATION_BINARY.cinematicBearingHook ? cinematicBearing != null : true)
+
+  const markerUsesCounterBearing =
+    MAP_ROTATION_BINARY.markerCounterBearing && !explorationActive
+
+  const userUsesCinematicBearing = MAP_ROTATION_BINARY.cinematicBearingHook
+  const userUsesTrackHeading = MAP_ROTATION_BINARY.userTrackHeading
 
   const showFocusOverlay = useStableBoolean(isFocusNear, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
@@ -846,11 +861,11 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          {!MAP_ISOLATION_DISABLE_MAP_ROTATION ? (
+          {MAP_ROTATION_BINARY.mapRotationController ? (
             <MapRotationController
               position={mapPosition}
-              bearing={cinematicBearing}
-              enabled={cinematicRotationEnabled && cinematicBearing != null}
+              bearing={rotationControllerBearing}
+              enabled={rotationControllerEnabled}
               freeze={rotationDragFrozen}
             />
           ) : null}
@@ -859,15 +874,9 @@ function LeafletMapViewInner({
             figuresSignature={markerFiguresSignature}
             nearFigureIdsKey={nearFigureIdsKey}
             activeTargetFigureId={activeTargetFigureId}
-            cinematicBearing={
-              MAP_ISOLATION_DISABLE_MAP_ROTATION || explorationActive
-                ? null
-                : cinematicBearing
-            }
+            cinematicBearing={markerUsesCounterBearing ? cinematicBearing : null}
             cinematicActive={
-              !MAP_ISOLATION_DISABLE_MAP_ROTATION &&
-              cinematicModeActive &&
-              !explorationActive
+              markerUsesCounterBearing && cinematicModeActive
             }
             onFigureClick={handleFigureClick}
           />
@@ -875,13 +884,9 @@ function LeafletMapViewInner({
             <UserLocationMarker
               position={mapPosition}
               isCoarse={!trustedPosition || !hasUsablePosition}
-              cinematicBearing={
-                MAP_ISOLATION_DISABLE_MAP_ROTATION ? null : cinematicBearing
-              }
-              cinematicActive={
-                !MAP_ISOLATION_DISABLE_MAP_ROTATION && cinematicModeActive
-              }
-              trackHeading={!MAP_ISOLATION_DISABLE_MAP_ROTATION}
+              cinematicBearing={userUsesCinematicBearing ? cinematicBearing : null}
+              cinematicActive={userUsesCinematicBearing && cinematicModeActive}
+              trackHeading={userUsesTrackHeading}
             />
           )}
         </MapContainer>

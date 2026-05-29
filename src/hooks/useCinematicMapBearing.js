@@ -13,7 +13,7 @@ import {
   MAP_ROTATION_WAKE_SPEED_CONFIRM_MS,
   MAP_ROTATION_WAKE_SPEED_MPS,
 } from '../config/mapRotation'
-import { MAP_ISOLATION_DISABLE_MAP_ROTATION } from '../config/mapIsolationPreview'
+import { MAP_ROTATION_BINARY } from '../config/mapRotationBinaryTest'
 import { getDistanceMeters } from '../utils/geo'
 import {
   computeCourseOverGround,
@@ -357,7 +357,7 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       quietLockAnchorRef.current = null
       lowSpeedSinceRef.current = null
       wakeSpeedSinceRef.current = null
-      if (!MAP_ISOLATION_DISABLE_MAP_ROTATION) {
+      if (MAP_ROTATION_BINARY.cinematicBearingHook) {
         logRotationDelta({
           file: 'useCinematicMapBearing.js',
           fn: 'useEffect[tick]',
