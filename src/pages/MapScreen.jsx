@@ -95,7 +95,19 @@ export function MapScreen() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
-      <div className="flex h-20 w-full shrink-0 flex-col items-center justify-center bg-red-600 text-center font-sans font-bold text-white">
+      <div
+        className="flex flex-col items-center justify-center text-center font-sans font-bold text-white"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '80px',
+          background: 'red',
+          zIndex: 999999,
+        }}
+        role="status"
+      >
         <p className="text-lg leading-tight">TEST NO INVALIDATE SIZE</p>
         <p className="text-base">SHA: {appBuildInfo.shaShort}</p>
       </div>
