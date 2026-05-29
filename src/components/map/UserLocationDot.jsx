@@ -1,4 +1,5 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
+import { logRotationDelta } from '../../utils/rotationDeltaLog'
 
 function UserLocationDotInner({
   accuracy,
@@ -17,6 +18,25 @@ function UserLocationDotInner({
   const rotationDeg = lockHeadingUp
     ? counterBearing ?? 0
     : heading
+
+  const prevRotationRef = useRef(null)
+  useEffect(() => {
+    const next =
+      showHeading && rotationDeg != null ? `rotate(${rotationDeg}deg)` : null
+    const prev = prevRotationRef.current
+    if (prev === next) return
+    prevRotationRef.current = next
+    logRotationDelta({
+      file: 'UserLocationDot.jsx',
+      fn: 'useEffect',
+      line: 39,
+      field: 'userDot.transform',
+      reason: lockHeadingUp ? 'counterBearing' : 'compassHeading',
+      prev,
+      next,
+      meta: { lockHeadingUp, rotationDeg },
+    })
+  }, [lockHeadingUp, rotationDeg, showHeading])
 
   return (
     <div className="relative flex items-center justify-center">

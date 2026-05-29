@@ -1,13 +1,8 @@
 /**
- * Aislamiento final Exploration vs MapRotation (preview temporal).
- *
- * Prueba A — rotación ON, exploración OFF:
- *   DISABLE_EXPLORATION_CAMERA = true
- *   DISABLE_MAP_ROTATION = false
- *
- * Prueba B — rotación OFF, exploración ON:
- *   DISABLE_EXPLORATION_CAMERA = false
- *   DISABLE_MAP_ROTATION = true
+ * Flags temporales de preview (revertir tras diagnóstico).
  */
-export const MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA = true
+export const MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA = false
 export const MAP_ISOLATION_DISABLE_MAP_ROTATION = false
+
+/** Prueba controlada: no ejecutar syncOrigin en moveend (zoomend sigue activo). */
+export const MAP_ROTATION_DISABLE_SYNC_ORIGIN_MOVEEND = true

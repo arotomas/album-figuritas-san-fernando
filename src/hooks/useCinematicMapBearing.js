@@ -22,6 +22,7 @@ import {
   shortestAngleDelta,
 } from '../utils/mapBearing'
 import { rotationTrace } from '../utils/rotationTrace'
+import { logRotationDelta } from '../utils/rotationDeltaLog'
 
 const DEV = import.meta.env.DEV
 
@@ -355,6 +356,15 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
       quietLockAnchorRef.current = null
       lowSpeedSinceRef.current = null
       wakeSpeedSinceRef.current = null
+      logRotationDelta({
+        file: 'useCinematicMapBearing.js',
+        fn: 'useEffect[tick]',
+        line: 358,
+        field: 'bearing',
+        reason: 'enabled:false-reset',
+        prev: lastPublishedRef.current,
+        next: null,
+      })
       setBearing(null)
       if (DEV) setDebug(null)
       return undefined
@@ -414,7 +424,22 @@ export function useCinematicMapBearing(position, { enabled = true, paused = fals
         )
 
         if (lastPublishedRef.current == null || delta >= MAP_ROTATION_MIN_DELTA_DEG) {
+          const prevPublished = lastPublishedRef.current
           lastPublishedRef.current = displayRef.current
+          logRotationDelta({
+            file: 'useCinematicMapBearing.js',
+            fn: 'tick',
+            line: 418,
+            field: 'bearing',
+            reason: 'publish:interval',
+            prev: prevPublished,
+            next: displayRef.current,
+            meta: {
+              target,
+              delta: Math.round(delta * 10) / 10,
+              intervalMs: MAP_ROTATION_UPDATE_MS,
+            },
+          })
           setBearing(displayRef.current)
           if (DEV) {
             rotationTrace('publish bearing', {
