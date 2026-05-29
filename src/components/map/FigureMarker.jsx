@@ -10,6 +10,7 @@ function FigureMarkerInner({
   isActiveTarget = false,
   isDimmed = false,
   counterBearing = null,
+  showHeadingCue = false,
 }) {
   const isQaTest = Boolean(figure.isQaTest)
   const rarity = getRarity(figure.rareza)
@@ -55,6 +56,12 @@ function FigureMarkerInner({
       }
       style={hasBearing ? { transform: `rotate(${counterBearing}deg)` } : undefined}
     >
+      {hasBearing && showHeadingCue && (
+        <span
+          className="pointer-events-none absolute -top-1 left-1/2 z-10 h-0 w-0 -translate-x-1/2 border-x-[3px] border-b-[6px] border-x-transparent border-b-white/70"
+          aria-hidden
+        />
+      )}
       <div
         className={`relative flex flex-col items-center ${floatClass} ${pulseClass} ${specialClass} ${activeClass} ${dimClass}`}
       >

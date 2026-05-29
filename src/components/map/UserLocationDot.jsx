@@ -6,6 +6,7 @@ function UserLocationDotInner({
   heading = null,
   lockHeadingUp = false,
   counterBearing = null,
+  enhancedHeading = false,
 }) {
   const dotClass = isCoarse
     ? 'border-white/90 bg-amber-400 shadow-md'
@@ -40,13 +41,29 @@ function UserLocationDotInner({
             : undefined
         }
       >
-        {showHeading && (
+        {enhancedHeading && showHeading && (
           <span
-            className="absolute -top-2 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[4px] border-b-[7px] border-x-transparent border-b-white/88 opacity-90"
+            className="absolute inset-0 rounded-full border border-dashed border-white/25"
             aria-hidden
           />
         )}
-        <span className={`relative h-4 w-4 rounded-full border-[3px] ${dotClass}`} />
+        {showHeading && (
+          <span
+            className={`absolute left-1/2 -translate-x-1/2 border-x-transparent border-b-white/88 opacity-90 ${
+              enhancedHeading
+                ? '-top-3.5 h-0 w-0 border-x-[6px] border-b-[12px]'
+                : '-top-2 h-0 w-0 border-x-[4px] border-b-[7px]'
+            }`}
+            aria-hidden
+          />
+        )}
+        {enhancedHeading && showHeading && (
+          <span
+            className="absolute -bottom-3 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-white/35"
+            aria-hidden
+          />
+        )}
+        <span className={`relative rounded-full border-[3px] ${dotClass} ${enhancedHeading ? 'h-5 w-5' : 'h-4 w-4'}`} />
       </div>
     </div>
   )

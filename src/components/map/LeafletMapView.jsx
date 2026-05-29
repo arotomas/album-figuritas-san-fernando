@@ -48,7 +48,9 @@ import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
+import { MapHeadingBearingBar, MapHeadingCompass } from './heading'
 import { useExplorationStore } from '../../store/explorationStore'
+import { HEADING_UP_SAFE_EXPERIMENT } from '../../config/headingUpSafeExperiment'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
 import {
   isMapRotationDragFrozen,
@@ -226,6 +228,7 @@ function UserLocationMarker({
   cinematicBearing = null,
   cinematicActive = false,
   trackHeading = true,
+  enhancedHeading = false,
 }) {
   const map = useMap()
   const markerRef = useRef(null)
@@ -282,6 +285,7 @@ function UserLocationMarker({
           heading={compassHeading}
           lockHeadingUp={cinematicActive}
           counterBearing={cinematicActive ? cinematicBearing : null}
+          enhancedHeading={enhancedHeading}
         />,
       )
     } catch (error) {
@@ -289,7 +293,7 @@ function UserLocationMarker({
         console.warn('[map] user dot render skipped after unmount', error?.message)
       }
     }
-  }, [cinematicActive, cinematicBearing, compassHeading, isCoarse, position, position?.accuracy])
+  }, [cinematicActive, cinematicBearing, compassHeading, enhancedHeading, isCoarse, position, position?.accuracy])
 
   return null
 }
@@ -314,6 +318,7 @@ function FigureMarkersLayer({
   activeTargetFigureId = null,
   cinematicBearing = null,
   cinematicActive = false,
+  markerHeadingCue = false,
   onFigureClick,
 }) {
   const map = useMap()
@@ -397,7 +402,7 @@ function FigureMarkersLayer({
         markerBearing != null && Number.isFinite(markerBearing)
           ? Math.round(markerBearing * 2) / 2
           : null
-      const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}-${isActiveTarget}-${isDimmed}-${counterBearingBucket ?? 'na'}`
+      const cacheKey = `${figure.id}-${figure.obtenida}-${isNear}-${isActiveTarget}-${isDimmed}-${counterBearingBucket ?? 'na'}-${markerHeadingCue ? 1 : 0}`
 
       if (cacheRef.current[figure.id] === cacheKey) return
       cacheRef.current[figure.id] = cacheKey
@@ -410,6 +415,7 @@ function FigureMarkersLayer({
           isActiveTarget={isActiveTarget}
           isDimmed={isDimmed}
           counterBearing={markerBearing}
+          showHeadingCue={markerHeadingCue && markerBearing != null}
         />,
       )
     })
@@ -418,6 +424,7 @@ function FigureMarkersLayer({
     bearingForMarkers,
     cinematicActive,
     figuresSignature,
+    markerHeadingCue,
     nearFigureIdsKey,
   ])
 
@@ -572,6 +579,15 @@ function LeafletMapViewInner({
     !rotationPausedOrFrozen
 
   const markerUsesCounterBearing = !explorationActive
+  const headingExperiment = HEADING_UP_SAFE_EXPERIMENT.enabled
+  const showHeadingExperimentUi =
+    headingExperiment && cinematicModeActive && cinematicBearing != null
+  const markerHeadingCue =
+    headingExperiment &&
+    HEADING_UP_SAFE_EXPERIMENT.markerHeadingCue &&
+    markerUsesCounterBearing
+  const enhancedUserDot =
+    headingExperiment && HEADING_UP_SAFE_EXPERIMENT.enhancedUserDot
 
   const showFocusOverlay = useStableBoolean(isFocusNear, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
@@ -842,6 +858,7 @@ function LeafletMapViewInner({
             cinematicActive={
               markerUsesCounterBearing && cinematicModeActive
             }
+            markerHeadingCue={markerHeadingCue}
             onFigureClick={handleFigureClick}
           />
           {mapPosition && (
@@ -851,10 +868,19 @@ function LeafletMapViewInner({
               cinematicBearing={cinematicBearing}
               cinematicActive={cinematicModeActive}
               trackHeading
+              enhancedHeading={enhancedUserDot}
             />
           )}
         </MapContainer>
       </div>
+
+      {headingExperiment && HEADING_UP_SAFE_EXPERIMENT.compassWidget ? (
+        <MapHeadingCompass bearing={cinematicBearing} active={showHeadingExperimentUi} />
+      ) : null}
+
+      {headingExperiment && HEADING_UP_SAFE_EXPERIMENT.bearingBar ? (
+        <MapHeadingBearingBar bearing={cinematicBearing} active={showHeadingExperimentUi} />
+      ) : null}
 
       {showAcquisitionBanner && (
         <MapGpsStatus
