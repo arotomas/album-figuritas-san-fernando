@@ -81,38 +81,6 @@ function MapInstanceBridge({ mapRef }) {
   return null
 }
 
-/** Prueba north-fixed: fuerza mapPane sin transform ni transformOrigin. */
-function MapPaneNorthLock() {
-  const map = useMap()
-
-  useEffect(() => {
-    if (!MAP_ISOLATION_DISABLE_MAP_ROTATION) return undefined
-
-    const pane = map.getPane('mapPane')
-    if (!pane) return undefined
-
-    const lockNorth = () => {
-      if (pane.style.transform) pane.style.transform = ''
-      if (pane.style.transformOrigin) pane.style.transformOrigin = ''
-      pane.style.willChange = 'auto'
-    }
-
-    lockNorth()
-    map.on('move', lockNorth)
-    map.on('moveend', lockNorth)
-    map.on('zoomend', lockNorth)
-
-    return () => {
-      map.off('move', lockNorth)
-      map.off('moveend', lockNorth)
-      map.off('zoomend', lockNorth)
-      lockNorth()
-    }
-  }, [map])
-
-  return null
-}
-
 function MapFlyController({
   position,
   zoom,
@@ -878,7 +846,6 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          {MAP_ISOLATION_DISABLE_MAP_ROTATION ? <MapPaneNorthLock /> : null}
           {!MAP_ISOLATION_DISABLE_MAP_ROTATION ? (
             <MapRotationController
               position={mapPosition}

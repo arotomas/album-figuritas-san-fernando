@@ -2,7 +2,10 @@
  * Flags temporales de preview (revertir tras diagnóstico).
  */
 
-/** Prueba extrema: norte fijo — sin transform/rotate/bearing en mapPane ni marcadores. */
+/**
+ * Prueba: rotación lógica apagada (MapRotationController, bearing, marcadores)
+ * sin tocar mapPane.style.transform / transformOrigin de Leaflet.
+ */
 export const MAP_TEST_NORTH_FIXED = true
 
 export const MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA = false
