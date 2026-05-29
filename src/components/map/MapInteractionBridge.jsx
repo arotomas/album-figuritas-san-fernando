@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { MISSION_FOLLOW_RESUME_MS } from '../../config/proximity'
+import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
 
 /**
  * Pausa el pan automático y/o la rotación cinematográfica tras gestos manuales en el mapa.
@@ -47,7 +48,8 @@ export function MapInteractionBridge({
       }, gestureEndHoldMs)
     }
 
-    const markUserControl = () => {
+    const markUserControl = (source) => {
+      registerUserDragStart(source)
       if (userControlledRef) userControlledRef.current = true
       markGestureActive()
     }
@@ -64,31 +66,34 @@ export function MapInteractionBridge({
       }, rotationPauseResumeMs)
     }
 
-    const pause = ({ fromUser = true } = {}) => {
+    const pause = ({ fromUser = true, source = 'unknown' } = {}) => {
       clearResumeTimer()
       onRotationPausedChange?.(true)
       onFollowPausedChange?.(true)
-      if (fromUser) markUserControl()
+      if (fromUser) {
+        markUserControl(source)
+        return
+      }
       scheduleResume()
     }
 
     const onZoomStart = (event) => {
-      if (event?.originalEvent) pause({ fromUser: true })
+      if (event?.originalEvent) pause({ fromUser: true, source: 'zoomstart' })
     }
 
     const onMoveStart = (event) => {
       if (event?.originalEvent || map.dragging?.moved?.()) {
-        pause({ fromUser: true })
+        pause({ fromUser: true, source: 'movestart' })
       }
     }
 
     const container = map.getContainer()
     const onPinchTouchStart = (event) => {
-      if (event.touches?.length >= 2) pause({ fromUser: true })
+      if (event.touches?.length >= 2) pause({ fromUser: true, source: 'pinch-touchstart' })
     }
 
     const onDragStart = () => {
-      pause({ fromUser: true })
+      pause({ fromUser: true, source: 'dragstart' })
     }
 
     const onGestureStart = () => {

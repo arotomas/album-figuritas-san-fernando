@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useMap } from 'react-leaflet'
+import { registerUserDragStart } from '../../utils/mapUserDragFollowIsolation'
 
 /**
  * Marca control manual de cámara en drag/zoom del usuario.
@@ -11,32 +12,35 @@ export function MapCameraGestureBridge({ userControlledCameraRef }) {
   useEffect(() => {
     if (!userControlledCameraRef) return undefined
 
-    const lockCamera = () => {
+    const lockCamera = (source) => {
+      registerUserDragStart(source)
       userControlledCameraRef.current = true
     }
 
     const onMoveStart = (event) => {
       if (event?.originalEvent || map.dragging?.moved?.()) {
-        lockCamera()
+        lockCamera('movestart')
       }
     }
 
     const onZoomStart = (event) => {
-      if (event?.originalEvent) lockCamera()
+      if (event?.originalEvent) lockCamera('zoomstart')
     }
 
     const container = map.getContainer()
     const onPinchTouchStart = (event) => {
-      if (event.touches?.length >= 2) lockCamera()
+      if (event.touches?.length >= 2) lockCamera('pinch-touchstart')
     }
 
-    map.on('dragstart', lockCamera)
+    const onDragStart = () => lockCamera('dragstart')
+
+    map.on('dragstart', onDragStart)
     map.on('movestart', onMoveStart)
     map.on('zoomstart', onZoomStart)
     container.addEventListener('touchstart', onPinchTouchStart, { passive: true })
 
     return () => {
-      map.off('dragstart', lockCamera)
+      map.off('dragstart', onDragStart)
       map.off('movestart', onMoveStart)
       map.off('zoomstart', onZoomStart)
       container.removeEventListener('touchstart', onPinchTouchStart)

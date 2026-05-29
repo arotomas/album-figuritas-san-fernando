@@ -52,10 +52,11 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
-import { MapTreeDebugStack } from '../debug/MapTreeDebugOverlay'
-import { recordMapNavStep } from '../debug/mapNavAudit'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
-import { appBuildInfo } from '../../build/appBuildInfo'
+import {
+  isUserDragAutoCenterBlocked,
+  logAutoCenterBlocked,
+} from '../../utils/mapUserDragFollowIsolation'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -118,6 +119,18 @@ function MapFlyController({
       if (accuracy != null) lastAccuracyRef.current = accuracy
 
       if (isFirst || manualRecenter) {
+        if (!manualRecenter && isUserDragAutoCenterBlocked()) {
+          logAutoCenterBlocked({
+            action: 'flyTo',
+            source: 'MapFlyController',
+            branch: 'freePanMode',
+            lat,
+            lng,
+            isFirst,
+            manualRecenter,
+          })
+          return
+        }
         panningRef.current = true
         map.flyTo([lat, lng], zoom, {
           animate: !reducedMotion,
@@ -155,6 +168,22 @@ function MapFlyController({
 
     lastCenteredRef.current = { lat, lng }
     if (accuracy != null) lastAccuracyRef.current = accuracy
+
+    const centerAction = isFirst || manualRecenter ? 'flyTo' : 'panTo'
+
+    if (!manualRecenter && isUserDragAutoCenterBlocked()) {
+      logAutoCenterBlocked({
+        action: centerAction,
+        source: 'MapFlyController',
+        missionFollow,
+        freePanMode,
+        lat,
+        lng,
+        isFirst,
+        manualRecenter,
+      })
+      return
+    }
 
     if (isFirst || manualRecenter) {
       panningRef.current = true
@@ -415,14 +444,6 @@ function LeafletMapViewInner({
   const explorationActive = useExplorationStore((state) => state.active)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
   const freePanMode = isMapFreeCameraEnabled()
-
-  useEffect(() => {
-    console.log('REAL MAP COMPONENT MOUNTED')
-    recordMapNavStep('LeafletMapView mount', {
-      pathname: typeof window !== 'undefined' ? window.location.pathname : '/map',
-      search: typeof window !== 'undefined' ? window.location.search : '',
-    })
-  }, [])
 
   const {
     mapPosition,
@@ -745,21 +766,236 @@ function LeafletMapViewInner({
 
   const showHardError = error && errorType === 'denied'
 
-  // TEMP: pantalla magenta — confirmar montaje de LeafletMapView en Android (sin MapContainer).
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'magenta',
-        color: 'black',
-        fontSize: '48px',
-        zIndex: 999999999,
-      }}
-    >
-      LEAFLETMAPVIEW MOUNTED
-      <br />
-      SHA: {appBuildInfo.shaShort}
+    <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
+      <div
+        className="map-container absolute inset-0 h-full w-full"
+        style={{ '--map-tile-filter': MAP_TILE_FILTER }}
+      >
+        <MapContainer
+          key={mapInstanceKey}
+          center={DEFAULT_CENTER}
+          zoom={DEFAULT_ZOOM}
+          zoomControl={false}
+          attributionControl
+          className="!h-full !w-full"
+          preferCanvas
+          bounceAtZoomLimits={false}
+        >
+          <TileLayer
+            url={TILE_URL}
+            attribution={TILE_ATTRIBUTION}
+            {...TILE_OPTIONS}
+          />
+          <MapInstanceBridge mapRef={mapRef} />
+          <MapFlyController
+            position={followCenter ?? mapPosition}
+            zoom={USER_ZOOM}
+            reducedMotion={reducedMotion}
+            recenterTick={recenterTick}
+            missionFollow={Boolean(activeTargetFigureId)}
+            followPaused={missionFollowPaused}
+            followPausedRef={mapFollowPausedRef}
+            userControlledRef={userControlledMapRef}
+            mapGestureActiveRef={mapGestureActiveRef}
+            explorationActive={explorationActive}
+            freePanMode={freePanMode}
+          />
+          {freePanMode ? (
+            <MapCameraGestureBridge userControlledCameraRef={userControlledMapRef} />
+          ) : null}
+          {explorationActive && (
+            <ExplorationController
+              userPosition={mapPosition}
+              reducedMotion={reducedMotion}
+              onPauseMapFollow={handlePauseMapFollowForExploration}
+            />
+          )}
+          <MapInteractionBridge
+            autoResumeFollow={freePanMode ? false : Boolean(activeTargetFigureId)}
+            userControlledRef={userControlledMapRef}
+            mapGestureActiveRef={mapGestureActiveRef}
+            gestureEndHoldMs={MAP_GESTURE_END_HOLD_MS}
+            onFollowPausedChange={handleFollowPausedChange}
+            onRotationPausedChange={handleRotationPausedChange}
+          />
+          <MapRotationController
+            position={mapPosition}
+            bearing={cinematicBearing}
+            enabled={cinematicModeActive}
+          />
+          <FigureMarkersLayer
+            figures={markerFigures}
+            figuresSignature={markerFiguresSignature}
+            nearFigureIdsKey={nearFigureIdsKey}
+            activeTargetFigureId={activeTargetFigureId}
+            cinematicBearing={explorationActive ? null : cinematicBearing}
+            cinematicActive={cinematicModeActive && !explorationActive}
+            onFigureClick={handleFigureClick}
+          />
+          {mapPosition && (
+            <UserLocationMarker
+              position={mapPosition}
+              isCoarse={!trustedPosition || !hasUsablePosition}
+              cinematicBearing={cinematicBearing}
+              cinematicActive={cinematicModeActive}
+            />
+          )}
+        </MapContainer>
+      </div>
+
+      {showAcquisitionBanner && (
+        <MapGpsStatus
+          label={gpsBannerLabel}
+          phase={
+            acquisitionStatus === 'no_response'
+              ? 'warn'
+              : acquisitionStatus === 'ready'
+                ? 'ready'
+                : 'searching'
+          }
+        />
+      )}
+
+      <GeoPolicyBanner position={mapPosition} />
+
+      {showGpsBanner && (
+        <MapGpsStatus
+          label={gpsBannerLabel}
+          phase={showSoftWarning ? 'warn' : 'searching'}
+        />
+      )}
+
+      {showRefiningBanner && (
+        <MapGpsStatus
+          label={gpsBannerLabel}
+          phase={showSoftWarning ? 'warn' : 'refining'}
+        />
+      )}
+
+      {showNoFixBanner && (
+        <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-red-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
+          <p className="text-sm font-semibold text-red-200">{acquisitionMessage}</p>
+          <p className="mt-2 text-xs leading-relaxed text-red-200/90">{error}</p>
+          <button
+            type="button"
+            onClick={retryPreciseLocation}
+            className="mt-3 min-h-[44px] w-full rounded-lg border border-red-400/40 bg-red-950/50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-100 active:scale-[0.98]"
+          >
+            Reintentar ubicación precisa
+          </button>
+        </div>
+      )}
+
+      {showApproximateBanner && (
+        <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-amber-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
+          <p className="text-sm leading-relaxed text-amber-100">{approximateMessage}</p>
+          {showPreciseLocationHelp && (
+            <p className="mt-2 text-left text-[11px] leading-relaxed text-amber-200/90">
+              {GPS_PRECISE_LOCATION_HELP}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={retryPreciseLocation}
+            className="mt-3 min-h-[44px] w-full rounded-lg border border-amber-400/40 bg-amber-950/50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-amber-100 active:scale-[0.98]"
+          >
+            Reintentar ubicación precisa
+          </button>
+        </div>
+      )}
+
+      {showHardError && (
+        <div className="safe-top absolute inset-x-4 top-16 z-[500] rounded-xl bg-red-950/90 px-4 py-3 text-center">
+          <p className="text-sm text-red-200">{error}</p>
+          <p className="mt-1 text-xs text-red-300/80">
+            Habilitalo en ajustes del navegador si lo rechazaste antes.
+          </p>
+          <button
+            type="button"
+            onClick={retryPreciseLocation}
+            className="mt-2 min-h-[44px] text-xs font-bold uppercase text-white underline"
+          >
+            Reintentar ubicación precisa
+          </button>
+        </div>
+      )}
+
+      {error && !showHardError && !showApproximateBanner && !showNoFixBanner && (
+        <div className="safe-top absolute inset-x-4 top-16 z-[500]">
+          <MapGpsStatus label={error} phase="warn" />
+          <button
+            type="button"
+            onClick={retryPreciseLocation}
+            className="pointer-events-auto mx-auto mt-2 block text-xs font-medium text-white/70 underline"
+          >
+            Reintentar ubicación precisa
+          </button>
+        </div>
+      )}
+
+      {mapPosition && (
+        <button
+          type="button"
+          onClick={handleRecenter}
+          className="gpu-layer absolute right-4 top-4 z-[500] flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-zinc-900/90 text-white shadow-md active:scale-95"
+          aria-label="Centrar en mi ubicación"
+        >
+          <FaLocationCrosshairs size={18} />
+        </button>
+      )}
+
+      <MapRotationDebugOverlay
+        debug={rotationDebug}
+        paused={mapRotationPaused}
+        cinematicActive={cinematicModeActive}
+      />
+
+      <MapQaOverlay
+        geolocationAvailable={geolocationAvailable}
+        permission={permission}
+        trustedPosition={trustedPosition}
+        onRequestSingleFix={requestSingleFix}
+        onRetryPrecise={retryPreciseLocation}
+        onStartTracking={startTracking}
+        onStopTracking={stopTracking}
+        onRecenter={handleRecenter}
+        hasMapPosition={Boolean(mapPosition)}
+        proximityNearest={proximityNearest}
+        rawNearest={rawNearest}
+        isNearFigure={isNearFigure}
+        nearFigure={nearFigure}
+        mapPosition={mapPosition}
+        isWatching={isWatching}
+        figures={figures}
+      />
+
+      {activeTargetFigure && !explorationActive && (
+        <ActiveTargetPill
+          figureName={activeTargetFigure.nombre}
+          onCancel={handleCancelTracking}
+        />
+      )}
+
+      <FigureTargetPrompt
+        figure={pendingTargetFigure}
+        onConfirm={handleConfirmTarget}
+        onDismiss={() => setPendingTargetFigure(null)}
+      />
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">
+        {activeTargetFigureId && showSecondaryHint && (
+          <p className="pointer-events-none mb-2 px-4 text-center text-xs font-medium text-white/45">
+            Hay otra figurita cerca…
+          </p>
+        )}
+        {showFocusOverlay && nearFigure && (
+          <NearFigureOverlay
+            nearFigure={nearFigure}
+            onOpenCamera={handleOpenCamera}
+          />
+        )}
+      </div>
     </div>
   )
 }
