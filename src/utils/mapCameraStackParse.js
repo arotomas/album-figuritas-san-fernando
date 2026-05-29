@@ -7,19 +7,33 @@ const SKIP_SUBSTRINGS = [
   'chunk-vendors',
 ]
 
-/** Símbolos de app que invocan métodos de cámara (buscar en stack completo). */
-const APP_FUNCTION_SYMBOLS = [
+/** Orden de prioridad para resolvedFunction. */
+export const RESOLVED_CAMERA_CALLERS = [
   'MapFlyController',
   'handleRecenter',
   'handleConfirmTarget',
-  'fitBoundsBetweenUserAndTarget',
   'flyToExplorationTarget',
   'runExplorationCamera',
+  'fitBoundsBetweenUserAndTarget',
+]
+
+const APP_FUNCTION_SYMBOLS = [
+  ...RESOLVED_CAMERA_CALLERS,
   'MapRecenter',
   'LeafletMapViewInner',
 ]
 
-/** Fragmento del chunk → ruta lógica en src/. */
+const RESOLVED_FILE_BY_SYMBOL = {
+  MapFlyController: 'components/map/LeafletMapView.jsx',
+  handleRecenter: 'components/map/LeafletMapView.jsx',
+  handleConfirmTarget: 'components/map/LeafletMapView.jsx',
+  LeafletMapViewInner: 'components/map/LeafletMapView.jsx',
+  fitBoundsBetweenUserAndTarget: 'utils/explorationMap.js',
+  flyToExplorationTarget: 'utils/explorationMap.js',
+  runExplorationCamera: 'utils/explorationMap.js',
+  MapRecenter: 'components/admin/AdminFigureLocationPicker.jsx',
+}
+
 const APP_FILE_HINTS = [
   ['LeafletMapView', 'components/map/LeafletMapView.jsx'],
   ['explorationMap', 'utils/explorationMap.js'],
@@ -38,8 +52,8 @@ function isMinifiedFnName(name) {
   return false
 }
 
-function findSymbolInStack(stack) {
-  for (const symbol of APP_FUNCTION_SYMBOLS) {
+function findResolvedFunction(stack) {
+  for (const symbol of RESOLVED_CAMERA_CALLERS) {
     if (stack.includes(symbol)) return symbol
   }
   return null
@@ -135,9 +149,12 @@ function findAnyFrame(lines) {
   return null
 }
 
-/**
- * Resuelve origen del api-call en dev (/src/) y prod (chunk + símbolos conocidos).
- */
+function formatCaller(frame) {
+  if (!frame) return 'unknown'
+  const lineSuffix = frame.line != null ? `:${frame.line}` : ''
+  return `${frame.fn} @ ${frame.file}${lineSuffix}`
+}
+
 export function parseMapCameraStackOrigin(stack) {
   const unknown = {
     originFile: 'unknown',
@@ -145,6 +162,9 @@ export function parseMapCameraStackOrigin(stack) {
     stackSummary: 'unknown',
     rawFrame: null,
     bundleFn: null,
+    caller: 'unknown',
+    resolvedFunction: 'unknown',
+    resolvedFile: 'unknown',
   }
 
   if (!stack) return unknown
@@ -154,13 +174,22 @@ export function parseMapCameraStackOrigin(stack) {
     .map((line) => line.trim())
     .filter(Boolean)
 
-  const symbol = findSymbolInStack(stack)
+  const resolvedFunction = findResolvedFunction(stack)
   const srcFrame = findSrcFrame(lines)
   const appFrame = findBestAppFrame(lines)
-  const anyFrame = findAnyFrame(lines)
+  const callerFrame = appFrame ?? findAnyFrame(lines)
+
+  const resolvedFile =
+    (resolvedFunction && RESOLVED_FILE_BY_SYMBOL[resolvedFunction]) ||
+    srcFrame?.file ||
+    appFrame?.file ||
+    callerFrame?.file ||
+    'unknown'
+
+  const caller = formatCaller(callerFrame)
 
   if (srcFrame) {
-    const fn = symbol && symbol !== srcFrame.fn ? symbol : srcFrame.fn
+    const fn = resolvedFunction ?? srcFrame.fn
     return {
       originFile: srcFrame.file,
       originFn: fn,
@@ -168,18 +197,21 @@ export function parseMapCameraStackOrigin(stack) {
         fn,
         file: srcFrame.file,
         line: srcFrame.line,
-        bundleFn: symbol && symbol !== srcFrame.fn ? srcFrame.fn : null,
+        bundleFn: resolvedFunction && resolvedFunction !== srcFrame.fn ? srcFrame.fn : null,
       }),
       rawFrame: srcFrame.raw,
       bundleFn: srcFrame.fn,
+      caller,
+      resolvedFunction: resolvedFunction ?? fn,
+      resolvedFile,
     }
   }
 
-  const frame = appFrame ?? anyFrame
+  const frame = appFrame ?? callerFrame
   if (frame) {
     let fn = frame.fn
-    if (symbol) {
-      fn = symbol
+    if (resolvedFunction) {
+      fn = resolvedFunction
     } else if (isMinifiedFnName(fn) && frame.line != null) {
       fn = `${frame.file.split('/').pop() ?? 'bundle'}@L${frame.line}`
     }
@@ -195,16 +227,22 @@ export function parseMapCameraStackOrigin(stack) {
       }),
       rawFrame: frame.raw,
       bundleFn: frame.fn,
+      caller,
+      resolvedFunction: resolvedFunction ?? fn,
+      resolvedFile,
     }
   }
 
-  if (symbol) {
+  if (resolvedFunction) {
     return {
-      originFile: 'unknown',
-      originFn: symbol,
-      stackSummary: symbol,
+      originFile: resolvedFile,
+      originFn: resolvedFunction,
+      stackSummary: resolvedFunction,
       rawFrame: null,
       bundleFn: null,
+      caller,
+      resolvedFunction,
+      resolvedFile,
     }
   }
 
@@ -213,5 +251,5 @@ export function parseMapCameraStackOrigin(stack) {
 
 export function siteKeyFromParsedOrigin(origin) {
   if (!origin) return 'unknown'
-  return `${origin.originFn} @ ${origin.originFile}`
+  return `${origin.resolvedFunction ?? origin.originFn} @ ${origin.resolvedFile ?? origin.originFile}`
 }

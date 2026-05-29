@@ -7,7 +7,6 @@ import { fetchPublicFigures } from '../services/supabase/figures'
 import { publishAuthSuccessSnapshot } from '../services/supabase/auth'
 import { isProfileComplete } from '../utils/profileValidation'
 import { getPostAuthPath } from '../utils/postAuthRedirect'
-import { recordMapNavStep } from '../components/debug/mapNavAudit'
 
 export function useAuthNavigation() {
   const navigate = useNavigate()
@@ -57,7 +56,6 @@ export function useAuthNavigation() {
         search: location.search,
       })
 
-      recordMapNavStep(`post-auth navigate → ${nextPath}`, location)
       navigate(nextPath, { replace: true })
       return { completed, profile }
     },

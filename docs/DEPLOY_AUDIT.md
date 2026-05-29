@@ -40,11 +40,25 @@ En **cualquier** pantalla de la app:
 
 Si el SHA no coincide con el commit que esperás en GitHub, no estás en ese deploy.
 
+## Protección SSO en previews (causa frecuente en el teléfono)
+
+Las URLs `*-arotomas-projects.vercel.app` tienen **Vercel Authentication** activa. Sin iniciar sesión en Vercel en ese navegador:
+
+- La app **no carga** (pantalla “Authentication Required”).
+- No verás `BUILD SHA`, `/build-info`, ni el cartel verde aunque el link sea correcto.
+
+**Qué hacer en el teléfono:** abrir el link preview → completar login Vercel (SSO) una vez → recargar. O usar el alias estable del deploy tras autenticarte.
+
+Producción (`album-figuritas-san-fernando.vercel.app`) **no** tiene esa pantalla, pero sirve código de `main` (sin fingerprint ni flags de la rama feature).
+
 ## Deploys de referencia (mayo 2026)
 
-| Deployment | Target | Notas |
-|------------|--------|--------|
-| `album-figuritas-san-fernando.vercel.app` | production | `main`, sin `map_free_camera` |
-| `album-figuritas-san-fernando-6685ycbk0-…` | preview | rama `feat/map-free-camera-flag` ~`8f5e67a` |
+| URL | Target | SHA en bundle | BUILD SHA badge |
+|-----|--------|---------------|-----------------|
+| `https://album-figuritas-san-fernando.vercel.app` | production | `87c5fb9` (`main`) | **No** |
+| `https://album-figuritas-san-fernando-cxwq48jvv-arotomas-projects.vercel.app` | preview (CLI) | `988249e` | **Sí** |
+| Alias: `…-arotomas-arotomas-projects.vercel.app` | preview | mismo deploy | **Sí** |
+
+Deployment ID preview actual: `dpl_7YHEpPbWZD8xCiSfYTYU6UqkfxFL` (2026-05-29).
 
 Actualizá esta tabla con el SHA que muestre `/build-info` tras cada deploy.

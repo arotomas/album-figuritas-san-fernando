@@ -887,7 +887,7 @@ function LeafletMapViewInner({
         </MapContainer>
       </div>
 
-      {showAcquisitionBanner && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && showAcquisitionBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
           phase={
@@ -900,23 +900,23 @@ function LeafletMapViewInner({
         />
       )}
 
-      <GeoPolicyBanner position={mapPosition} />
+      {!MAP_DIAGNOSTIC_UI_CLEAN ? <GeoPolicyBanner position={mapPosition} /> : null}
 
-      {showGpsBanner && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && showGpsBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
           phase={showSoftWarning ? 'warn' : 'searching'}
         />
       )}
 
-      {showRefiningBanner && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && showRefiningBanner && (
         <MapGpsStatus
           label={gpsBannerLabel}
           phase={showSoftWarning ? 'warn' : 'refining'}
         />
       )}
 
-      {showNoFixBanner && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && showNoFixBanner && (
         <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-red-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
           <p className="text-sm font-semibold text-red-200">{acquisitionMessage}</p>
           <p className="mt-2 text-xs leading-relaxed text-red-200/90">{error}</p>
@@ -930,7 +930,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {showApproximateBanner && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && showApproximateBanner && (
         <div className="safe-top pointer-events-auto absolute inset-x-4 top-16 z-[500] rounded-xl border border-amber-400/35 bg-zinc-950/95 px-4 py-3 text-center shadow-lg backdrop-blur-sm">
           <p className="text-sm leading-relaxed text-amber-100">{approximateMessage}</p>
           {showPreciseLocationHelp && (
@@ -948,7 +948,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {showHardError && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && showHardError && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500] rounded-xl bg-red-950/90 px-4 py-3 text-center">
           <p className="text-sm text-red-200">{error}</p>
           <p className="mt-1 text-xs text-red-300/80">
@@ -964,7 +964,7 @@ function LeafletMapViewInner({
         </div>
       )}
 
-      {error && !showHardError && !showApproximateBanner && !showNoFixBanner && (
+      {!MAP_DIAGNOSTIC_UI_CLEAN && error && !showHardError && !showApproximateBanner && !showNoFixBanner && (
         <div className="safe-top absolute inset-x-4 top-16 z-[500]">
           <MapGpsStatus label={error} phase="warn" />
           <button

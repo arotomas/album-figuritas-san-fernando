@@ -81,7 +81,7 @@ function App() {
 
   return (
     <ViewportProvider>
-      <BuildShaBadge />
+      {!mapDiagnosticClean ? <BuildShaBadge /> : null}
       {mapDiagnosticClean ? <MapDiagnosticOverlay /> : null}
       <LazyMotion features={domAnimation} strict>
         <div

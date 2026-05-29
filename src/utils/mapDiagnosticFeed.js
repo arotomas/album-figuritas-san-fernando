@@ -1,5 +1,9 @@
 const MAX_ENTRIES = 20
-export const PINNED_API_CALL_HOLD_MS = 15_000
+
+/** Snapshot persistente del último flyTo/panTo (no lo reemplazan move/rotation). */
+export const PINNED_API_CALL_HOLD_MS = 120_000
+
+const PINNED_CAMERA_METHODS = new Set(['flyTo', 'panTo'])
 
 /** @type {Array<object>} */
 let entries = []
@@ -67,6 +71,14 @@ function schedulePinnedExpiry() {
   }, remaining)
 }
 
+function isPinnedCameraApiCall(entry) {
+  return (
+    entry.source === 'MAP_CAMERA' &&
+    entry.kind === 'api-call' &&
+    PINNED_CAMERA_METHODS.has(entry.method)
+  )
+}
+
 function pinApiCall(row) {
   pinnedApiCall = row
   pinnedUntilMs = Date.now() + PINNED_API_CALL_HOLD_MS
@@ -76,6 +88,7 @@ function pinApiCall(row) {
 
 function mergeCenterAfter(row) {
   if (!pinnedApiCall || row.kind !== 'center-after-call') return
+  if (!PINNED_CAMERA_METHODS.has(pinnedApiCall.method)) return
   if (row.method !== pinnedApiCall.method) return
   pinnedApiCall = {
     ...pinnedApiCall,
@@ -92,9 +105,13 @@ export function pushMapDiagnosticEvent(entry) {
   }
   entries = [row, ...entries].slice(0, MAX_ENTRIES)
 
-  if (entry.source === 'MAP_CAMERA' && entry.kind === 'api-call') {
+  if (isPinnedCameraApiCall(entry)) {
     pinApiCall(row)
-  } else if (entry.source === 'MAP_CAMERA' && entry.kind === 'center-after-call') {
+  } else if (
+    entry.source === 'MAP_CAMERA' &&
+    entry.kind === 'center-after-call' &&
+    PINNED_CAMERA_METHODS.has(entry.method)
+  ) {
     mergeCenterAfter(row)
   }
 
