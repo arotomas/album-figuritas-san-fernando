@@ -1,20 +1,13 @@
 /**
- * Reducción binaria dentro de MapRotationController (base: 496b6ae + mount).
- * Una rama por flag; activar una sola pieza por prueba.
+ * Sub-reducción rc-01: aislar effect / origin / rotate / pivot.
  */
 export const MAP_RC_BINARY = {
-  /** useEffect position/bearing → paintPane */
-  effectPositionOrBearing: false,
-  /** paintPane escribe mapPane.style.transformOrigin */
+  effectPositionOrBearing: true,
   applyTransformOrigin: false,
-  /** paintPane escribe mapPane.style.transform (rotate) */
-  applyMapPaneTransform: false,
-  /** map.on('moveend') → syncOrigin */
+  applyMapPaneTransform: true,
   syncOriginMoveend: false,
-  /** map.on('zoomend') → syncOrigin */
   syncOriginZoomend: false,
-  /** latLngToContainerPoint(GPS); si false → centro del contenedor */
-  usePivotFromGps: false,
+  usePivotFromGps: true,
 }
 
-export const MAP_RC_BINARY_LABEL = 'rc-00-mount-only'
+export const MAP_RC_BINARY_LABEL = 'rc01-a-rotate-no-origin'
