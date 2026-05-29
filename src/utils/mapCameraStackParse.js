@@ -7,7 +7,7 @@ const SKIP_SUBSTRINGS = [
   'chunk-vendors',
 ]
 
-/** Símbolos de app conocidos que invocan métodos de cámara. */
+/** Símbolos de app que invocan métodos de cámara (buscar en stack completo). */
 const APP_FUNCTION_SYMBOLS = [
   'MapFlyController',
   'handleRecenter',
@@ -19,7 +19,7 @@ const APP_FUNCTION_SYMBOLS = [
   'LeafletMapViewInner',
 ]
 
-/** Fragmento del bundle/chunk → ruta lógica en src/. */
+/** Fragmento del chunk → ruta lógica en src/. */
 const APP_FILE_HINTS = [
   ['LeafletMapView', 'components/map/LeafletMapView.jsx'],
   ['explorationMap', 'utils/explorationMap.js'],
@@ -28,6 +28,21 @@ const APP_FILE_HINTS = [
 
 function shouldSkipLine(line) {
   return SKIP_SUBSTRINGS.some((part) => line.includes(part))
+}
+
+function isMinifiedFnName(name) {
+  if (!name || name === 'unknown') return true
+  if (name.length <= 2) return true
+  if (/^Object\./.test(name)) return true
+  if (name === 'anonymous' || name === '<anonymous>') return true
+  return false
+}
+
+function findSymbolInStack(stack) {
+  for (const symbol of APP_FUNCTION_SYMBOLS) {
+    if (stack.includes(symbol)) return symbol
+  }
+  return null
 }
 
 function lineNumberFromUrl(urlPart) {
@@ -47,6 +62,14 @@ function fileFromUrl(urlPart) {
   return baseMatch ? baseMatch[1] : urlPart.split('/').pop()?.split(':')[0] ?? 'unknown'
 }
 
+function isAppChunkLine(line, parsed) {
+  if (!parsed) return false
+  if (APP_FILE_HINTS.some(([hint]) => parsed.file.includes(hint) || line.includes(hint))) {
+    return true
+  }
+  return parsed.file.includes('/src/')
+}
+
 function parseStackLine(line) {
   const chrome = line.match(/^at\s+(?:async\s+)?([^\s(]+)\s+\((.+)\)$/)
   if (chrome) {
@@ -56,7 +79,7 @@ function parseStackLine(line) {
       fn,
       file: fileFromUrl(urlPart),
       line: lineNumberFromUrl(urlPart),
-      raw: line,
+      raw: line.trim(),
     }
   }
 
@@ -68,21 +91,52 @@ function parseStackLine(line) {
       fn,
       file: fileFromUrl(urlPart),
       line: lineNumberFromUrl(urlPart),
-      raw: line,
+      raw: line.trim(),
     }
   }
 
   return null
 }
 
-function formatStackSummary({ fn, file, line }) {
+function formatStackSummary({ fn, file, line, bundleFn }) {
   const lineSuffix = line != null ? `:${line}` : ''
+  if (bundleFn && bundleFn !== fn) {
+    return `${fn} @ ${file}${lineSuffix} (bundle:${bundleFn})`
+  }
   return `${fn} @ ${file}${lineSuffix}`
 }
 
+function findBestAppFrame(lines) {
+  for (const line of lines) {
+    if (shouldSkipLine(line)) continue
+    const parsed = parseStackLine(line)
+    if (!parsed || !isAppChunkLine(line, parsed)) continue
+    return parsed
+  }
+  return null
+}
+
+function findSrcFrame(lines) {
+  for (const line of lines) {
+    if (shouldSkipLine(line)) continue
+    if (!line.includes('/src/')) continue
+    const parsed = parseStackLine(line)
+    if (parsed) return parsed
+  }
+  return null
+}
+
+function findAnyFrame(lines) {
+  for (const line of lines) {
+    if (shouldSkipLine(line)) continue
+    const parsed = parseStackLine(line)
+    if (parsed) return parsed
+  }
+  return null
+}
+
 /**
- * Resuelve el primer frame de aplicación responsable de un api-call.
- * Prioridad: /src/ → símbolo conocido → primer frame no interno.
+ * Resuelve origen del api-call en dev (/src/) y prod (chunk + símbolos conocidos).
  */
 export function parseMapCameraStackOrigin(stack) {
   const unknown = {
@@ -90,6 +144,7 @@ export function parseMapCameraStackOrigin(stack) {
     originFn: 'unknown',
     stackSummary: 'unknown',
     rawFrame: null,
+    bundleFn: null,
   }
 
   if (!stack) return unknown
@@ -99,56 +154,57 @@ export function parseMapCameraStackOrigin(stack) {
     .map((line) => line.trim())
     .filter(Boolean)
 
-  for (const line of lines) {
-    if (shouldSkipLine(line)) continue
-    if (!line.includes('/src/')) continue
+  const symbol = findSymbolInStack(stack)
+  const srcFrame = findSrcFrame(lines)
+  const appFrame = findBestAppFrame(lines)
+  const anyFrame = findAnyFrame(lines)
 
-    const parsed = parseStackLine(line)
-    if (!parsed) continue
-
+  if (srcFrame) {
+    const fn = symbol && symbol !== srcFrame.fn ? symbol : srcFrame.fn
     return {
-      originFile: parsed.file,
-      originFn: parsed.fn,
-      stackSummary: formatStackSummary(parsed),
-      rawFrame: parsed.raw,
+      originFile: srcFrame.file,
+      originFn: fn,
+      stackSummary: formatStackSummary({
+        fn,
+        file: srcFrame.file,
+        line: srcFrame.line,
+        bundleFn: symbol && symbol !== srcFrame.fn ? srcFrame.fn : null,
+      }),
+      rawFrame: srcFrame.raw,
+      bundleFn: srcFrame.fn,
     }
   }
 
-  for (const symbol of APP_FUNCTION_SYMBOLS) {
-    for (const line of lines) {
-      if (shouldSkipLine(line)) continue
-      if (!line.includes(symbol)) continue
+  const frame = appFrame ?? anyFrame
+  if (frame) {
+    let fn = frame.fn
+    if (symbol) {
+      fn = symbol
+    } else if (isMinifiedFnName(fn) && frame.line != null) {
+      fn = `${frame.file.split('/').pop() ?? 'bundle'}@L${frame.line}`
+    }
 
-      const parsed = parseStackLine(line)
-      if (parsed) {
-        return {
-          originFile: parsed.file,
-          originFn: symbol,
-          stackSummary: formatStackSummary({ ...parsed, fn: symbol }),
-          rawFrame: parsed.raw,
-        }
-      }
-
-      return {
-        originFile: 'unknown',
-        originFn: symbol,
-        stackSummary: symbol,
-        rawFrame: line,
-      }
+    return {
+      originFile: frame.file,
+      originFn: fn,
+      stackSummary: formatStackSummary({
+        fn,
+        file: frame.file,
+        line: frame.line,
+        bundleFn: frame.fn !== fn ? frame.fn : null,
+      }),
+      rawFrame: frame.raw,
+      bundleFn: frame.fn,
     }
   }
 
-  for (const line of lines) {
-    if (shouldSkipLine(line)) continue
-
-    const parsed = parseStackLine(line)
-    if (!parsed) continue
-
+  if (symbol) {
     return {
-      originFile: parsed.file,
-      originFn: parsed.fn,
-      stackSummary: formatStackSummary(parsed),
-      rawFrame: parsed.raw,
+      originFile: 'unknown',
+      originFn: symbol,
+      stackSummary: symbol,
+      rawFrame: null,
+      bundleFn: null,
     }
   }
 

@@ -76,6 +76,10 @@ export default defineConfig({
     }),
   ],
   build: {
+    esbuild: {
+      /** Preserva nombres de funciones en stack traces del bundle (solo diagnóstico). */
+      keepNames: true,
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {

@@ -6,32 +6,33 @@ import {
   subscribeMapDiagnosticFeed,
 } from '../../utils/mapDiagnosticFeed'
 
+function LabeledLine({ label, value, bold = false }) {
+  return (
+    <p
+      className={`break-all text-[8px] leading-tight ${bold ? 'font-bold text-sky-100' : 'text-white/80'}`}
+    >
+      <span className="text-amber-200">{label}:</span> {value ?? '—'}
+    </p>
+  )
+}
+
 function CameraApiCallRow({ entry }) {
   return (
-    <li className="border-b border-sky-400/25 py-1.5 last:border-0">
-      <p className="font-bold text-[9px] text-amber-200">
+    <li className="border-b border-sky-400/40 py-1.5 last:border-0">
+      <p className="mb-0.5 font-bold text-[9px] text-amber-200">
         {formatDiagnosticTime(entry.iso)}{' '}
         <span className="text-sky-300">MAP_CAMERA</span>{' '}
-        <span className="text-white">{entry.kind ?? 'event'}</span>
+        <span className="text-white">{entry.kind ?? 'api-call'}</span>
       </p>
-      <p className="text-[9px] font-bold text-sky-200">
-        method: {entry.method ?? entry.event ?? '—'}
-      </p>
-      <p className="truncate text-[8px] text-white/85">
-        fn: {entry.originFn ?? 'unknown'}
-      </p>
-      <p className="truncate text-[8px] text-white/75">
-        file: {entry.originFile ?? 'unknown'}
-      </p>
-      <p className="truncate text-[8px] text-white/65">
-        stack: {entry.stackSummary ?? entry.site ?? 'unknown'}
-      </p>
-      <p className="text-[8px] leading-tight text-white/60">
-        before: {formatDiagnosticCenter(entry.centerBefore)}
-      </p>
-      <p className="text-[8px] leading-tight text-white/60">
-        after: {formatDiagnosticCenter(entry.centerAfter ?? entry.center)}
-      </p>
+      <LabeledLine label="method" value={entry.method ?? entry.event} bold />
+      <LabeledLine label="fn" value={entry.originFn} bold />
+      <LabeledLine label="file" value={entry.originFile} />
+      <LabeledLine label="stack" value={entry.stackSummary ?? entry.site} />
+      {entry.bundleFn && entry.bundleFn !== entry.originFn ? (
+        <LabeledLine label="bundleFn" value={entry.bundleFn} />
+      ) : null}
+      <LabeledLine label="before" value={formatDiagnosticCenter(entry.centerBefore)} />
+      <LabeledLine label="after" value={formatDiagnosticCenter(entry.centerAfter ?? entry.center)} />
     </li>
   )
 }
@@ -48,15 +49,18 @@ function EventRow({ entry }) {
       <li className="border-b border-fuchsia-400/20 py-1 last:border-0">
         <p className="font-bold text-[9px] text-amber-200">
           {formatDiagnosticTime(entry.iso)}{' '}
-          <span className="text-fuchsia-300">ROTATION_DELTA</span>{' '}
-          <span className="text-white/90">{entry.field ?? 'rotation'}</span>
+          <span className="text-fuchsia-300">ROTATION_DELTA</span>
         </p>
-        <p className="truncate text-[8px] text-white/75">
-          {entry.reason ?? `${entry.file ?? ''}:${entry.line ?? ''}`}
-        </p>
-        <p className="text-[8px] leading-tight text-white/60">
-          {formatDiagnosticCenter(entry.prev)} → {formatDiagnosticCenter(entry.next)}
-        </p>
+        <LabeledLine label="field" value={entry.field} />
+        <LabeledLine label="reason" value={entry.reason} />
+        <LabeledLine
+          label="before"
+          value={formatDiagnosticCenter(entry.prev)}
+        />
+        <LabeledLine
+          label="after"
+          value={formatDiagnosticCenter(entry.next)}
+        />
       </li>
     )
   }
@@ -66,15 +70,14 @@ function EventRow({ entry }) {
       <p className="font-bold text-[9px] text-amber-200">
         {formatDiagnosticTime(entry.iso)}{' '}
         <span className="text-sky-300">MAP_CAMERA</span>{' '}
-        <span className="text-white/90">{entry.kind ?? entry.event ?? 'event'}</span>
+        <span className="text-white/90">{entry.kind ?? entry.event}</span>
       </p>
-      <p className="truncate text-[8px] text-white/75">
-        {entry.stackSummary ?? entry.site ?? 'unknown'}
-      </p>
-      <p className="text-[8px] leading-tight text-white/60">
-        {formatDiagnosticCenter(entry.centerBefore ?? entry.center)} →{' '}
-        {formatDiagnosticCenter(entry.centerAfter)}
-      </p>
+      <LabeledLine label="stack" value={entry.stackSummary ?? entry.site} />
+      <LabeledLine
+        label="before"
+        value={formatDiagnosticCenter(entry.centerBefore ?? entry.center)}
+      />
+      <LabeledLine label="after" value={formatDiagnosticCenter(entry.centerAfter)} />
     </li>
   )
 }
@@ -88,7 +91,7 @@ export function MapDiagnosticOverlay() {
 
   return (
     <div
-      className="pointer-events-none absolute right-2 top-14 z-[600] max-h-[min(55vh,26rem)] w-[min(94vw,15.5rem)] overflow-hidden rounded-lg border border-white/20 bg-black/90 px-2 py-1.5 font-mono text-[9px] leading-snug text-white shadow-lg backdrop-blur-sm"
+      className="pointer-events-none absolute right-2 top-14 z-[600] max-h-[min(58vh,28rem)] w-[min(96vw,16.5rem)] overflow-hidden rounded-lg border border-white/25 bg-black/92 px-2 py-1.5 font-mono text-[9px] leading-snug text-white shadow-lg backdrop-blur-sm"
       role="log"
       aria-live="polite"
       aria-label="Diagnóstico mapa"
@@ -99,7 +102,7 @@ export function MapDiagnosticOverlay() {
       {entries.length === 0 ? (
         <p className="text-[8px] text-white/45">Esperando eventos…</p>
       ) : (
-        <ol className="max-h-[min(50vh,24rem)] list-none overflow-hidden">
+        <ol className="max-h-[min(54vh,26rem)] list-none overflow-hidden">
           {entries.map((entry) => (
             <EventRow key={entry.id} entry={entry} />
           ))}
