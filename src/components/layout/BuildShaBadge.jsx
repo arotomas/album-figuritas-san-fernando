@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import { appBuildInfo } from '../../build/appBuildInfo'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
+import { MAP_DIAGNOSTIC_UI_CLEAN } from '../../config/mapDiagnosticUi'
 
 const STORAGE_KEY = 'album-map-free-camera'
 
@@ -14,6 +15,20 @@ function readStorageValue() {
 
 export function BuildShaBadge() {
   const location = useLocation()
+
+  if (MAP_DIAGNOSTIC_UI_CLEAN) {
+    return (
+      <div
+        className="pointer-events-none fixed left-0 top-0 z-[2147483647] border-b border-r border-white/25 bg-black px-2 py-1 font-mono text-[10px] font-bold leading-snug text-white shadow-lg"
+        role="status"
+        aria-live="polite"
+        style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))' }}
+      >
+        BUILD SHA: {appBuildInfo.shaShort}
+      </div>
+    )
+  }
+
   const freeCamera = isMapFreeCameraEnabled()
   const storage = readStorageValue()
 

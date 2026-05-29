@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useSyncExternalStore } from 'react'
 import {
   formatDiagnosticCenter,
@@ -7,6 +8,7 @@ import {
   PINNED_API_CALL_HOLD_MS,
   subscribeMapDiagnosticFeed,
 } from '../../utils/mapDiagnosticFeed'
+import { MAP_DIAGNOSTIC_BADGE_OFFSET_PX } from '../../config/mapDiagnosticUi'
 
 function PinnedField({ label, value }) {
   return (
@@ -21,11 +23,11 @@ function PinnedApiCallPanel({ entry }) {
   const remainingSec = Math.ceil(getPinnedApiCallRemainingMs() / 1000)
 
   return (
-    <div className="rounded-md border-2 border-sky-400/70 bg-sky-950/40 p-2">
+    <div className="rounded-md border-2 border-sky-400/70 bg-black/95 p-2.5">
       <p className="mb-2 border-b border-sky-400/30 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-sky-200">
         Último MAP_CAMERA api-call
       </p>
-      <p className="mb-2 text-[9px] text-white/55">
+      <p className="mb-2 text-[9px] text-white/50">
         {formatDiagnosticTime(entry.iso)} · visible {remainingSec}s /{' '}
         {Math.round(PINNED_API_CALL_HOLD_MS / 1000)}s
       </p>
@@ -46,20 +48,28 @@ export function MapDiagnosticOverlay() {
     getPinnedApiCall,
   )
 
-  return (
+  const panel = (
     <div
-      className="pointer-events-none absolute right-2 top-14 z-[600] w-[min(96vw,17rem)] rounded-lg border border-white/25 bg-black/94 px-2.5 py-2 font-mono shadow-lg backdrop-blur-sm"
+      className="pointer-events-none fixed left-0 z-[2147483646] max-h-[40dvh] w-[min(100vw,18rem)] overflow-y-auto px-2 pb-2 font-mono shadow-lg"
+      style={{
+        top: `calc(${MAP_DIAGNOSTIC_BADGE_OFFSET_PX}px + env(safe-area-inset-top, 0px))`,
+      }}
       role="log"
       aria-live="polite"
-      aria-label="Último api-call MAP_CAMERA"
+      aria-label="Último MAP_CAMERA api-call"
     >
       {pinned ? (
         <PinnedApiCallPanel entry={pinned} />
       ) : (
-        <p className="text-[10px] leading-relaxed text-white/50">
-          Esperando MAP_CAMERA api-call…
-        </p>
+        <div className="rounded-md border border-white/20 bg-black/95 p-2.5">
+          <p className="text-[10px] leading-relaxed text-white/50">
+            Esperando MAP_CAMERA api-call…
+          </p>
+        </div>
       )}
     </div>
   )
+
+  if (typeof document === 'undefined') return panel
+  return createPortal(panel, document.body)
 }

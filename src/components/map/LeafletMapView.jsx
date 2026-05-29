@@ -66,7 +66,7 @@ import {
   logAutoCenterBlocked,
 } from '../../utils/mapUserDragFollowIsolation'
 import { installMapCameraInstrumentation } from '../../utils/mapCameraInstrumentation'
-import { MapDiagnosticOverlay } from './MapDiagnosticOverlay'
+import { MAP_DIAGNOSTIC_UI_CLEAN } from '../../config/mapDiagnosticUi'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -795,7 +795,6 @@ function LeafletMapViewInner({
 
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
-      <MapDiagnosticOverlay />
       <div
         className="map-container absolute inset-0 h-full w-full"
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}
@@ -989,30 +988,34 @@ function LeafletMapViewInner({
         </button>
       )}
 
-      <MapRotationDebugOverlay
-        debug={rotationDebug}
-        paused={mapRotationPaused}
-        cinematicActive={cinematicModeActive}
-      />
+      {!MAP_DIAGNOSTIC_UI_CLEAN ? (
+        <MapRotationDebugOverlay
+          debug={rotationDebug}
+          paused={mapRotationPaused}
+          cinematicActive={cinematicModeActive}
+        />
+      ) : null}
 
-      <MapQaOverlay
-        geolocationAvailable={geolocationAvailable}
-        permission={permission}
-        trustedPosition={trustedPosition}
-        onRequestSingleFix={requestSingleFix}
-        onRetryPrecise={retryPreciseLocation}
-        onStartTracking={startTracking}
-        onStopTracking={stopTracking}
-        onRecenter={handleRecenter}
-        hasMapPosition={Boolean(mapPosition)}
-        proximityNearest={proximityNearest}
-        rawNearest={rawNearest}
-        isNearFigure={isNearFigure}
-        nearFigure={nearFigure}
-        mapPosition={mapPosition}
-        isWatching={isWatching}
-        figures={figures}
-      />
+      {!MAP_DIAGNOSTIC_UI_CLEAN ? (
+        <MapQaOverlay
+          geolocationAvailable={geolocationAvailable}
+          permission={permission}
+          trustedPosition={trustedPosition}
+          onRequestSingleFix={requestSingleFix}
+          onRetryPrecise={retryPreciseLocation}
+          onStartTracking={startTracking}
+          onStopTracking={stopTracking}
+          onRecenter={handleRecenter}
+          hasMapPosition={Boolean(mapPosition)}
+          proximityNearest={proximityNearest}
+          rawNearest={rawNearest}
+          isNearFigure={isNearFigure}
+          nearFigure={nearFigure}
+          mapPosition={mapPosition}
+          isWatching={isWatching}
+          figures={figures}
+        />
+      ) : null}
 
       {activeTargetFigure && !explorationActive && (
         <ActiveTargetPill
