@@ -52,7 +52,10 @@ import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
 import { useExplorationStore } from '../../store/explorationStore'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
-import { MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION } from '../../config/mapIsolationPreview'
+import {
+  MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA,
+  MAP_ISOLATION_DISABLE_MAP_ROTATION,
+} from '../../config/mapIsolationPreview'
 import { MapCameraGestureBridge } from './MapCameraGestureBridge'
 import {
   isUserDragAutoCenterBlocked,
@@ -551,7 +554,7 @@ function LeafletMapViewInner({
     (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
 
   const cinematicRotationEnabled =
-    !MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION &&
+    !MAP_ISOLATION_DISABLE_MAP_ROTATION &&
     !reducedMotion &&
     !prefersTouchMap
   const { bearing: cinematicBearing, debug: rotationDebug } = useCinematicMapBearing(
@@ -810,7 +813,7 @@ function LeafletMapViewInner({
           {freePanMode ? (
             <MapCameraGestureBridge userControlledCameraRef={userControlledMapRef} />
           ) : null}
-          {!MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION && explorationActive ? (
+          {!MAP_ISOLATION_DISABLE_EXPLORATION_CAMERA && explorationActive ? (
             <ExplorationController
               userPosition={mapPosition}
               reducedMotion={reducedMotion}
@@ -825,7 +828,7 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          {!MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION ? (
+          {!MAP_ISOLATION_DISABLE_MAP_ROTATION ? (
             <MapRotationController
               position={mapPosition}
               bearing={cinematicBearing}
@@ -838,12 +841,12 @@ function LeafletMapViewInner({
             nearFigureIdsKey={nearFigureIdsKey}
             activeTargetFigureId={activeTargetFigureId}
             cinematicBearing={
-              MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION || explorationActive
+              MAP_ISOLATION_DISABLE_MAP_ROTATION || explorationActive
                 ? null
                 : cinematicBearing
             }
             cinematicActive={
-              !MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION &&
+              !MAP_ISOLATION_DISABLE_MAP_ROTATION &&
               cinematicModeActive &&
               !explorationActive
             }
@@ -854,12 +857,12 @@ function LeafletMapViewInner({
               position={mapPosition}
               isCoarse={!trustedPosition || !hasUsablePosition}
               cinematicBearing={
-                MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION ? null : cinematicBearing
+                MAP_ISOLATION_DISABLE_MAP_ROTATION ? null : cinematicBearing
               }
               cinematicActive={
-                !MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION && cinematicModeActive
+                !MAP_ISOLATION_DISABLE_MAP_ROTATION && cinematicModeActive
               }
-              trackHeading={!MAP_ISOLATION_NO_EXPLORATION_CAMERA_ROTATION}
+              trackHeading={!MAP_ISOLATION_DISABLE_MAP_ROTATION}
             />
           )}
         </MapContainer>
