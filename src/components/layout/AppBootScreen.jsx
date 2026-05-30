@@ -27,7 +27,7 @@ export function AppBootScreen({ phase = 'album' }) {
         className="relative z-10 mb-7 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[1.35rem] border border-white/10 bg-charcoal shadow-[0_0_40px_rgba(140,198,63,0.12)]"
       >
         <img
-          src="/favicon.svg"
+          src="/pwa-192.png"
           alt=""
           aria-hidden
           className="h-10 w-10"
