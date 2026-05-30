@@ -48,9 +48,10 @@ import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
-import { SimpleTargetLineLayer } from './routing'
+import { SimpleTargetLineLayer, StreetRouteLineLayer, RouteMetricsBadge } from './routing'
 import { useExplorationStore } from '../../store/explorationStore'
 import { SIMPLE_ROUTING_EXPERIMENT } from '../../config/simpleRoutingExperiment'
+import { STREET_ROUTING_OSRM_EXPERIMENT } from '../../config/streetRoutingOsrmExperiment'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
 import {
   isMapRotationDragFrozen,
@@ -433,6 +434,7 @@ function LeafletMapViewInner({
   onNearFigureChange,
   onOpenCamera,
   onBonusDiscovered,
+  onRouteMetricsChange,
 }) {
   const mapRef = useRef(null)
   const mapFollowPausedRef = useRef(false)
@@ -445,6 +447,15 @@ function LeafletMapViewInner({
   const [mapRotationPaused, setMapRotationPaused] = useState(false)
   const [rotationDragFrozen, setRotationDragFrozen] = useState(() =>
     isMapRotationDragFrozen(),
+  )
+  const [routeMetrics, setRouteMetrics] = useState(null)
+
+  const handleRouteMetricsChange = useCallback(
+    (metrics) => {
+      setRouteMetrics(metrics)
+      onRouteMetricsChange?.(metrics)
+    },
+    [onRouteMetricsChange],
   )
 
   useEffect(() => subscribeMapRotationDragFreeze(() => {
@@ -525,6 +536,13 @@ function LeafletMapViewInner({
     SIMPLE_ROUTING_EXPERIMENT.enabled &&
     (explorationActive || Boolean(activeTargetFigureId)) &&
     simpleRouteTargetCoordinates != null
+
+  useEffect(() => {
+    if (!simpleRouteActive) {
+      setRouteMetrics(null)
+      onRouteMetricsChange?.(null)
+    }
+  }, [onRouteMetricsChange, simpleRouteActive])
 
   useEffect(() => {
     if (activeTargetStale) clearActiveTargetFigure()
@@ -864,11 +882,20 @@ function LeafletMapViewInner({
             onRotationPausedChange={handleRotationPausedChange}
           />
           {simpleRouteActive ? (
-            <SimpleTargetLineLayer
-              active
-              userPosition={mapPosition}
-              targetCoordinates={simpleRouteTargetCoordinates}
-            />
+            STREET_ROUTING_OSRM_EXPERIMENT.enabled ? (
+              <StreetRouteLineLayer
+                active
+                userPosition={mapPosition}
+                targetCoordinates={simpleRouteTargetCoordinates}
+                onRouteMetricsChange={handleRouteMetricsChange}
+              />
+            ) : (
+              <SimpleTargetLineLayer
+                active
+                userPosition={mapPosition}
+                targetCoordinates={simpleRouteTargetCoordinates}
+              />
+            )
           ) : null}
           <FigureMarkersLayer
             figures={markerFigures}
@@ -1019,6 +1046,16 @@ function LeafletMapViewInner({
           onCancel={handleCancelTracking}
         />
       )}
+
+      {STREET_ROUTING_OSRM_EXPERIMENT.enabled &&
+      activeTargetFigure &&
+      !explorationActive ? (
+        <RouteMetricsBadge
+          visible={Boolean(routeMetrics)}
+          metrics={routeMetrics}
+          className="safe-top top-[4.25rem]"
+        />
+      ) : null}
 
       <FigureTargetPrompt
         figure={pendingTargetFigure}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LazyMap } from '../components/performance/LazyMap'
 import { ProgressBar } from '../components/ProgressBar'
+import { RouteMetricsBadge } from '../components/map/routing/RouteMetricsBadge'
 import { useQaTestFigure } from '../hooks/useQaTestFigure'
 import { useAppStore } from '../store/useAppStore'
 import {
@@ -12,6 +13,7 @@ import {
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 import { useExplorationStore } from '../store/explorationStore'
 import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
+import { STREET_ROUTING_OSRM_EXPERIMENT } from '../config/streetRoutingOsrmExperiment'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -24,6 +26,7 @@ export function MapScreen() {
   const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
   const explorationHasUserLocation = useExplorationStore((state) => state.hasUserLocation)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
+  const [routeMetrics, setRouteMetrics] = useState(null)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
   const mainProgress = useMemo(() => getMainProgressState(figures), [figures])
   const visiblePlayerFigures = useMemo(
@@ -92,6 +95,10 @@ export function MapScreen() {
     [figures, nearFigure, navigate, startCaptureSession],
   )
 
+  const handleRouteMetricsChange = useCallback((metrics) => {
+    setRouteMetrics(metrics)
+  }, [])
+
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
       <ExplorationDistanceBadge
@@ -102,12 +109,21 @@ export function MapScreen() {
         onExit={stopExploration}
       />
 
+      {STREET_ROUTING_OSRM_EXPERIMENT.enabled && explorationActive ? (
+        <RouteMetricsBadge
+          visible={Boolean(routeMetrics)}
+          metrics={routeMetrics}
+          className="safe-top top-[8.5rem]"
+        />
+      ) : null}
+
       <LazyMap
         figures={mapFigures}
         proximityFigures={proximityFigures}
         onBonusDiscovered={handleBonusDiscovered}
         onNearFigureChange={handleNearFigureChange}
         onOpenCamera={handleOpenCamera}
+        onRouteMetricsChange={handleRouteMetricsChange}
       />
 
       <div className="safe-bottom pointer-events-none absolute inset-x-0 bottom-0 z-10 pb-2">
