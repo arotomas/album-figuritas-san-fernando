@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { NAVIGATION_UX_EXPERIMENT } from '../../../config/navigationUx'
 import { formatExplorationDistance } from '../../../utils/explorationMap'
 
 function formatWalkingMinutes(durationSeconds) {
@@ -7,6 +8,7 @@ function formatWalkingMinutes(durationSeconds) {
 }
 
 function RouteMetricsBadgeInner({ visible, metrics, className = '' }) {
+  if (NAVIGATION_UX_EXPERIMENT.enabled) return null
   if (!visible || !metrics?.distanceMeters) return null
 
   return (

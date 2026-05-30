@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LazyMap } from '../components/performance/LazyMap'
 import { ProgressBar } from '../components/ProgressBar'
+import { NavigationMetricsPanel } from '../components/map/routing/NavigationMetricsPanel'
 import { RouteMetricsBadge } from '../components/map/routing/RouteMetricsBadge'
+import { useGeolocation } from '../hooks/useGeolocation'
 import { useQaTestFigure } from '../hooks/useQaTestFigure'
 import { useAppStore } from '../store/useAppStore'
 import {
@@ -13,19 +15,23 @@ import {
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
 import { useExplorationStore } from '../store/explorationStore'
 import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
+import { NAVIGATION_UX_EXPERIMENT } from '../config/navigationUx'
 import { STREET_ROUTING_OSRM_EXPERIMENT } from '../config/streetRoutingOsrmExperiment'
 
 export function MapScreen() {
   const navigate = useNavigate()
   const figures = useAppStore((state) => state.figures)
+  const activeTargetFigureId = useAppStore((state) => state.activeTargetFigureId)
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const startCaptureSession = useAppStore((state) => state.startCaptureSession)
   const explorationActive = useExplorationStore((state) => state.active)
   const explorationTargetName = useExplorationStore((state) => state.targetName)
+  const explorationTargetCoordinates = useExplorationStore((state) => state.targetCoordinates)
   const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
   const explorationHasUserLocation = useExplorationStore((state) => state.hasUserLocation)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
+  const { mapPosition } = useGeolocation()
   const [routeMetrics, setRouteMetrics] = useState(null)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
   const mainProgress = useMemo(() => getMainProgressState(figures), [figures])
@@ -42,6 +48,37 @@ export function MapScreen() {
     () => [...mapFigures, ...hiddenBonusFigures],
     [hiddenBonusFigures, mapFigures],
   )
+
+  const routeTargetCoordinates = useMemo(() => {
+    if (explorationActive && explorationTargetCoordinates) {
+      return explorationTargetCoordinates
+    }
+    if (!activeTargetFigureId) return null
+    const figure =
+      figures.find((item) => String(item.id) === String(activeTargetFigureId)) ??
+      mapFigures.find((item) => String(item.id) === String(activeTargetFigureId)) ??
+      null
+    if (!figure) return null
+    const lat = Number(figure.lat)
+    const lng = Number(figure.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    return { lat, lng }
+  }, [
+    activeTargetFigureId,
+    explorationActive,
+    explorationTargetCoordinates,
+    figures,
+    mapFigures,
+  ])
+
+  const routeNavigationActive =
+    STREET_ROUTING_OSRM_EXPERIMENT.enabled &&
+    Boolean(routeMetrics) &&
+    (explorationActive || Boolean(activeTargetFigureId))
+
+  const navigationMetricsTopClass = explorationActive
+    ? 'safe-top top-[8.5rem]'
+    : 'safe-top top-[4.25rem]'
 
   const handleBonusDiscovered = useCallback((figure) => {
     if (!figure?.id) return
@@ -109,7 +146,15 @@ export function MapScreen() {
         onExit={stopExploration}
       />
 
-      {STREET_ROUTING_OSRM_EXPERIMENT.enabled && explorationActive ? (
+      {NAVIGATION_UX_EXPERIMENT.enabled ? (
+        <NavigationMetricsPanel
+          visible={routeNavigationActive}
+          metrics={routeMetrics}
+          userPosition={mapPosition}
+          targetCoordinates={routeTargetCoordinates}
+          className={navigationMetricsTopClass}
+        />
+      ) : STREET_ROUTING_OSRM_EXPERIMENT.enabled && explorationActive ? (
         <RouteMetricsBadge
           visible={Boolean(routeMetrics)}
           metrics={routeMetrics}
@@ -126,8 +171,8 @@ export function MapScreen() {
         onRouteMetricsChange={handleRouteMetricsChange}
       />
 
-      <div className="safe-bottom pointer-events-none absolute inset-x-0 bottom-0 z-10 pb-2">
-        <div className="pointer-events-auto mx-4 rounded-2xl border border-white/10 bg-charcoal/95 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+      <div className="pointer-events-none shrink-0 px-4 pb-2">
+        <div className="pointer-events-auto rounded-2xl border border-white/10 bg-charcoal/95 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
           <ProgressBar showSimulateLink={false} variant="dark" />
         </div>
       </div>

@@ -1,3 +1,6 @@
 export { SimpleTargetLineLayer } from './SimpleTargetLineLayer'
 export { StreetRouteLineLayer } from './StreetRouteLineLayer'
 export { RouteMetricsBadge } from './RouteMetricsBadge'
+export { NavigationMetricsPanel } from './NavigationMetricsPanel'
+export { RouteDestinationMarker } from './RouteDestinationMarker'
+export { TransportModeSelector } from './TransportModeSelector'

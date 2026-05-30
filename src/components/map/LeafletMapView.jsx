@@ -51,6 +51,7 @@ import { ExplorationController } from './exploration'
 import { SimpleTargetLineLayer, StreetRouteLineLayer, RouteMetricsBadge } from './routing'
 import { useExplorationStore } from '../../store/explorationStore'
 import { SIMPLE_ROUTING_EXPERIMENT } from '../../config/simpleRoutingExperiment'
+import { NAVIGATION_UX_EXPERIMENT } from '../../config/navigationUx'
 import { STREET_ROUTING_OSRM_EXPERIMENT } from '../../config/streetRoutingOsrmExperiment'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
 import {
@@ -310,11 +311,18 @@ function buildFiguresLayerSignature(figures) {
     .join('|')
 }
 
+function getLayerFigures(figures, suppressedFigureId = null) {
+  const sorted = sortFiguresForMapLayer(figures)
+  if (!suppressedFigureId) return sorted
+  return sorted.filter((figure) => String(figure.id) !== String(suppressedFigureId))
+}
+
 function FigureMarkersLayer({
   figures,
   figuresSignature,
   nearFigureIdsKey = '',
   activeTargetFigureId = null,
+  suppressedFigureId = null,
   cinematicBearing = null,
   cinematicActive = false,
   onFigureClick,
@@ -333,7 +341,7 @@ function FigureMarkersLayer({
   )
 
   useEffect(() => {
-    const layerFigures = sortFiguresForMapLayer(figuresRef.current)
+    const layerFigures = getLayerFigures(figuresRef.current, suppressedFigureId)
 
     if (import.meta.env.DEV) {
       console.info('[map-figures]', 'markers render', JSON.stringify({
@@ -380,12 +388,12 @@ function FigureMarkersLayer({
       markersRef.current = []
       rootsRef.current = []
     }
-  }, [figuresSignature, map])
+  }, [figuresSignature, map, suppressedFigureId])
 
   const bearingForMarkers = cinematicActive ? cinematicBearing : null
 
   useEffect(() => {
-    sortFiguresForMapLayer(figuresRef.current).forEach((figure, index) => {
+    getLayerFigures(figuresRef.current, suppressedFigureId).forEach((figure, index) => {
       const root = rootsRef.current[index]
       if (!root) return
 
@@ -422,6 +430,7 @@ function FigureMarkersLayer({
     cinematicActive,
     figuresSignature,
     nearFigureIdsKey,
+    suppressedFigureId,
   ])
 
   return null
@@ -466,6 +475,7 @@ function LeafletMapViewInner({
   const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const explorationActive = useExplorationStore((state) => state.active)
+  const explorationTargetFigureId = useExplorationStore((state) => state.targetFigureId)
   const explorationTargetCoordinates = useExplorationStore((state) => state.targetCoordinates)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
   const freePanMode = isMapFreeCameraEnabled()
@@ -536,6 +546,17 @@ function LeafletMapViewInner({
     SIMPLE_ROUTING_EXPERIMENT.enabled &&
     (explorationActive || Boolean(activeTargetFigureId)) &&
     simpleRouteTargetCoordinates != null
+
+  const navigationSuppressedFigureId = useMemo(() => {
+    if (!NAVIGATION_UX_EXPERIMENT.enabled || !simpleRouteActive) return null
+    if (explorationActive) return explorationTargetFigureId
+    return activeTargetFigureId
+  }, [
+    activeTargetFigureId,
+    explorationActive,
+    explorationTargetFigureId,
+    simpleRouteActive,
+  ])
 
   useEffect(() => {
     if (!simpleRouteActive) {
@@ -902,6 +923,7 @@ function LeafletMapViewInner({
             figuresSignature={markerFiguresSignature}
             nearFigureIdsKey={nearFigureIdsKey}
             activeTargetFigureId={activeTargetFigureId}
+            suppressedFigureId={navigationSuppressedFigureId}
             cinematicBearing={markerUsesCounterBearing ? cinematicBearing : null}
             cinematicActive={
               markerUsesCounterBearing && cinematicModeActive

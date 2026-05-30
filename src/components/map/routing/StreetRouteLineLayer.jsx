@@ -2,19 +2,108 @@ import { memo, useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { EXPLORATION_LINE_UPDATE_MIN_M } from '../../../config/exploration'
+import { NAVIGATION_UX_EXPERIMENT, OSRM_PROFILE_BY_MODE } from '../../../config/navigationUx'
 import { SIMPLE_ROUTING_EXPERIMENT } from '../../../config/simpleRoutingExperiment'
 import { STREET_ROUTING_OSRM_EXPERIMENT } from '../../../config/streetRoutingOsrmExperiment'
+import { useNavigationStore } from '../../../store/navigationStore'
 import { getDistanceMeters } from '../../../utils/geo'
-import { estimateWalkingDurationSeconds, fetchOsrmWalkingRoute } from '../../../utils/osrmRoute'
+import {
+  estimateDurationSecondsForProfile,
+  fetchOsrmWalkingRoute,
+} from '../../../utils/osrmRoute'
+import { RouteDestinationMarker } from './RouteDestinationMarker'
 
-const STREET_ROUTE_PANE = 'streetRoutePane'
+/** Android-safe: overlayPane estándar (sin pane custom). */
+const ROUTE_PANE = 'overlayPane'
 
-function ensureStreetRoutePane(map) {
-  if (map.getPane(STREET_ROUTE_PANE)) return STREET_ROUTE_PANE
+function measurePolylinePathMeters(latlngs) {
+  if (!Array.isArray(latlngs) || latlngs.length < 2) return 0
 
-  const pane = map.createPane(STREET_ROUTE_PANE)
-  pane.style.zIndex = '515'
-  return STREET_ROUTE_PANE
+  let total = 0
+  for (let i = 1; i < latlngs.length; i += 1) {
+    const [lat1, lng1] = latlngs[i - 1]
+    const [lat2, lng2] = latlngs[i]
+    const segment = getDistanceMeters(lat1, lng1, lat2, lng2)
+    if (segment != null) total += segment
+  }
+  return total
+}
+
+function withUserOriginAnchor(latlngs, from) {
+  if (!Array.isArray(latlngs) || latlngs.length === 0 || !from) return latlngs
+
+  const [firstLat, firstLng] = latlngs[0]
+  const gapMeters = getDistanceMeters(from.lat, from.lng, firstLat, firstLng)
+  if (gapMeters != null && gapMeters > 2) {
+    return [[from.lat, from.lng], ...latlngs]
+  }
+  return latlngs
+}
+
+function logRoutePane(map, paneName) {
+  const paneEl = map.getPane(paneName)
+  console.info('[ROUTE_PANE]', {
+    pane: paneName,
+    customPane: paneName !== 'overlayPane',
+    zIndex: paneEl?.style?.zIndex ?? null,
+    computedZIndex: paneEl ? getComputedStyle(paneEl).zIndex : null,
+    childCount: paneEl?.childElementCount ?? null,
+    preferCanvas: Boolean(map._renderer?.options?.preferCanvas),
+  })
+}
+
+function logRouteLayer(map, line, latlngs, metrics, requestFrom, requestTo, { updated = false } = {}) {
+  const bounds = line?.getBounds?.()
+  const southWest = bounds?.getSouthWest?.()
+  const northEast = bounds?.getNorthEast?.()
+  const renderedPathMeters = measurePolylinePathMeters(latlngs)
+  const first = latlngs[0] ?? null
+  const last = latlngs[latlngs.length - 1] ?? null
+
+  console.info('[ROUTE_POINTS_RENDERED]', latlngs.length)
+  console.info('[ROUTE_FIRST_RENDERED]', first)
+  console.info('[ROUTE_LAST_RENDERED]', last)
+  console.info('[ROUTE_BOUNDS_RENDERED]', {
+    southWest: southWest ? { lat: southWest.lat, lng: southWest.lng } : null,
+    northEast: northEast ? { lat: northEast.lat, lng: northEast.lng } : null,
+    isValid: bounds?.isValid?.() ?? null,
+  })
+  console.info('[ROUTE_DISTANCE_COMPARE_RENDERED]', {
+    osrmDistanceMeters: metrics?.distanceMeters ?? null,
+    renderedPathMeters,
+    deltaMeters:
+      metrics?.distanceMeters != null ? metrics.distanceMeters - renderedPathMeters : null,
+    requestOrigin: requestFrom,
+    requestDestination: requestTo,
+    originToFirstMeters:
+      first && requestFrom
+        ? getDistanceMeters(requestFrom.lat, requestFrom.lng, first[0], first[1])
+        : null,
+    destinationToLastMeters:
+      last && requestTo
+        ? getDistanceMeters(requestTo.lat, requestTo.lng, last[0], last[1])
+        : null,
+    metricsSource: metrics?.source ?? null,
+    updated,
+  })
+  console.info('[ROUTE_POINT_COUNT]', latlngs.length)
+  console.info('[ROUTE_BOUNDS]', {
+    southWest: southWest ? { lat: southWest.lat, lng: southWest.lng } : null,
+    northEast: northEast ? { lat: northEast.lat, lng: northEast.lng } : null,
+    isValid: bounds?.isValid?.() ?? null,
+  })
+  console.info('[ROUTE_LAYER_ADDED]', {
+    pointCount: latlngs.length,
+    first,
+    last,
+    pane: ROUTE_PANE,
+    color: SIMPLE_ROUTING_EXPERIMENT.line.color,
+    weight: SIMPLE_ROUTING_EXPERIMENT.line.weight,
+    opacity: SIMPLE_ROUTING_EXPERIMENT.line.opacity,
+    onMap: line ? map.hasLayer(line) : false,
+    metricsSource: metrics?.source ?? null,
+    updated,
+  })
 }
 
 function StreetRouteLineLayerInner({
@@ -25,14 +114,38 @@ function StreetRouteLineLayerInner({
 }) {
   const map = useMap()
   const lineRef = useRef(null)
-  const lastRequestRef = useRef(null)
+  const routeRendererRef = useRef(null)
+  const lastDrawRef = useRef(null)
+  const pendingFetchRef = useRef(null)
+  const fetchSeqRef = useRef(0)
   const lineStyle = SIMPLE_ROUTING_EXPERIMENT.line
+  const transportProfile = useNavigationStore((state) => state.transportProfile)
+  const osrmProfile = NAVIGATION_UX_EXPERIMENT.enabled
+    ? OSRM_PROFILE_BY_MODE[transportProfile] ?? 'walking'
+    : STREET_ROUTING_OSRM_EXPERIMENT.profile
+
+  useEffect(() => {
+    console.info('[ROUTE_LAYER_MOUNT]', {
+      active,
+      userLat: userPosition?.lat ?? null,
+      userLng: userPosition?.lng ?? null,
+      targetLat: targetCoordinates?.lat ?? null,
+      targetLng: targetCoordinates?.lng ?? null,
+      routePane: ROUTE_PANE,
+    })
+    logRoutePane(map, ROUTE_PANE)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const removeLine = () => {
       if (!lineRef.current) return
       map.removeLayer(lineRef.current)
       lineRef.current = null
+    }
+
+    const abortPendingFetch = () => {
+      pendingFetchRef.current?.abortController?.abort()
+      pendingFetchRef.current = null
     }
 
     const guardFailed =
@@ -43,40 +156,98 @@ function StreetRouteLineLayerInner({
       !targetCoordinates?.lng
 
     if (guardFailed) {
+      abortPendingFetch()
       removeLine()
-      lastRequestRef.current = null
+      lastDrawRef.current = null
       onRouteMetricsChange?.(null)
       return undefined
     }
 
     const from = { lat: userPosition.lat, lng: userPosition.lng }
     const to = { lat: targetCoordinates.lat, lng: targetCoordinates.lng }
+    const lastDraw = lastDrawRef.current
+    const pendingFetch = pendingFetchRef.current
 
-    const last = lastRequestRef.current
-    if (last) {
-      const movedUser = getDistanceMeters(last.from.lat, last.from.lng, from.lat, from.lng)
-      const movedTarget = getDistanceMeters(last.to.lat, last.to.lng, to.lat, to.lng)
-      if (
-        movedUser != null &&
-        movedUser < EXPLORATION_LINE_UPDATE_MIN_M &&
-        movedTarget != null &&
-        movedTarget < EXPLORATION_LINE_UPDATE_MIN_M
-      ) {
+    let userMovedFromDraw = null
+    let targetMovedFromDraw = null
+
+    if (lastDraw) {
+      userMovedFromDraw = getDistanceMeters(
+        lastDraw.from.lat,
+        lastDraw.from.lng,
+        from.lat,
+        from.lng,
+      )
+      targetMovedFromDraw = getDistanceMeters(
+        lastDraw.to.lat,
+        lastDraw.to.lng,
+        to.lat,
+        to.lng,
+      )
+
+      const profileUnchanged = lastDraw.profile === osrmProfile
+      const userStale =
+        userMovedFromDraw != null &&
+        userMovedFromDraw >= EXPLORATION_LINE_UPDATE_MIN_M
+      const targetStable =
+        targetMovedFromDraw == null ||
+        targetMovedFromDraw < EXPLORATION_LINE_UPDATE_MIN_M
+
+      if (!userStale && targetStable && profileUnchanged) {
         return undefined
       }
     }
 
-    lastRequestRef.current = { from, to }
+    if (pendingFetch) {
+      const pendingUserMove = getDistanceMeters(
+        pendingFetch.from.lat,
+        pendingFetch.from.lng,
+        from.lat,
+        from.lng,
+      )
+      const pendingTargetMove = getDistanceMeters(
+        pendingFetch.to.lat,
+        pendingFetch.to.lng,
+        to.lat,
+        to.lng,
+      )
+      const pendingStillFresh =
+        pendingFetch.profile === osrmProfile &&
+        pendingUserMove != null &&
+        pendingUserMove < EXPLORATION_LINE_UPDATE_MIN_M &&
+        pendingTargetMove != null &&
+        pendingTargetMove < EXPLORATION_LINE_UPDATE_MIN_M
 
-    const abortController = new AbortController()
-    let cancelled = false
+      if (pendingStillFresh) {
+        return undefined
+      }
+    }
 
-    const drawLatLngs = (latlngs, metrics) => {
-      if (cancelled) return
+    const targetChanged =
+      targetMovedFromDraw != null &&
+      targetMovedFromDraw >= EXPLORATION_LINE_UPDATE_MIN_M
 
-      const pane = ensureStreetRoutePane(map)
+    if (targetChanged) {
+      abortPendingFetch()
+      removeLine()
+      lastDrawRef.current = null
+      onRouteMetricsChange?.(null)
+    } else {
+      abortPendingFetch()
+    }
+
+    const drawLatLngs = (latlngs, metrics, requestFrom, requestTo) => {
+      const anchoredLatLngs = withUserOriginAnchor(latlngs, requestFrom)
+
+      if (!routeRendererRef.current) {
+        routeRendererRef.current = L.svg({ padding: 0.5 })
+      }
+
+      logRoutePane(map, ROUTE_PANE)
+
       if (!lineRef.current) {
-        lineRef.current = L.polyline(latlngs, {
+        console.info('[ROUTE_RENDERER]', { type: 'SVG' })
+        lineRef.current = L.polyline(anchoredLatLngs, {
           color: lineStyle.color,
           weight: lineStyle.weight,
           opacity: lineStyle.opacity,
@@ -85,56 +256,105 @@ function StreetRouteLineLayerInner({
           lineJoin: 'round',
           className: 'street-route-line',
           interactive: false,
-          pane,
+          pane: ROUTE_PANE,
+          renderer: routeRendererRef.current,
         }).addTo(map)
+        logRouteLayer(map, lineRef.current, anchoredLatLngs, metrics, requestFrom, requestTo)
       } else {
-        lineRef.current.setLatLngs(latlngs)
+        lineRef.current.setLatLngs(anchoredLatLngs)
+        logRouteLayer(map, lineRef.current, anchoredLatLngs, metrics, requestFrom, requestTo, {
+          updated: true,
+        })
       }
 
-      onRouteMetricsChange?.(metrics)
-    }
-
-    const drawStraightFallback = () => {
-      const latlngs = [
-        [from.lat, from.lng],
-        [to.lat, to.lng],
-      ]
-      const distanceMeters = getDistanceMeters(from.lat, from.lng, to.lat, to.lng)
-      drawLatLngs(latlngs, {
-        distanceMeters,
-        durationSeconds: estimateWalkingDurationSeconds(distanceMeters),
-        source: 'straight',
+      lastDrawRef.current = { from: requestFrom, to: requestTo, profile: osrmProfile }
+      onRouteMetricsChange?.({
+        ...metrics,
+        profile: osrmProfile,
       })
     }
+
+    const drawStraightFallback = (requestFrom, requestTo) => {
+      const latlngs = [
+        [requestFrom.lat, requestFrom.lng],
+        [requestTo.lat, requestTo.lng],
+      ]
+      const distanceMeters = getDistanceMeters(
+        requestFrom.lat,
+        requestFrom.lng,
+        requestTo.lat,
+        requestTo.lng,
+      )
+      drawLatLngs(latlngs, {
+        distanceMeters,
+        durationSeconds: estimateDurationSecondsForProfile(distanceMeters, osrmProfile),
+        source: 'straight',
+        profile: osrmProfile,
+      }, requestFrom, requestTo)
+    }
+
+    const fetchSeq = ++fetchSeqRef.current
+    const abortController = new AbortController()
+    pendingFetchRef.current = {
+      from,
+      to,
+      abortController,
+      seq: fetchSeq,
+      profile: osrmProfile,
+    }
+
+    console.info('[ROUTE_REFETCH]', {
+      reason: lastDraw ? 'stale_or_target' : 'initial',
+      userMovedFromDrawMeters: userMovedFromDraw,
+      targetMovedFromDrawMeters: targetMovedFromDraw,
+      from,
+      to,
+      keepExistingLine: Boolean(lineRef.current) && !targetChanged,
+    })
 
     ;(async () => {
       try {
         const route = await fetchOsrmWalkingRoute(from, to, {
           baseUrl: STREET_ROUTING_OSRM_EXPERIMENT.baseUrl,
-          profile: STREET_ROUTING_OSRM_EXPERIMENT.profile,
+          profile: osrmProfile,
           signal: abortController.signal,
         })
+
+        if (fetchSeq !== fetchSeqRef.current) return
+
         drawLatLngs(route.latlngs, {
           distanceMeters: route.distanceMeters,
           durationSeconds: route.durationSeconds,
           source: 'osrm',
-        })
+          profile: route.profile ?? osrmProfile,
+        }, from, to)
+
+        if (pendingFetchRef.current?.seq === fetchSeq) {
+          pendingFetchRef.current = null
+        }
       } catch (error) {
-        if (cancelled || error?.name === 'AbortError') return
+        if (error?.name === 'AbortError') return
+        if (fetchSeq !== fetchSeqRef.current) return
+
         if (STREET_ROUTING_OSRM_EXPERIMENT.fallbackToStraightLine) {
-          drawStraightFallback()
+          drawStraightFallback(from, to)
+          if (pendingFetchRef.current?.seq === fetchSeq) {
+            pendingFetchRef.current = null
+          }
           return
         }
-        removeLine()
-        onRouteMetricsChange?.(null)
+
+        if (!lineRef.current) {
+          onRouteMetricsChange?.(null)
+        }
+
+        if (pendingFetchRef.current?.seq === fetchSeq) {
+          pendingFetchRef.current = null
+        }
       }
     })()
 
-    return () => {
-      cancelled = true
-      abortController.abort()
-      removeLine()
-    }
+    return undefined
   }, [
     active,
     lineStyle.color,
@@ -147,9 +367,29 @@ function StreetRouteLineLayerInner({
     targetCoordinates?.lng,
     userPosition?.lat,
     userPosition?.lng,
+    osrmProfile,
   ])
 
-  return null
+  useEffect(() => {
+    return () => {
+      pendingFetchRef.current?.abortController?.abort()
+      pendingFetchRef.current = null
+      fetchSeqRef.current += 1
+
+      if (!lineRef.current) return
+      map.removeLayer(lineRef.current)
+      lineRef.current = null
+      lastDrawRef.current = null
+    }
+  }, [map])
+
+  return (
+    <>
+      {NAVIGATION_UX_EXPERIMENT.enabled ? (
+        <RouteDestinationMarker active={active} targetCoordinates={targetCoordinates} />
+      ) : null}
+    </>
+  )
 }
 
 export const StreetRouteLineLayer = memo(StreetRouteLineLayerInner)
