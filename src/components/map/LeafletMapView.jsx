@@ -48,7 +48,9 @@ import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
+import { SimpleTargetLineLayer } from './routing'
 import { useExplorationStore } from '../../store/explorationStore'
+import { SIMPLE_ROUTING_EXPERIMENT } from '../../config/simpleRoutingExperiment'
 import { isMapFreeCameraEnabled } from '../../config/mapCamera'
 import {
   isMapRotationDragFrozen,
@@ -453,6 +455,7 @@ function LeafletMapViewInner({
   const setActiveTargetFigureId = useAppStore((state) => state.setActiveTargetFigureId)
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const explorationActive = useExplorationStore((state) => state.active)
+  const explorationTargetCoordinates = useExplorationStore((state) => state.targetCoordinates)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
   const freePanMode = isMapFreeCameraEnabled()
 
@@ -506,6 +509,22 @@ function LeafletMapViewInner({
       null
     )
   }, [activeTargetFigureId, figures, proximityFigures])
+
+  const simpleRouteTargetCoordinates = useMemo(() => {
+    if (explorationActive && explorationTargetCoordinates) {
+      return explorationTargetCoordinates
+    }
+    if (!activeTargetFigure) return null
+    const lat = Number(activeTargetFigure.lat)
+    const lng = Number(activeTargetFigure.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    return { lat, lng }
+  }, [explorationActive, explorationTargetCoordinates, activeTargetFigure])
+
+  const simpleRouteActive =
+    SIMPLE_ROUTING_EXPERIMENT.enabled &&
+    (explorationActive || Boolean(activeTargetFigureId)) &&
+    simpleRouteTargetCoordinates != null
 
   useEffect(() => {
     if (activeTargetStale) clearActiveTargetFigure()
@@ -844,6 +863,13 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
+          {simpleRouteActive ? (
+            <SimpleTargetLineLayer
+              active
+              userPosition={mapPosition}
+              targetCoordinates={simpleRouteTargetCoordinates}
+            />
+          ) : null}
           <FigureMarkersLayer
             figures={markerFigures}
             figuresSignature={markerFiguresSignature}

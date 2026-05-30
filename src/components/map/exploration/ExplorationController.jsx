@@ -4,7 +4,6 @@ import { useExplorationStore } from '../../../store/explorationStore'
 import { useExplorationDistanceSync } from '../../../hooks/useExplorationMode'
 import { SIMPLE_ROUTING_EXPERIMENT } from '../../../config/simpleRoutingExperiment'
 import { runExplorationCamera } from '../../../utils/explorationMap'
-import { SimpleTargetLineLayer } from '../routing'
 import { ExplorationLineLayer } from './ExplorationLineLayer'
 import { ExplorationTargetMarker } from './ExplorationTargetMarker'
 
@@ -97,19 +96,13 @@ function ExplorationControllerInner({
           targetName={targetName}
         />
       ) : null}
-      {SIMPLE_ROUTING_EXPERIMENT.enabled ? (
-        <SimpleTargetLineLayer
-          active={active}
-          userPosition={userPosition}
-          targetCoordinates={targetCoordinates}
-        />
-      ) : (
+      {!SIMPLE_ROUTING_EXPERIMENT.enabled ? (
         <ExplorationLineLayer
           active={active}
           userPosition={userPosition}
           targetCoordinates={targetCoordinates}
         />
-      )}
+      ) : null}
     </>
   )
 }
