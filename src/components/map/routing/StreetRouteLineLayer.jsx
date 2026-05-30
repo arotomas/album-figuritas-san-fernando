@@ -54,15 +54,61 @@ function withUserOriginAnchor(latlngs, from) {
   return latlngs
 }
 
-/** Punto azul en [0] + geometría OSRM sin recalcular ruta. */
-function buildLiveRenderLatLngs(osrmLatlngs, userPosition, anchorFrom = userPosition) {
+/** Umbral para omitir el primer vértice OSRM duplicado cerca del GPS. */
+const ROUTE_ORIGIN_DEDUPE_METERS = 25
+
+function normalizeOsrmLatLngs(latlngs) {
+  if (!Array.isArray(latlngs)) return []
+  return latlngs.map((pt) => (Array.isArray(pt) ? pt : [pt.lat, pt.lng]))
+}
+
+/**
+ * Geometría visible: inicio en GPS actual, fin en targetCoordinates (círculo rojo).
+ * No modifica la geometría OSRM almacenada ni dispara nuevos requests.
+ */
+function buildLiveRenderLatLngs(
+  osrmLatlngs,
+  userPosition,
+  targetCoordinates,
+  anchorFrom = userPosition,
+) {
   if (!Array.isArray(osrmLatlngs) || osrmLatlngs.length === 0) return osrmLatlngs
 
-  if (userPosition?.lat == null || userPosition?.lng == null) {
-    return withUserOriginAnchor(osrmLatlngs, anchorFrom)
+  let body = normalizeOsrmLatLngs(osrmLatlngs)
+
+  if (userPosition?.lat != null && userPosition?.lng != null) {
+    if (body.length > 0) {
+      const gapToFirst = getDistanceMeters(
+        userPosition.lat,
+        userPosition.lng,
+        body[0][0],
+        body[0][1],
+      )
+      if (gapToFirst != null && gapToFirst < ROUTE_ORIGIN_DEDUPE_METERS) {
+        body = body.slice(1)
+      }
+    }
+    body =
+      body.length > 0
+        ? [[userPosition.lat, userPosition.lng], ...body]
+        : [[userPosition.lat, userPosition.lng]]
+  } else if (anchorFrom?.lat != null && anchorFrom?.lng != null) {
+    body = normalizeOsrmLatLngs(withUserOriginAnchor(osrmLatlngs, anchorFrom))
   }
 
-  return [[userPosition.lat, userPosition.lng], ...osrmLatlngs]
+  if (
+    targetCoordinates?.lat != null &&
+    targetCoordinates?.lng != null &&
+    body.length > 0
+  ) {
+    const targetPoint = [targetCoordinates.lat, targetCoordinates.lng]
+    body =
+      body.length === 1
+        ? [targetPoint]
+        : [...body.slice(0, -1), targetPoint]
+  }
+
+  return body
 }
 
 function logRoutePane(map, paneName) {
@@ -237,7 +283,11 @@ function StreetRouteLineLayerInner({
       if (position?.lat == null || position?.lng == null) return
 
       lineRef.current.setLatLngs(
-        buildLiveRenderLatLngs(osrmGeometryRef.current, position),
+        buildLiveRenderLatLngs(
+          osrmGeometryRef.current,
+          position,
+          targetCoordinates,
+        ),
       )
       syncDiagnosticCircles(targetCoordinates)
     }
@@ -337,6 +387,7 @@ function StreetRouteLineLayerInner({
       const renderLatLngs = buildLiveRenderLatLngs(
         latlngs,
         userPosition,
+        requestTo,
         requestFrom,
       )
 

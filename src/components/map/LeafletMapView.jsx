@@ -21,6 +21,7 @@ import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
 import { useCinematicMapBearing } from '../../hooks/useCinematicMapBearing'
 import { useSmoothedHeading } from '../../hooks/useSmoothedHeading'
 import { MapInteractionBridge } from './MapInteractionBridge'
+import { MapSizeSync } from './MapSizeSync'
 import { useFigureProximity } from '../../hooks/useFigureProximity'
 import { logGpsSnapshot } from '../../utils/universeDiagnostics'
 import {
@@ -446,6 +447,7 @@ function LeafletMapViewInner({
   onRouteMetricsChange,
 }) {
   const mapRef = useRef(null)
+  const mapContainerRef = useRef(null)
   const mapFollowPausedRef = useRef(false)
   const userControlledMapRef = useRef(false)
   const mapGestureActiveRef = useRef(false)
@@ -852,6 +854,7 @@ function LeafletMapViewInner({
   return (
     <div className={`relative h-full min-h-0 overflow-hidden ${className}`}>
       <div
+        ref={mapContainerRef}
         className="map-container absolute inset-0 h-full w-full"
         style={{ '--map-tile-filter': MAP_TILE_FILTER }}
       >
@@ -871,6 +874,7 @@ function LeafletMapViewInner({
             {...TILE_OPTIONS}
           />
           <MapInstanceBridge mapRef={mapRef} />
+          <MapSizeSync containerRef={mapContainerRef} />
           <MapFlyController
             position={followCenter ?? mapPosition}
             zoom={USER_ZOOM}
