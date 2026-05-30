@@ -1,24 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminErrorBanner, formatDate } from '../../components/admin/adminShared'
 import {
-  composePushDisplayTitle,
+  formatPushHistoryTitle,
   formatPushStatus,
   getDestinationLabel,
-  getPushIconByKey,
   PUSH_DESTINATIONS,
-  PUSH_NOTIFICATION_ICONS,
 } from '../../config/pushNotificationIcons'
 import {
   fetchPushAdminStats,
   fetchPushNotificationHistory,
+  lookupPushTestRecipient,
   sendPushBroadcast,
   sendPushTest,
 } from '../../services/supabase/pushAdmin'
+import { getArgentineMobileValidation } from '../../utils/argentinePhone'
 import { isSuperAdminProfile } from '../../utils/roles'
 import { useAppStore } from '../../store/useAppStore'
 
 const DEFAULT_FORM = {
-  iconKey: 'event',
   title: '',
   body: '',
   destination: 'map',
@@ -67,16 +66,13 @@ function ConfirmModal({ open, title, message, confirmLabel, busy, onCancel, onCo
 function HistoryDetailModal({ item, onClose }) {
   if (!item) return null
 
-  const icon = getPushIconByKey(item.icon_key)
   const status = formatPushStatus(item.status)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-lg font-bold text-ink">
-            {icon.emoji} {item.title}
-          </h3>
+          <h3 className="text-lg font-bold text-ink">{formatPushHistoryTitle(item)}</h3>
           <button type="button" onClick={onClose} className="text-sm font-semibold text-muted">
             Cerrar
           </button>
@@ -137,13 +133,20 @@ export function AdminPushNotificationsPage() {
   const [formMessage, setFormMessage] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sending, setSending] = useState(false)
-  const [testing, setTesting] = useState(false)
   const [detailItem, setDetailItem] = useState(null)
+  const [testPhone, setTestPhone] = useState('')
+  const [lookupResult, setLookupResult] = useState(null)
+  const [lookupError, setLookupError] = useState(null)
+  const [testSendMessage, setTestSendMessage] = useState(null)
+  const [testSendError, setTestSendError] = useState(null)
+  const [searching, setSearching] = useState(false)
+  const [testing, setTesting] = useState(false)
 
-  const previewTitle = useMemo(
-    () => composePushDisplayTitle(form.iconKey, form.title),
-    [form.iconKey, form.title],
-  )
+  const previewTitle = useMemo(() => form.title.trim(), [form.title])
+  const phoneValidation = useMemo(() => getArgentineMobileValidation(testPhone), [testPhone])
+  const canSearchPhone = Boolean(phoneValidation?.valid)
+  const canSendTest =
+    Boolean(lookupResult?.ok) && Number(lookupResult?.active_devices ?? 0) > 0 && !searching && !testing
 
   const loadAll = useCallback(async () => {
     if (!isSuperAdmin) return
@@ -176,29 +179,75 @@ export function AdminPushNotificationsPage() {
   }
 
   const buildPayload = () => ({
-    icon_key: form.iconKey,
     title: form.title.trim(),
     body: form.body.trim(),
     destination: form.destination,
   })
 
+  const resetTestLookup = () => {
+    setLookupResult(null)
+    setLookupError(null)
+    setTestSendMessage(null)
+    setTestSendError(null)
+  }
+
+  const handleTestPhoneChange = (value) => {
+    setTestPhone(value)
+    resetTestLookup()
+  }
+
+  const handleSearchRecipient = async () => {
+    if (!canSearchPhone) return
+
+    setSearching(true)
+    setLookupError(null)
+    setLookupResult(null)
+    setTestSendMessage(null)
+    setTestSendError(null)
+
+    try {
+      const result = await lookupPushTestRecipient(testPhone)
+      if (!result.ok && result.error === 'USER_NOT_FOUND') {
+        setLookupError('No existe un usuario registrado con ese número.')
+        return
+      }
+      if (!result.ok) {
+        setLookupError('No pudimos buscar el número. Probá de nuevo.')
+        return
+      }
+      setLookupResult(result)
+      if (Number(result.active_devices ?? 0) === 0) {
+        setLookupError('El usuario existe pero no tiene dispositivos suscritos.')
+      }
+    } catch (searchError) {
+      setLookupError(searchError?.message ?? 'No pudimos buscar el número.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
   const handleTestSend = async () => {
     const validationError = validateForm()
     if (validationError) {
-      setFormError(validationError)
+      setTestSendError(validationError)
       return
     }
+    if (!canSendTest) return
 
     setTesting(true)
-    setFormError(null)
-    setFormMessage(null)
+    setTestSendError(null)
+    setTestSendMessage(null)
     try {
-      const result = await sendPushTest(buildPayload())
-      setFormMessage(
-        `Prueba enviada a ${result.device_count} dispositivo(s): ${result.success_count} ok.`,
+      const result = await sendPushTest({
+        ...buildPayload(),
+        local_phone: testPhone,
+      })
+      setTestSendMessage(
+        result.message ??
+          `Prueba enviada correctamente a ${result.device_count} dispositivo(s) (${result.success_count} ok).`,
       )
     } catch (testError) {
-      setFormError(testError?.message ?? 'No pudimos enviar la prueba.')
+      setTestSendError(testError?.message ?? 'No pudimos enviar la prueba.')
     } finally {
       setTesting(false)
     }
@@ -275,30 +324,6 @@ export function AdminPushNotificationsPage() {
           }}
         >
           <div>
-            <label className="text-xs font-bold uppercase tracking-wide text-muted">Icono</label>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {PUSH_NOTIFICATION_ICONS.map((icon) => {
-                const selected = form.iconKey === icon.key
-                return (
-                  <button
-                    key={icon.key}
-                    type="button"
-                    onClick={() => setForm((current) => ({ ...current, iconKey: icon.key }))}
-                    className={`rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
-                      selected
-                        ? 'border-progress bg-progress/10 font-bold text-ink'
-                        : 'border-border bg-slate-50 text-ink hover:bg-white'
-                    }`}
-                  >
-                    <span className="mr-1">{icon.emoji}</span>
-                    {icon.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div>
             <label htmlFor="push-title" className="text-xs font-bold uppercase tracking-wide text-muted">
               Título
             </label>
@@ -309,8 +334,11 @@ export function AdminPushNotificationsPage() {
               value={form.title}
               onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
               className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-ink"
-              placeholder="Nueva colección disponible"
+              placeholder="📢 Comunicado importante"
             />
+            <p className="mt-1.5 text-xs text-muted">
+              Podés incluir emojis directamente en el título, por ejemplo 🚧 Corte de calle.
+            </p>
           </div>
 
           <div>
@@ -324,7 +352,7 @@ export function AdminPushNotificationsPage() {
               value={form.body}
               onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
               className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-ink"
-              placeholder="Ya podés buscar las figuritas del Delta."
+              placeholder="🚲 Nueva figurita disponible en el mapa."
             />
           </div>
 
@@ -359,16 +387,8 @@ export function AdminPushNotificationsPage() {
 
           <div className="flex flex-wrap gap-2 pt-2">
             <button
-              type="button"
-              onClick={() => void handleTestSend()}
-              disabled={testing || sending}
-              className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-50"
-            >
-              {testing ? 'Enviando prueba…' : 'Enviar prueba a mi dispositivo'}
-            </button>
-            <button
               type="submit"
-              disabled={testing || sending}
+              disabled={sending}
               className="rounded-xl bg-progress px-5 py-2.5 text-sm font-black uppercase tracking-wide text-ink disabled:opacity-50"
             >
               Enviar notificación
@@ -388,11 +408,115 @@ export function AdminPushNotificationsPage() {
             </p>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            La vista previa compone icono + título visualmente. En la base de datos se guardan por
-            separado.
+            La vista previa muestra el título y mensaje exactamente como los verá el usuario.
           </p>
         </aside>
       </div>
+
+      <section className="space-y-5 rounded-2xl border border-border bg-slate-50 p-6 shadow-sm">
+        <div>
+          <h2 className="text-lg font-black text-ink">Enviar prueba</h2>
+          <p className="mt-1 text-sm text-muted">
+            Buscá un usuario por celular y enviá una prueba a sus dispositivos. No se registra en el
+            historial de campañas.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="push-test-phone" className="text-xs font-bold uppercase tracking-wide text-muted">
+            Número para prueba
+          </label>
+          <div className="mt-2 flex max-w-md">
+            <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-white px-4 py-3 text-sm font-semibold text-muted">
+              +54 9
+            </span>
+            <input
+              id="push-test-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+              value={testPhone}
+              onChange={(event) => handleTestPhoneChange(event.target.value)}
+              className="w-full rounded-r-xl border border-border bg-white px-4 py-3 text-sm text-ink"
+              placeholder="11 3456 7890"
+            />
+          </div>
+          <p className="mt-2 max-w-md text-xs leading-relaxed text-muted">
+            Ingresá el número desde el código de área.
+            <br />
+            No escribas +54.
+            <br />
+            Ejemplo: 11 3456 7890
+          </p>
+          {phoneValidation && (
+            <p
+              className={`mt-2 text-sm font-medium ${phoneValidation.valid ? 'text-emerald-700' : 'text-red-600'}`}
+              role="status"
+            >
+              {phoneValidation.valid ? '✅' : '❌'} {phoneValidation.message}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSearchRecipient()}
+            disabled={!canSearchPhone || searching || testing}
+            className="rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-50"
+          >
+            {searching ? 'Buscando…' : 'Buscar'}
+          </button>
+        </div>
+
+        {lookupError && (
+          <p className="text-sm text-red-600" role="alert">
+            ❌ {lookupError}
+          </p>
+        )}
+
+        {lookupResult?.ok && (
+          <div className="max-w-md rounded-xl border border-border bg-white p-4 text-sm">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted">Usuario encontrado</p>
+            <dl className="mt-3 space-y-2">
+              <div>
+                <dt className="font-semibold text-muted">Nombre</dt>
+                <dd className="text-ink">{lookupResult.full_name?.trim() || '—'}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-muted">Email</dt>
+                <dd className="text-ink">{lookupResult.email?.trim() || '—'}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-muted">Dispositivos activos</dt>
+                <dd className="text-ink">{Number(lookupResult.active_devices ?? 0).toLocaleString('es-AR')}</dd>
+              </div>
+            </dl>
+          </div>
+        )}
+
+        {testSendError && (
+          <p className="text-sm text-red-600" role="alert">
+            ❌ {testSendError}
+          </p>
+        )}
+        {testSendMessage && (
+          <p className="text-sm text-emerald-700" role="status">
+            ✅ {testSendMessage}
+          </p>
+        )}
+
+        <div>
+          <button
+            type="button"
+            onClick={() => void handleTestSend()}
+            disabled={!canSendTest}
+            className="rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-50"
+          >
+            {testing ? 'Enviando prueba…' : 'Enviar prueba'}
+          </button>
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-border bg-white p-6 shadow-sm">
         <h2 className="text-xl font-black text-ink">📢 Historial de Notificaciones</h2>
@@ -406,7 +530,6 @@ export function AdminPushNotificationsPage() {
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wide text-muted">
                   <th className="px-3 py-2">Fecha</th>
-                  <th className="px-3 py-2">Icono</th>
                   <th className="px-3 py-2">Título</th>
                   <th className="px-3 py-2">Destino</th>
                   <th className="px-3 py-2">Usuario</th>
@@ -416,13 +539,11 @@ export function AdminPushNotificationsPage() {
               </thead>
               <tbody>
                 {history.map((item) => {
-                  const icon = getPushIconByKey(item.icon_key)
                   const status = formatPushStatus(item.status)
                   return (
                     <tr key={item.id} className="border-b border-border/70">
                       <td className="px-3 py-3 whitespace-nowrap">{formatDate(item.created_at)}</td>
-                      <td className="px-3 py-3">{icon.emoji}</td>
-                      <td className="px-3 py-3 font-medium text-ink">{item.title}</td>
+                      <td className="px-3 py-3 font-medium text-ink">{formatPushHistoryTitle(item)}</td>
                       <td className="px-3 py-3">{getDestinationLabel(item.destination)}</td>
                       <td className="px-3 py-3">{item.sent_by_username || '—'}</td>
                       <td className="px-3 py-3 whitespace-nowrap">

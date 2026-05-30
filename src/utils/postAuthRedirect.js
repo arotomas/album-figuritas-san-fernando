@@ -12,6 +12,12 @@ function wantsAdminPanel(search = '') {
   return params.get('admin') === '1'
 }
 
+/** Rutas /admin o login staff (?admin=1) — sin splash ni boot animado. */
+export function isAdminExperiencePath(pathname = '', search = '') {
+  if (String(pathname).startsWith('/admin')) return true
+  return wantsAdminPanel(search)
+}
+
 /** Destino por defecto del panel (moderadores y admins). */
 export const ADMIN_HOME_PATH = '/admin/players'
 

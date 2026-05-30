@@ -63,6 +63,21 @@ export async function sendPushBroadcast(payload) {
   return data
 }
 
+export async function lookupPushTestRecipient(localPhone) {
+  await assertSuperAdminClient()
+
+  const { data, error } = await supabase.rpc('lookup_push_test_recipient', {
+    p_local_phone: localPhone,
+  })
+
+  if (error) {
+    if (/forbidden/i.test(error.message ?? '')) throw new Error('FORBIDDEN')
+    throw error
+  }
+
+  return data ?? { ok: false, error: 'INTERNAL_ERROR' }
+}
+
 export async function sendPushTest(payload) {
   await assertSuperAdminClient()
 
@@ -71,14 +86,9 @@ export async function sendPushTest(payload) {
   })
 
   if (error) throw error
-  if (data?.error && data.error !== 'NO_DEVICES') {
+  if (data?.error) {
     const err = new Error(data.message ?? data.error)
     err.code = data.error
-    throw err
-  }
-  if (data?.error === 'NO_DEVICES') {
-    const err = new Error(data.message ?? 'No tenés dispositivos suscritos activos.')
-    err.code = 'NO_DEVICES'
     throw err
   }
   return data

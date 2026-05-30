@@ -1,5 +1,5 @@
-/** Icon catalog — keep in sync with src/config/pushNotificationIcons.js */
-export const PUSH_ICON_EMOJI: Record<string, string> = {
+/** Legacy icon keys — historial anterior al selector removido. */
+export const LEGACY_ICON_EMOJI: Record<string, string> = {
   event: '🎉',
   highlight: '⭐',
   location: '📍',
@@ -12,8 +12,6 @@ export const PUSH_ICON_EMOJI: Record<string, string> = {
   important: '🚨',
 }
 
-export const VALID_ICON_KEYS = new Set(Object.keys(PUSH_ICON_EMOJI))
-
 export const VALID_DESTINATIONS = new Set(['map', 'album', 'home'])
 
 export const DEEP_LINKS: Record<string, string> = {
@@ -23,7 +21,7 @@ export const DEEP_LINKS: Record<string, string> = {
 }
 
 export type PushPayloadInput = {
-  icon_key: string
+  icon_key?: string
   title: string
   body: string
   destination: string
@@ -38,14 +36,12 @@ export type PushSubscriptionRow = {
 }
 
 export function validatePushPayload(input: PushPayloadInput) {
-  const icon_key = String(input.icon_key ?? '').trim()
+  const rawIconKey = String(input.icon_key ?? '').trim()
+  const icon_key = rawIconKey || 'custom'
   const title = String(input.title ?? '').trim()
   const body = String(input.body ?? '').trim()
   const destination = String(input.destination ?? '').trim()
 
-  if (!VALID_ICON_KEYS.has(icon_key)) {
-    throw new Error('INVALID_ICON_KEY')
-  }
   if (!title || title.length > 120) {
     throw new Error('INVALID_TITLE')
   }
@@ -56,7 +52,6 @@ export function validatePushPayload(input: PushPayloadInput) {
     throw new Error('INVALID_DESTINATION')
   }
 
-  const emoji = PUSH_ICON_EMOJI[icon_key]
   const deep_link = DEEP_LINKS[destination]
 
   return {
@@ -65,7 +60,7 @@ export function validatePushPayload(input: PushPayloadInput) {
     body,
     destination,
     deep_link,
-    display_title: `${emoji} ${title}`,
+    display_title: title,
   }
 }
 
@@ -78,16 +73,15 @@ export function buildWebPushPayload(validated: ReturnType<typeof validatePushPay
     data: {
       url: validated.deep_link,
       icon_key: validated.icon_key,
-      title: validated.title,
       destination: validated.destination,
     },
   })
 }
 
 export function computeStatus(successCount: number, failureCount: number) {
-  if (successCount <= 0) return 'failed'
-  if (failureCount > 0) return 'partial'
-  return 'sent'
+  if (successCount > 0 && failureCount === 0) return 'sent'
+  if (successCount > 0 && failureCount > 0) return 'partial'
+  return 'failed'
 }
 
 export function corsHeaders(origin: string | null) {

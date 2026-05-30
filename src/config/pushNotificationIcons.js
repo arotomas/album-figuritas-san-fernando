@@ -1,36 +1,31 @@
-export const PUSH_NOTIFICATION_ICONS = [
-  { key: 'event', emoji: '🎉', label: 'Evento' },
-  { key: 'highlight', emoji: '⭐', label: 'Destacado' },
-  { key: 'location', emoji: '📍', label: 'Ubicación' },
-  { key: 'nature', emoji: '🏞️', label: 'Naturaleza' },
-  { key: 'sports', emoji: '⚽', label: 'Deportes' },
-  { key: 'culture', emoji: '🎭', label: 'Cultura' },
-  { key: 'achievement', emoji: '🏆', label: 'Logro' },
-  { key: 'prize', emoji: '🎁', label: 'Premio' },
-  { key: 'activity', emoji: '🚴', label: 'Actividad' },
-  { key: 'important', emoji: '🚨', label: 'Importante' },
-]
-
 export const PUSH_DESTINATIONS = [
   { key: 'map', label: 'Mapa' },
   { key: 'album', label: 'Álbum' },
   { key: 'home', label: 'Inicio' },
 ]
 
-const ICON_BY_KEY = Object.fromEntries(
-  PUSH_NOTIFICATION_ICONS.map((item) => [item.key, item]),
-)
-
-export function getPushIconByKey(iconKey) {
-  return ICON_BY_KEY[iconKey] ?? PUSH_NOTIFICATION_ICONS[0]
+/** Legacy catalog — solo para historial creado antes de quitar el selector de iconos. */
+const LEGACY_ICON_EMOJI = {
+  event: '🎉',
+  highlight: '⭐',
+  location: '📍',
+  nature: '🏞️',
+  sports: '⚽',
+  culture: '🎭',
+  achievement: '🏆',
+  prize: '🎁',
+  activity: '🚴',
+  important: '🚨',
 }
 
-/** Solo para preview / payload visual — no muta el título del formulario. */
-export function composePushDisplayTitle(iconKey, title) {
-  const trimmed = String(title ?? '').trim()
-  const emoji = getPushIconByKey(iconKey).emoji
-  if (!trimmed) return emoji
-  return `${emoji} ${trimmed}`
+export function formatPushHistoryTitle(item) {
+  const title = String(item?.title ?? '').trim()
+  const iconKey = String(item?.icon_key ?? '').trim()
+  const legacyEmoji = LEGACY_ICON_EMOJI[iconKey]
+  if (legacyEmoji && iconKey !== 'custom') {
+    return `${legacyEmoji} ${title}`
+  }
+  return title
 }
 
 export function getDestinationLabel(destinationKey) {

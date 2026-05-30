@@ -1,4 +1,3 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import webpush from 'npm:web-push@3.6.7'
 import {
   buildWebPushPayload,
@@ -7,6 +6,8 @@ import {
   type PushSubscriptionRow,
   validatePushPayload,
 } from '../_shared/push.ts'
+import { lookupPushTestRecipient } from '../_shared/phone.ts'
+import { assertSuperAdmin } from '../_shared/superAdmin.ts'
 
 const BATCH_SIZE = 20
 
@@ -22,43 +23,6 @@ function configureWebPush() {
   webpush.setVapidDetails(subject, publicKey, privateKey)
 }
 
-async function assertSuperAdmin(req: Request) {
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    throw new Error('UNAUTHORIZED')
-  }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  })
-
-  const {
-    data: { user },
-    error: userError,
-  } = await userClient.auth.getUser()
-
-  if (userError || !user) {
-    throw new Error('UNAUTHORIZED')
-  }
-
-  const adminClient = createClient(supabaseUrl, serviceRoleKey)
-  const { data: profile, error: profileError } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (profileError || profile?.role !== 'super_admin') {
-    throw new Error('FORBIDDEN')
-  }
-
-  return { user, adminClient }
-}
-
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin')
 
@@ -71,14 +35,53 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { user, adminClient } = await assertSuperAdmin(req)
+    const { userClient, adminClient } = await assertSuperAdmin(req)
     const body = await req.json()
     const validated = validatePushPayload(body)
+    const localPhone = String(body.local_phone ?? body.phone ?? '').trim()
+
+    if (!localPhone) {
+      return jsonResponse({ error: 'INVALID_PHONE', message: 'Ingresá un número válido.' }, 400, origin)
+    }
+
+    const lookup = await lookupPushTestRecipient(userClient, localPhone)
+
+    if (!lookup.ok && lookup.error === 'INVALID_PHONE') {
+      return jsonResponse({ error: 'INVALID_PHONE', message: 'Número inválido.' }, 400, origin)
+    }
+
+    if (!lookup.ok && lookup.error === 'USER_NOT_FOUND') {
+      return jsonResponse(
+        {
+          error: 'USER_NOT_FOUND',
+          message: 'No existe un usuario registrado con ese número.',
+        },
+        404,
+        origin,
+      )
+    }
+
+    if (!lookup.ok || !lookup.user_id) {
+      return jsonResponse({ error: 'INTERNAL_ERROR' }, 500, origin)
+    }
+
+    const activeDevices = Number(lookup.active_devices ?? 0)
+    if (activeDevices === 0) {
+      return jsonResponse(
+        {
+          error: 'NO_DEVICES',
+          message: 'El usuario existe pero no tiene dispositivos suscritos.',
+          device_count: 0,
+        },
+        400,
+        origin,
+      )
+    }
 
     const { data: subscriptions, error: subError } = await adminClient
       .from('push_subscriptions')
       .select('id, user_id, endpoint, p256dh, auth')
-      .eq('user_id', user.id)
+      .eq('user_id', lookup.user_id)
       .eq('is_active', true)
 
     if (subError) {
@@ -90,7 +93,7 @@ Deno.serve(async (req) => {
       return jsonResponse(
         {
           error: 'NO_DEVICES',
-          message: 'No tenés dispositivos suscritos activos. Activá notificaciones en la app.',
+          message: 'El usuario existe pero no tiene dispositivos suscritos.',
           device_count: 0,
         },
         400,
@@ -143,6 +146,7 @@ Deno.serve(async (req) => {
         success_count: successCount,
         failure_count: failureCount,
         ok: successCount > 0,
+        message: 'Prueba enviada correctamente.',
       },
       200,
       origin,

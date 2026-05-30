@@ -11,15 +11,17 @@ import { PushInviteBanner } from './components/push/PushInviteBanner'
 import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
+import { isAdminExperiencePath } from './utils/postAuthRedirect'
 import { useAppStore } from './store/useAppStore'
 
 function App() {
-  const { isBooting, bootPhase } = useAppBootGate()
-  const [splashComplete, setSplashComplete] = useState(false)
+  const location = useLocation()
+  const isAdminExperience = isAdminExperiencePath(location.pathname, location.search)
+  const { isBooting, bootPhase } = useAppBootGate({ skipReadyHold: isAdminExperience })
+  const [splashComplete, setSplashComplete] = useState(() => isAdminExperience)
   const handleSplashComplete = useCallback(() => {
     setSplashComplete(true)
   }, [])
-  const location = useLocation()
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)
   const supabaseUserId = useAppStore((state) => state.supabaseUserId)
@@ -29,12 +31,18 @@ function App() {
   const isAdminRoute = location.pathname.startsWith('/admin')
 
   useEffect(() => {
+    if (isAdminExperience) {
+      setSplashComplete(true)
+    }
+  }, [isAdminExperience])
+
+  useEffect(() => {
     if (!authBootstrapped) return
-    if (wasAuthenticatedRef.current === true && !isAuthenticated) {
+    if (wasAuthenticatedRef.current === true && !isAuthenticated && !isAdminExperience) {
       setSplashComplete(false)
     }
     wasAuthenticatedRef.current = isAuthenticated
-  }, [authBootstrapped, isAuthenticated])
+  }, [authBootstrapped, isAuthenticated, isAdminExperience])
 
   useEffect(() => {
     setQaAccessContext({
@@ -54,7 +62,7 @@ function App() {
     }
   }, [clearQaTestFigure, location.pathname, location.search])
 
-  if (isBooting) {
+  if (isBooting && !isAdminExperience) {
     return (
       <ViewportProvider>
         <div className="app-shell bg-app h-app overflow-hidden text-ink">
@@ -64,7 +72,7 @@ function App() {
     )
   }
 
-  if (!splashComplete) {
+  if (!splashComplete && !isAdminExperience) {
     return (
       <ViewportProvider>
         <SplashScreen onComplete={handleSplashComplete} />

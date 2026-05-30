@@ -7,8 +7,9 @@ const READY_HOLD_MS = 420
 
 /**
  * Orquesta el boot unificado: hidratación álbum → restore sesión → hold breve → app.
+ * @param {{ skipReadyHold?: boolean }} options — admin abre sin espera visual extra
  */
-export function useAppBootGate() {
+export function useAppBootGate({ skipReadyHold = false } = {}) {
   const { hasHydrated } = usePersistedAlbum()
   useSupabaseBootstrap(hasHydrated)
 
@@ -23,9 +24,14 @@ export function useAppBootGate() {
       return undefined
     }
 
+    if (skipReadyHold) {
+      setReadyHoldComplete(true)
+      return undefined
+    }
+
     const timer = window.setTimeout(() => setReadyHoldComplete(true), READY_HOLD_MS)
     return () => window.clearTimeout(timer)
-  }, [coreBootComplete])
+  }, [coreBootComplete, skipReadyHold])
 
   const phase = useMemo(() => {
     if (!hasHydrated) return 'album'
