@@ -38,11 +38,9 @@ function ProgressBarInner({
               key={index}
               className={`h-3 flex-1 rounded-sm transition-colors duration-300 ${
                 index < progress
-                  ? isDark
-                    ? 'bg-white'
-                    : 'bg-progress'
+                  ? 'bg-progress'
                   : isDark
-                    ? 'bg-white/30'
+                    ? 'bg-zinc-700'
                     : 'bg-border'
               }`}
             />
@@ -50,7 +48,7 @@ function ProgressBarInner({
         </div>
         <span
           className={`min-w-10 text-right text-sm font-semibold ${
-            isDark ? 'text-white' : 'text-ink'
+            isDark ? 'text-progress' : 'text-ink'
           }`}
         >
           {progress}/{totalFigures}

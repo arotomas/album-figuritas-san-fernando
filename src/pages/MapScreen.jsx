@@ -172,7 +172,7 @@ export function MapScreen() {
       />
 
       <div className="pointer-events-none shrink-0 px-4 pb-2">
-        <div className="pointer-events-auto rounded-2xl border border-white/15 bg-progress p-4 shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
+        <div className="pointer-events-auto rounded-2xl border border-progress/25 bg-charcoal/95 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_20px_rgba(140,198,63,0.1)]">
           <ProgressBar showSimulateLink={false} variant="dark" />
         </div>
       </div>
