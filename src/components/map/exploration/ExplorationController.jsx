@@ -2,7 +2,9 @@ import { memo, useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import { useExplorationStore } from '../../../store/explorationStore'
 import { useExplorationDistanceSync } from '../../../hooks/useExplorationMode'
+import { SIMPLE_ROUTING_EXPERIMENT } from '../../../config/simpleRoutingExperiment'
 import { runExplorationCamera } from '../../../utils/explorationMap'
+import { SimpleTargetLineLayer } from '../routing'
 import { ExplorationLineLayer } from './ExplorationLineLayer'
 import { ExplorationTargetMarker } from './ExplorationTargetMarker'
 
@@ -18,18 +20,27 @@ function ExplorationControllerInner({
   const pendingCamera = useExplorationStore((state) => state.pendingCamera)
   const clearPendingCamera = useExplorationStore((state) => state.clearPendingCamera)
   const flewWithoutGpsRef = useRef(false)
+  const simpleRouting =
+    SIMPLE_ROUTING_EXPERIMENT.enabled && SIMPLE_ROUTING_EXPERIMENT.skipExplorationCamera
 
   useExplorationDistanceSync(userPosition)
 
   useEffect(() => {
     if (!active) return undefined
-    onPauseMapFollow?.(true)
+    if (!simpleRouting) {
+      onPauseMapFollow?.(true)
+    }
     return undefined
-  }, [active, onPauseMapFollow])
+  }, [active, onPauseMapFollow, simpleRouting])
 
   useEffect(() => {
     if (!active) {
       flewWithoutGpsRef.current = false
+      return undefined
+    }
+
+    if (simpleRouting) {
+      if (pendingCamera) clearPendingCamera()
       return undefined
     }
 
@@ -56,6 +67,7 @@ function ExplorationControllerInner({
     map,
     pendingCamera,
     reducedMotion,
+    simpleRouting,
     targetCoordinates,
     userPosition?.lat,
     userPosition?.lng,
@@ -63,18 +75,31 @@ function ExplorationControllerInner({
 
   if (!active) return null
 
+  const showTargetMarker =
+    !SIMPLE_ROUTING_EXPERIMENT.enabled || !SIMPLE_ROUTING_EXPERIMENT.skipTargetMarker
+
   return (
     <>
-      <ExplorationTargetMarker
-        active={active}
-        targetCoordinates={targetCoordinates}
-        targetName={targetName}
-      />
-      <ExplorationLineLayer
-        active={active}
-        userPosition={userPosition}
-        targetCoordinates={targetCoordinates}
-      />
+      {showTargetMarker ? (
+        <ExplorationTargetMarker
+          active={active}
+          targetCoordinates={targetCoordinates}
+          targetName={targetName}
+        />
+      ) : null}
+      {SIMPLE_ROUTING_EXPERIMENT.enabled ? (
+        <SimpleTargetLineLayer
+          active={active}
+          userPosition={userPosition}
+          targetCoordinates={targetCoordinates}
+        />
+      ) : (
+        <ExplorationLineLayer
+          active={active}
+          userPosition={userPosition}
+          targetCoordinates={targetCoordinates}
+        />
+      )}
     </>
   )
 }
