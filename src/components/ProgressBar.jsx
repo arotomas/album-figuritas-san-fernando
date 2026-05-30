@@ -24,7 +24,7 @@ function ProgressBarInner({
       {showLabel && (
         <p
           className={`mb-3 text-center text-sm font-medium ${
-            isDark ? 'text-white' : 'text-ink'
+            isDark ? 'text-progress-dark' : 'text-ink'
           }`}
         >
           ¡Encontrá la próxima figurita!
@@ -40,7 +40,7 @@ function ProgressBarInner({
                 index < progress
                   ? 'bg-progress'
                   : isDark
-                    ? 'bg-zinc-700'
+                    ? 'bg-progress/18'
                     : 'bg-border'
               }`}
             />
@@ -48,7 +48,7 @@ function ProgressBarInner({
         </div>
         <span
           className={`min-w-10 text-right text-sm font-semibold ${
-            isDark ? 'text-progress' : 'text-ink'
+            isDark ? 'text-progress-dark' : 'text-ink'
           }`}
         >
           {progress}/{totalFigures}
