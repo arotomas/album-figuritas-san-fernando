@@ -9,6 +9,7 @@ import './styles/index.css'
 import { bootLog, bootWarn } from './utils/bootLog.js'
 import { initPwaInstallCapture } from './utils/pwaInstallController.js'
 import { useExplorationStore } from './store/explorationStore.js'
+import { soundService } from './services/audio/index.js'
 
 bootLog('main entry')
 try {
@@ -22,6 +23,7 @@ try {
   bootWarn('initPwaInstallCapture threw — continuing boot', error?.message)
 }
 syncQaFromUrl()
+soundService.schedulePreload()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

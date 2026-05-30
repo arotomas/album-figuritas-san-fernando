@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useNavigationArrivalSound } from '../../../hooks/useNavigationArrivalSound'
 import { NAVIGATION_UX_EXPERIMENT, TRANSPORT_MODES } from '../../../config/navigationUx'
 import { useLiveRouteMetrics } from '../../../hooks/useLiveRouteMetrics'
 import { useNavigationStore } from '../../../store/navigationStore'
@@ -29,6 +30,8 @@ function NavigationMetricsPanelInner({
     metrics,
     transportProfile,
   )
+
+  useNavigationArrivalSound(arrived)
 
   if (!NAVIGATION_UX_EXPERIMENT.enabled || !visible || !metrics?.distanceMeters) {
     return null

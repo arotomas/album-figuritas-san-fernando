@@ -12,6 +12,7 @@ import {
 } from '../utils/photoEncode'
 import { withTimeout } from '../utils/withTimeout'
 import { vibrateCapture, vibrateReady, vibrateProximityPulse } from '../utils/vibration'
+import { playGameSound } from '../services/audio'
 import { getDistanceMeters } from '../utils/geo'
 import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
 import { REWARD_ENTRY_BEAT_MS, FLASH_MIN_HOLD_MS } from '../config/captureFeel'
@@ -565,6 +566,7 @@ export function useCaptureFlow({
           hasSessionSnapshot: Boolean(trustedSnapshot),
         })
         setCaptureError('Esperá a que el GPS confirme tu ubicación.')
+        playGameSound('ERROR_O_FUERA_DE_RANGO')
         return false
       }
 
@@ -576,6 +578,7 @@ export function useCaptureFlow({
           captureRadiusMeters: captureRadius,
         })
         setCaptureError('Todavía no estás lo suficientemente cerca. Seguí la señal del aro.')
+        playGameSound('ERROR_O_FUERA_DE_RANGO')
         return false
       }
 
@@ -724,6 +727,7 @@ export function useCaptureFlow({
         figureId: figureSnapshot.id,
       })
       captureLog.unlockSuccess({ figureId: figureSnapshot.id })
+      playGameSound('CAPTURA_EXITOSA')
       rewardLog.info('enter reward phase', { figureId: figureSnapshot.id })
       return true
     },

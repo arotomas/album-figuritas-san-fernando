@@ -31,6 +31,11 @@ import {
 } from '../utils/collectionModel'
 import { getCollectionById } from '../utils/collectionRegistry'
 import { requiresCollectionDiscovery } from '../utils/collectionAvailability'
+import {
+  DEFAULT_USER_MUSIC_ENABLED,
+  DEFAULT_USER_SOUNDS_ENABLED,
+} from '../config/audio'
+import { stopAllGameSounds } from '../services/audio'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
@@ -180,6 +185,14 @@ function buildPersistedSnapshot(state) {
       ? state.acknowledgedDiscoveryCollectionIds
       : [],
     activeTargetFigureId: state.activeTargetFigureId ?? null,
+    soundsEnabled:
+      typeof state.soundsEnabled === 'boolean'
+        ? state.soundsEnabled
+        : DEFAULT_USER_SOUNDS_ENABLED,
+    musicEnabled:
+      typeof state.musicEnabled === 'boolean'
+        ? state.musicEnabled
+        : DEFAULT_USER_MUSIC_ENABLED,
   }
 }
 
@@ -257,6 +270,16 @@ export const useAppStore = create(
       profileCompleted: false,
       supabaseProfile: null,
       lastSupabaseSyncWarning: null,
+      soundsEnabled: DEFAULT_USER_SOUNDS_ENABLED,
+      musicEnabled: DEFAULT_USER_MUSIC_ENABLED,
+
+      setSoundsEnabled: (enabled) => {
+        const next = Boolean(enabled)
+        set({ soundsEnabled: next })
+        if (!next) stopAllGameSounds()
+      },
+
+      setMusicEnabled: (enabled) => set({ musicEnabled: Boolean(enabled) }),
 
       setHasHydrated: (value) => set({ _hasHydrated: value }),
 

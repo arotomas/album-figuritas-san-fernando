@@ -5,6 +5,7 @@ import { Input } from '../components/Input'
 import { AddressAutocomplete } from '../components/profile/AddressAutocomplete'
 import { useAuth } from '../hooks/useAuth'
 import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
+import { MUSIC_ENABLED } from '../config/audio'
 import { getMainProgressState } from '../utils/figureGameRules'
 import { getCurrentPosition } from '../services/geoService'
 import { GPS_HIGH_ACCURACY_OPTIONS } from '../config/gps'
@@ -35,6 +36,10 @@ export function OptionsScreen() {
   const supabaseUsername = useAppStore((state) => state.supabaseUsername)
   const lastSupabaseSyncWarning = useAppStore((state) => state.lastSupabaseSyncWarning)
   const figures = useAppStore((state) => state.figures)
+  const soundsEnabled = useAppStore((state) => state.soundsEnabled)
+  const musicEnabled = useAppStore((state) => state.musicEnabled)
+  const setSoundsEnabled = useAppStore((state) => state.setSoundsEnabled)
+  const setMusicEnabled = useAppStore((state) => state.setMusicEnabled)
   const mainProgress = getMainProgressState(figures)
   const [qaMessage, setQaMessage] = useState(null)
   const [qaLoading, setQaLoading] = useState(false)
@@ -252,6 +257,36 @@ export function OptionsScreen() {
               Guardado: {new Date(lastSavedAt).toLocaleString('es-AR')}
             </p>
           )}
+        </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted">Sonido y experiencia</p>
+          <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 text-sm text-ink">
+            <span>Efectos de sonido</span>
+            <input
+              type="checkbox"
+              checked={soundsEnabled !== false}
+              onChange={(event) => setSoundsEnabled(event.target.checked)}
+              className="h-4 w-4 accent-progress"
+            />
+          </label>
+          <label
+            className={`mt-2 flex items-center justify-between gap-3 text-sm ${
+              MUSIC_ENABLED ? 'cursor-pointer text-ink' : 'cursor-not-allowed text-muted'
+            }`}
+          >
+            <span>Música ambiental</span>
+            <input
+              type="checkbox"
+              checked={musicEnabled === true}
+              disabled={!MUSIC_ENABLED}
+              onChange={(event) => setMusicEnabled(event.target.checked)}
+              className="h-4 w-4 accent-progress disabled:opacity-40"
+            />
+          </label>
+          {!MUSIC_ENABLED ? (
+            <p className="mt-1 text-xs text-muted">Próximamente.</p>
+          ) : null}
         </div>
 
         <div>

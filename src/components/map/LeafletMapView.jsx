@@ -36,6 +36,7 @@ import {
   TARGET_LOCK_SECONDARY_HINT_HOLD_MS,
 } from '../../config/proximity'
 import { vibrateFigureProximityAlert } from '../../utils/vibration'
+import { playGameSound } from '../../services/audio'
 import { prefersReducedMotion } from '../../utils/performance'
 import { useStableBoolean } from '../../hooks/useStableBoolean'
 import { FigureMarker } from './FigureMarker'
@@ -771,6 +772,7 @@ function LeafletMapViewInner({
     if (lastVibratedFigureIdRef.current !== nearFigure.id) {
       if (vibrateFigureProximityAlert(nearFigure, phase, FIGURE_ALERT_COOLDOWN_MS)) {
         lastVibratedFigureIdRef.current = nearFigure.id
+        playGameSound('FIGURITA_DETECTADA')
       }
     }
 

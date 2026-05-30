@@ -7,6 +7,7 @@ import { motion as motionTokens } from '../../theme/motion'
 import { typeClasses } from '../../theme/typography'
 import { ParticleLayer } from '../ui/ParticleLayer'
 import { vibrateUnlock } from '../../utils/vibration'
+import { playGameSound } from '../../services/audio'
 import { rewardLog } from '../../utils/devLog'
 import { unlockTrace, traceMounted } from '../../utils/capturePipelineTrace'
 
@@ -30,6 +31,7 @@ export function UnlockAnimation({ onComplete }) {
     unlockTrace('unlock mounted', { progress, totalFigures })
 
     rewardLog.info('unlock animation started')
+    playGameSound('FIGURITA_NUEVA_EN_ALBUM')
     const hapticTimer = window.setTimeout(() => vibrateUnlock(), 90)
     const timer = window.setTimeout(() => {
       if (!mountedRef.current || completedRef.current) return

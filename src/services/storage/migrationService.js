@@ -42,6 +42,12 @@ export function sanitizePersistedState(raw) {
     acknowledgedDiscoveryCollectionIds: Array.isArray(source.acknowledgedDiscoveryCollectionIds)
       ? source.acknowledgedDiscoveryCollectionIds.filter((id) => typeof id === 'string')
       : [],
+    activeTargetFigureId:
+      source.activeTargetFigureId != null ? source.activeTargetFigureId : null,
+    soundsEnabled:
+      typeof source.soundsEnabled === 'boolean' ? source.soundsEnabled : null,
+    musicEnabled:
+      typeof source.musicEnabled === 'boolean' ? source.musicEnabled : null,
   }
 }
 
