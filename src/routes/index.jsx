@@ -60,6 +60,11 @@ const AdminCapturesPage = lazy(() =>
 const AdminMapPage = lazy(() =>
   import('../pages/admin/AdminMapPage').then((m) => ({ default: m.AdminMapPage })),
 )
+const AdminPushNotificationsPage = lazy(() =>
+  import('../pages/admin/AdminPushNotificationsPage').then((m) => ({
+    default: m.AdminPushNotificationsPage,
+  })),
+)
 const PrivacyPage = lazy(() =>
   import('../pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })),
 )
@@ -292,6 +297,16 @@ export function AppRoutes() {
               <AdminRoleGate minRole="admin">
                 <LazyPage>
                   <AdminMapPage />
+                </LazyPage>
+              </AdminRoleGate>
+            }
+          />
+          <Route
+            path="push-notifications"
+            element={
+              <AdminRoleGate minRole="super_admin">
+                <LazyPage label="AdminPushNotificationsPage">
+                  <AdminPushNotificationsPage />
                 </LazyPage>
               </AdminRoleGate>
             }

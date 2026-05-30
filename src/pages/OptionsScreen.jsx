@@ -15,6 +15,7 @@ import { getFullName } from '../utils/profileValidation'
 import { hasValidAddress } from '../utils/parseGooglePlace'
 import { LegalNotice } from '../components/legal/LegalNotice'
 import { InstallAppSection } from '../components/profile/InstallAppSection'
+import { PushNotificationsSection } from '../components/push/PushNotificationsSection'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -312,6 +313,10 @@ export function OptionsScreen() {
       </div>
 
       <InstallAppSection />
+
+      <div className="mt-6">
+        <PushNotificationsSection />
+      </div>
 
       {qaEnabled && (
         <div className="mt-6 space-y-3 rounded-2xl border border-cyan-400/40 bg-cyan-50 p-5">

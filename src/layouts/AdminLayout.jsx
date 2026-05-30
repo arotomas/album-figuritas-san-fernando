@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/admin/events', label: 'Eventos', minRole: 'admin' },
   { to: '/admin/captures', label: 'Capturas', minRole: 'moderator' },
   { to: '/admin/map', label: 'Mapa', minRole: 'admin' },
+  { to: '/admin/push-notifications', label: 'Notificaciones Push', minRole: 'super_admin' },
 ]
 
 const PAGE_TITLES = {
@@ -22,6 +23,7 @@ const PAGE_TITLES = {
   '/admin/events': 'Eventos',
   '/admin/captures': 'Capturas',
   '/admin/map': 'Mapa admin',
+  '/admin/push-notifications': 'Notificaciones Push',
 }
 
 function navLinkClass({ isActive }) {
