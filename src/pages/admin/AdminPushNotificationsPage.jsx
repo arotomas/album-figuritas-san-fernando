@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminErrorBanner, formatDate } from '../../components/admin/adminShared'
+import { EmojiTextField } from '../../components/admin/EmojiTextField'
 import {
   formatPushHistoryTitle,
   formatPushStatus,
@@ -323,38 +324,26 @@ export function AdminPushNotificationsPage() {
             setConfirmOpen(true)
           }}
         >
-          <div>
-            <label htmlFor="push-title" className="text-xs font-bold uppercase tracking-wide text-muted">
-              Título
-            </label>
-            <input
-              id="push-title"
-              type="text"
-              maxLength={120}
-              value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-ink"
-              placeholder="📢 Comunicado importante"
-            />
-            <p className="mt-1.5 text-xs text-muted">
-              Podés incluir emojis directamente en el título, por ejemplo 🚧 Corte de calle.
-            </p>
-          </div>
+          <EmojiTextField
+            id="push-title"
+            label="Título"
+            value={form.title}
+            onChange={(title) => setForm((current) => ({ ...current, title }))}
+            maxLength={120}
+            placeholder="📢 Comunicado importante"
+            helperText="Usá el botón 😀 para insertar cualquier emoji en la posición del cursor."
+          />
 
-          <div>
-            <label htmlFor="push-body" className="text-xs font-bold uppercase tracking-wide text-muted">
-              Mensaje
-            </label>
-            <textarea
-              id="push-body"
-              rows={4}
-              maxLength={500}
-              value={form.body}
-              onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
-              className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-ink"
-              placeholder="🚲 Nueva figurita disponible en el mapa."
-            />
-          </div>
+          <EmojiTextField
+            id="push-body"
+            label="Mensaje"
+            value={form.body}
+            onChange={(body) => setForm((current) => ({ ...current, body }))}
+            maxLength={500}
+            placeholder="🚲 Nueva figurita disponible en el mapa."
+            multiline
+            rows={4}
+          />
 
           <fieldset>
             <legend className="text-xs font-bold uppercase tracking-wide text-muted">Abrir al tocar</legend>
