@@ -24,7 +24,7 @@ function ProgressBarInner({
       {showLabel && (
         <p
           className={`mb-3 text-center text-sm font-medium ${
-            isDark ? 'text-zinc-200' : 'text-ink'
+            isDark ? 'text-white' : 'text-ink'
           }`}
         >
           ¡Encontrá la próxima figurita!
@@ -38,9 +38,11 @@ function ProgressBarInner({
               key={index}
               className={`h-3 flex-1 rounded-sm transition-colors duration-300 ${
                 index < progress
-                  ? 'bg-progress'
+                  ? isDark
+                    ? 'bg-white'
+                    : 'bg-progress'
                   : isDark
-                    ? 'bg-zinc-700'
+                    ? 'bg-white/30'
                     : 'bg-border'
               }`}
             />
