@@ -1,6 +1,5 @@
 /**
- * Experimento: routing por calles vía OSRM público.
- * Rama: test/street-routing-osrm
+ * Routing por calles vía OSRM público.
  */
 export const STREET_ROUTING_OSRM_EXPERIMENT = {
   enabled: true,

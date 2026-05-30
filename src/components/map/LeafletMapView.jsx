@@ -51,7 +51,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
 import { ExplorationController } from './exploration'
-import { SimpleTargetLineLayer, StreetRouteLineLayer, RouteMetricsBadge } from './routing'
+import { SimpleTargetLineLayer, StreetRouteLineLayer, RouteMetricsBadge, RouteDestinationMarker } from './routing'
 import { useExplorationStore } from '../../store/explorationStore'
 import { SIMPLE_ROUTING_EXPERIMENT } from '../../config/simpleRoutingExperiment'
 import { NAVIGATION_UX_EXPERIMENT } from '../../config/navigationUx'
@@ -583,16 +583,18 @@ function LeafletMapViewInner({
   const handleConfirmTarget = useCallback(() => {
     if (!pendingTargetFigure) return
 
-    console.info('[ROUTE_TARGET_SET]', {
-      source: 'handleConfirmTarget:activeTargetFigureId',
-      figureId: pendingTargetFigure.id,
-      figureName: pendingTargetFigure.nombre,
-      explorationActive: useExplorationStore.getState().active,
-    })
-    console.info('[ROUTE_TARGET_COORDS]', {
-      lat: Number(pendingTargetFigure.lat),
-      lng: Number(pendingTargetFigure.lng),
-    })
+    if (import.meta.env.DEV) {
+      console.info('[ROUTE_TARGET_SET]', {
+        source: 'handleConfirmTarget:activeTargetFigureId',
+        figureId: pendingTargetFigure.id,
+        figureName: pendingTargetFigure.nombre,
+        explorationActive: useExplorationStore.getState().active,
+      })
+      console.info('[ROUTE_TARGET_COORDS]', {
+        lat: Number(pendingTargetFigure.lat),
+        lng: Number(pendingTargetFigure.lng),
+      })
+    }
 
     setActiveTargetFigureId(pendingTargetFigure.id)
     setPendingTargetFigure(null)
@@ -915,12 +917,18 @@ function LeafletMapViewInner({
           />
           {simpleRouteActive ? (
             STREET_ROUTING_OSRM_EXPERIMENT.enabled ? (
-              <StreetRouteLineLayer
-                active
-                userPosition={mapPosition}
-                targetCoordinates={simpleRouteTargetCoordinates}
-                onRouteMetricsChange={handleRouteMetricsChange}
-              />
+              <>
+                <StreetRouteLineLayer
+                  active
+                  userPosition={mapPosition}
+                  targetCoordinates={simpleRouteTargetCoordinates}
+                  onRouteMetricsChange={handleRouteMetricsChange}
+                />
+                <RouteDestinationMarker
+                  active
+                  targetCoordinates={simpleRouteTargetCoordinates}
+                />
+              </>
             ) : (
               <SimpleTargetLineLayer
                 active

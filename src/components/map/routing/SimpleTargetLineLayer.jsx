@@ -36,15 +36,17 @@ function SimpleTargetLineLayerInner({ active, userPosition, targetCoordinates })
       !targetCoordinates?.lat ||
       !targetCoordinates?.lng
 
-    console.info('[ROUTE_LINE_RENDER]', {
-      source: 'SimpleTargetLineLayer',
-      active,
-      guardFailed,
-      userLat: userPosition?.lat ?? null,
-      userLng: userPosition?.lng ?? null,
-      targetLat: targetCoordinates?.lat ?? null,
-      targetLng: targetCoordinates?.lng ?? null,
-    })
+    if (import.meta.env.DEV) {
+      console.info('[ROUTE_LINE_RENDER]', {
+        source: 'SimpleTargetLineLayer',
+        active,
+        guardFailed,
+        userLat: userPosition?.lat ?? null,
+        userLng: userPosition?.lng ?? null,
+        targetLat: targetCoordinates?.lat ?? null,
+        targetLng: targetCoordinates?.lng ?? null,
+      })
+    }
 
     if (guardFailed) {
       removeLine()
@@ -56,10 +58,12 @@ function SimpleTargetLineLayerInner({ active, userPosition, targetCoordinates })
       [targetCoordinates.lat, targetCoordinates.lng],
     ]
 
-    console.info('[ROUTE_LINE_POINTS]', {
-      from: { lat: userPosition.lat, lng: userPosition.lng },
-      to: { lat: targetCoordinates.lat, lng: targetCoordinates.lng },
-    })
+    if (import.meta.env.DEV) {
+      console.info('[ROUTE_LINE_POINTS]', {
+        from: { lat: userPosition.lat, lng: userPosition.lng },
+        to: { lat: targetCoordinates.lat, lng: targetCoordinates.lng },
+      })
+    }
 
     const last = lastLineRef.current
     if (last) {

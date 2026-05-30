@@ -24,16 +24,18 @@ export function startFigureExploration(
 ) {
   const resolved = resolveFigureCoordinates(figure, figures)
   const started = useExplorationStore.getState().startExploration(resolved)
-  console.info('[ROUTE_TARGET_SET]', {
-    source: 'startFigureExploration',
-    started,
-    figureId: resolved?.id,
-  })
-  if (started) {
-    console.info('[ROUTE_TARGET_COORDS]', {
-      lat: Number(resolved?.lat),
-      lng: Number(resolved?.lng),
+  if (import.meta.env.DEV) {
+    console.info('[ROUTE_TARGET_SET]', {
+      source: 'startFigureExploration',
+      started,
+      figureId: resolved?.id,
     })
+    if (started) {
+      console.info('[ROUTE_TARGET_COORDS]', {
+        lat: Number(resolved?.lat),
+        lng: Number(resolved?.lng),
+      })
+    }
   }
   if (!started) return false
 

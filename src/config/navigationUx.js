@@ -1,6 +1,4 @@
-/**
- * UX de navegación — rama test/navigation-ux
- */
+/** UX de navegación — ETA local, modos de transporte y llegada. */
 export const NAVIGATION_UX_EXPERIMENT = {
   enabled: true,
 }

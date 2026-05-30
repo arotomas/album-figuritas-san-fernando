@@ -39,25 +39,27 @@ export async function fetchOsrmWalkingRoute(from, to, { baseUrl, profile = 'walk
   const latlngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng])
   const polylinePathMeters = measurePolylinePathMeters(latlngs)
 
-  console.info('[ROUTE_POINTS_OSRM]', latlngs.length)
-  console.info('[OSRM_ROUTE_POINTS]', latlngs.length)
-  console.info('[OSRM_ROUTE_FIRST]', latlngs[0] ?? null)
-  console.info('[OSRM_ROUTE_LAST]', latlngs[latlngs.length - 1] ?? null)
-  console.info('[ROUTE_DISTANCE_COMPARE_OSRM]', {
-    osrmDistanceMeters: route.distance,
-    polylinePathMeters,
-    deltaMeters: route.distance - polylinePathMeters,
-    requestOrigin: { lat: from.lat, lng: from.lng },
-    requestDestination: { lat: to.lat, lng: to.lng },
-    geometryFirst: latlngs[0] ?? null,
-    geometryLast: latlngs[latlngs.length - 1] ?? null,
-    originToFirstMeters: latlngs[0]
-      ? getDistanceMeters(from.lat, from.lng, latlngs[0][0], latlngs[0][1])
-      : null,
-    destinationToLastMeters: latlngs[latlngs.length - 1]
-      ? getDistanceMeters(to.lat, to.lng, latlngs.at(-1)[0], latlngs.at(-1)[1])
-      : null,
-  })
+  if (import.meta.env.DEV) {
+    console.info('[ROUTE_POINTS_OSRM]', latlngs.length)
+    console.info('[OSRM_ROUTE_POINTS]', latlngs.length)
+    console.info('[OSRM_ROUTE_FIRST]', latlngs[0] ?? null)
+    console.info('[OSRM_ROUTE_LAST]', latlngs[latlngs.length - 1] ?? null)
+    console.info('[ROUTE_DISTANCE_COMPARE_OSRM]', {
+      osrmDistanceMeters: route.distance,
+      polylinePathMeters,
+      deltaMeters: route.distance - polylinePathMeters,
+      requestOrigin: { lat: from.lat, lng: from.lng },
+      requestDestination: { lat: to.lat, lng: to.lng },
+      geometryFirst: latlngs[0] ?? null,
+      geometryLast: latlngs[latlngs.length - 1] ?? null,
+      originToFirstMeters: latlngs[0]
+        ? getDistanceMeters(from.lat, from.lng, latlngs[0][0], latlngs[0][1])
+        : null,
+      destinationToLastMeters: latlngs[latlngs.length - 1]
+        ? getDistanceMeters(to.lat, to.lng, latlngs.at(-1)[0], latlngs.at(-1)[1])
+        : null,
+    })
+  }
 
   return {
     latlngs,

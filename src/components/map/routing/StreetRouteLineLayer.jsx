@@ -12,8 +12,8 @@ import {
   fetchOsrmWalkingRoute,
 } from '../../../utils/osrmRoute'
 
-/** TEMP: círculos rojo/verde en lugar del pin para diagnóstico visual. */
-const ROUTE_END_DIAGNOSTIC_CIRCLES = true
+/** Producción: pin de destino vía RouteDestinationMarker; círculos solo en DEV explícito. */
+const ROUTE_END_DIAGNOSTIC_CIRCLES = import.meta.env.DEV && false
 
 /** Android-safe: overlayPane estándar (sin pane custom). */
 const ROUTE_PANE = 'overlayPane'
@@ -112,6 +112,7 @@ function buildLiveRenderLatLngs(
 }
 
 function logRoutePane(map, paneName) {
+  if (!import.meta.env.DEV) return
   const paneEl = map.getPane(paneName)
   console.info('[ROUTE_PANE]', {
     pane: paneName,
@@ -124,6 +125,7 @@ function logRoutePane(map, paneName) {
 }
 
 function logRouteLayer(map, line, latlngs, metrics, requestFrom, requestTo, { updated = false } = {}) {
+  if (!import.meta.env.DEV) return
   const bounds = line?.getBounds?.()
   const southWest = bounds?.getSouthWest?.()
   const northEast = bounds?.getNorthEast?.()
@@ -199,6 +201,7 @@ function StreetRouteLineLayerInner({
     : STREET_ROUTING_OSRM_EXPERIMENT.profile
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     console.info('[ROUTE_LAYER_MOUNT]', {
       active,
       userLat: userPosition?.lat ?? null,
@@ -398,7 +401,7 @@ function StreetRouteLineLayerInner({
       logRoutePane(map, ROUTE_PANE)
 
       if (!lineRef.current) {
-        console.info('[ROUTE_RENDERER]', { type: 'SVG' })
+        if (import.meta.env.DEV) console.info('[ROUTE_RENDERER]', { type: 'SVG' })
         lineRef.current = L.polyline(renderLatLngs, {
           color: lineStyle.color,
           weight: lineStyle.weight,
@@ -456,14 +459,16 @@ function StreetRouteLineLayerInner({
       profile: osrmProfile,
     }
 
-    console.info('[ROUTE_REFETCH]', {
-      reason: lastDraw ? 'stale_or_target' : 'initial',
-      userMovedFromDrawMeters: userMovedFromDraw,
-      targetMovedFromDrawMeters: targetMovedFromDraw,
-      from,
-      to,
-      keepExistingLine: Boolean(lineRef.current) && !targetChanged,
-    })
+    if (import.meta.env.DEV) {
+      console.info('[ROUTE_REFETCH]', {
+        reason: lastDraw ? 'stale_or_target' : 'initial',
+        userMovedFromDrawMeters: userMovedFromDraw,
+        targetMovedFromDrawMeters: targetMovedFromDraw,
+        from,
+        to,
+        keepExistingLine: Boolean(lineRef.current) && !targetChanged,
+      })
+    }
 
     ;(async () => {
       try {
