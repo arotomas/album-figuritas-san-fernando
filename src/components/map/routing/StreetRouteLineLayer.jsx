@@ -40,6 +40,17 @@ function withUserOriginAnchor(latlngs, from) {
   return latlngs
 }
 
+/** Punto azul en [0] + geometría OSRM sin recalcular ruta. */
+function buildLiveRenderLatLngs(osrmLatlngs, userPosition, anchorFrom = userPosition) {
+  if (!Array.isArray(osrmLatlngs) || osrmLatlngs.length === 0) return osrmLatlngs
+
+  if (userPosition?.lat == null || userPosition?.lng == null) {
+    return withUserOriginAnchor(osrmLatlngs, anchorFrom)
+  }
+
+  return [[userPosition.lat, userPosition.lng], ...osrmLatlngs]
+}
+
 function logRoutePane(map, paneName) {
   const paneEl = map.getPane(paneName)
   console.info('[ROUTE_PANE]', {
@@ -116,6 +127,7 @@ function StreetRouteLineLayerInner({
   const lineRef = useRef(null)
   const routeRendererRef = useRef(null)
   const lastDrawRef = useRef(null)
+  const osrmGeometryRef = useRef(null)
   const pendingFetchRef = useRef(null)
   const fetchSeqRef = useRef(0)
   const lineStyle = SIMPLE_ROUTING_EXPERIMENT.line
@@ -141,11 +153,21 @@ function StreetRouteLineLayerInner({
       if (!lineRef.current) return
       map.removeLayer(lineRef.current)
       lineRef.current = null
+      osrmGeometryRef.current = null
     }
 
     const abortPendingFetch = () => {
       pendingFetchRef.current?.abortController?.abort()
       pendingFetchRef.current = null
+    }
+
+    const updateLiveRouteAnchor = (position) => {
+      if (!lineRef.current || !osrmGeometryRef.current?.length) return
+      if (position?.lat == null || position?.lng == null) return
+
+      lineRef.current.setLatLngs(
+        buildLiveRenderLatLngs(osrmGeometryRef.current, position),
+      )
     }
 
     const guardFailed =
@@ -194,6 +216,7 @@ function StreetRouteLineLayerInner({
         targetMovedFromDraw < EXPLORATION_LINE_UPDATE_MIN_M
 
       if (!userStale && targetStable && profileUnchanged) {
+        updateLiveRouteAnchor(userPosition)
         return undefined
       }
     }
@@ -219,6 +242,7 @@ function StreetRouteLineLayerInner({
         pendingTargetMove < EXPLORATION_LINE_UPDATE_MIN_M
 
       if (pendingStillFresh) {
+        updateLiveRouteAnchor(userPosition)
         return undefined
       }
     }
@@ -237,7 +261,12 @@ function StreetRouteLineLayerInner({
     }
 
     const drawLatLngs = (latlngs, metrics, requestFrom, requestTo) => {
-      const anchoredLatLngs = withUserOriginAnchor(latlngs, requestFrom)
+      osrmGeometryRef.current = latlngs
+      const renderLatLngs = buildLiveRenderLatLngs(
+        latlngs,
+        userPosition,
+        requestFrom,
+      )
 
       if (!routeRendererRef.current) {
         routeRendererRef.current = L.svg({ padding: 0.5 })
@@ -247,7 +276,7 @@ function StreetRouteLineLayerInner({
 
       if (!lineRef.current) {
         console.info('[ROUTE_RENDERER]', { type: 'SVG' })
-        lineRef.current = L.polyline(anchoredLatLngs, {
+        lineRef.current = L.polyline(renderLatLngs, {
           color: lineStyle.color,
           weight: lineStyle.weight,
           opacity: lineStyle.opacity,
@@ -259,10 +288,10 @@ function StreetRouteLineLayerInner({
           pane: ROUTE_PANE,
           renderer: routeRendererRef.current,
         }).addTo(map)
-        logRouteLayer(map, lineRef.current, anchoredLatLngs, metrics, requestFrom, requestTo)
+        logRouteLayer(map, lineRef.current, renderLatLngs, metrics, requestFrom, requestTo)
       } else {
-        lineRef.current.setLatLngs(anchoredLatLngs)
-        logRouteLayer(map, lineRef.current, anchoredLatLngs, metrics, requestFrom, requestTo, {
+        lineRef.current.setLatLngs(renderLatLngs)
+        logRouteLayer(map, lineRef.current, renderLatLngs, metrics, requestFrom, requestTo, {
           updated: true,
         })
       }
@@ -380,6 +409,7 @@ function StreetRouteLineLayerInner({
       map.removeLayer(lineRef.current)
       lineRef.current = null
       lastDrawRef.current = null
+      osrmGeometryRef.current = null
     }
   }, [map])
 
