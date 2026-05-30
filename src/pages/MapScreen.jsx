@@ -137,7 +137,7 @@ export function MapScreen() {
   }, [])
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#141416]">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-warm-white">
       <ExplorationDistanceBadge
         visible={explorationActive}
         targetName={explorationTargetName}
@@ -171,7 +171,7 @@ export function MapScreen() {
         onRouteMetricsChange={handleRouteMetricsChange}
       />
 
-      <div className="pointer-events-none shrink-0 px-4 pb-2">
+      <div className="pointer-events-none shrink-0 bg-warm-white px-4 pb-2">
         <div className="pointer-events-auto rounded-2xl border border-progress/35 bg-warm-white p-4 shadow-[0_8px_24px_rgba(17,17,19,0.1),0_2px_10px_rgba(140,198,63,0.07)]">
           <ProgressBar showSimulateLink={false} variant="dark" />
         </div>
