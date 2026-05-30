@@ -16,6 +16,7 @@ import {
 } from '../../config/map'
 import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
 import { useGeolocation } from '../../hooks/useGeolocation'
+import { useGpsReadySound } from '../../hooks/useGpsReadySound'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
 import { useCinematicMapBearing } from '../../hooks/useCinematicMapBearing'
@@ -509,6 +510,8 @@ function LeafletMapViewInner({
     stopTracking,
   } = useGeolocation()
 
+  useGpsReadySound(gpsPhase, Boolean(mapPosition))
+
   const debouncedProximity = useDebouncedLocation(proximityPosition, MAP_PROXIMITY_DEBOUNCE_MS)
   const followCenter = useThrottledMapCenter(mapPosition, {
     minIntervalMs: MAP_FOLLOW_MIN_INTERVAL_MS,
@@ -593,6 +596,7 @@ function LeafletMapViewInner({
 
     setActiveTargetFigureId(pendingTargetFigure.id)
     setPendingTargetFigure(null)
+    playGameSound('INICIO_NAVEGACION')
 
     if (mapRef.current && mapPosition) {
       const bounds = L.latLngBounds([
@@ -608,6 +612,7 @@ function LeafletMapViewInner({
   }, [mapPosition, pendingTargetFigure, reducedMotion, setActiveTargetFigureId])
 
   const handleCancelTracking = useCallback(() => {
+    playGameSound('CANCELAR_NAVEGACION')
     clearActiveTargetFigure()
     setPendingTargetFigure(null)
   }, [clearActiveTargetFigure])

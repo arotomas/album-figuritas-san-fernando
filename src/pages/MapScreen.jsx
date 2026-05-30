@@ -13,6 +13,7 @@ import {
   getPlayerMapFigures,
 } from '../utils/figureGameRules'
 import { logMapFigurePipeline } from '../utils/universeDiagnostics'
+import { playGameSound } from '../services/audio'
 import { useExplorationStore } from '../store/explorationStore'
 import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
 import { NAVIGATION_UX_EXPERIMENT } from '../config/navigationUx'
@@ -31,6 +32,10 @@ export function MapScreen() {
   const explorationDistanceMeters = useExplorationStore((state) => state.distanceMeters)
   const explorationHasUserLocation = useExplorationStore((state) => state.hasUserLocation)
   const stopExploration = useExplorationStore((state) => state.stopExploration)
+  const handleExitExploration = useCallback(() => {
+    playGameSound('CANCELAR_NAVEGACION')
+    stopExploration()
+  }, [stopExploration])
   const { mapPosition } = useGeolocation()
   const [routeMetrics, setRouteMetrics] = useState(null)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
@@ -143,7 +148,7 @@ export function MapScreen() {
         targetName={explorationTargetName}
         distanceMeters={explorationDistanceMeters}
         hasUserLocation={explorationHasUserLocation}
-        onExit={stopExploration}
+        onExit={handleExitExploration}
       />
 
       {NAVIGATION_UX_EXPERIMENT.enabled ? (

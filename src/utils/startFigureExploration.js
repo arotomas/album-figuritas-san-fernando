@@ -1,4 +1,5 @@
 import { useExplorationStore } from '../store/explorationStore'
+import { playGameSound } from '../services/audio'
 
 export function canExploreFigure(figure) {
   const lat = Number(figure?.lat)
@@ -36,6 +37,7 @@ export function startFigureExploration(
   }
   if (!started) return false
 
+  playGameSound('INICIO_NAVEGACION')
   navigate(withQa('/map'))
   return true
 }

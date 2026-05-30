@@ -51,6 +51,27 @@ export const SOUND_CATALOG = {
     volume: 0.32,
     description: 'Intento de captura sin cumplir distancia o GPS.',
   },
+  inicio_navegacion: {
+    id: 'inicio_navegacion',
+    src: '/sounds/inicio-navegacion.mp3',
+    preload: true,
+    volume: 0.58,
+    description: 'Confirmación al iniciar navegación hacia un punto.',
+  },
+  cancelar_navegacion: {
+    id: 'cancelar_navegacion',
+    src: '/sounds/cancelar-navegacion.mp3',
+    preload: true,
+    volume: 0.45,
+    description: 'Cierre suave al cancelar navegación activa.',
+  },
+  gps_encontrado: {
+    id: 'gps_encontrado',
+    src: '/sounds/gps-encontrado.mp3',
+    preload: true,
+    volume: 0.28,
+    description: 'Primera señal GPS usable en la sesión.',
+  },
 }
 
 /** Eventos de juego → id de sonido en SOUND_CATALOG. */
@@ -60,4 +81,7 @@ export const GAME_SOUND_EVENTS = {
   FIGURITA_NUEVA_EN_ALBUM: 'figurita_nueva_en_album',
   LLEGADA_A_DESTINO: 'llegada_a_destino',
   ERROR_O_FUERA_DE_RANGO: 'error_o_fuera_de_rango',
+  INICIO_NAVEGACION: 'inicio_navegacion',
+  CANCELAR_NAVEGACION: 'cancelar_navegacion',
+  GPS_ENCONTRADO: 'gps_encontrado',
 }

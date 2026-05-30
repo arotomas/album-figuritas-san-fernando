@@ -22,6 +22,9 @@ Todos los archivos provienen del pack **Kenney Interface Sounds** (CC0), convert
 | `figurita-nueva-album.mp3` | `FIGURITA_NUEVA_EN_ALBUM` | `confirmation_004.ogg` | ~0.52 s | ~7 KB | 0.78 |
 | `llegada-destino.mp3` | `LLEGADA_A_DESTINO` | `maximize_007.ogg` | ~0.21 s | ~3 KB | 0.62 |
 | `error-fuera-rango.mp3` | `ERROR_O_FUERA_DE_RANGO` | `error_004.ogg` | ~0.13 s | ~2 KB | **0.32** (más discreto) |
+| `inicio-navegacion.mp3` | `INICIO_NAVEGACION` | `confirmation_001.ogg` | ~0.28 s | ~4 KB | 0.58 |
+| `cancelar-navegacion.mp3` | `CANCELAR_NAVEGACION` | `back_001.ogg` | ~0.10 s | ~2 KB | 0.45 |
+| `gps-encontrado.mp3` | `GPS_ENCONTRADO` | `tick_001.ogg` | ~0.05 s | ~1 KB | **0.28** (muy discreto) |
 
 Los volúmenes relativos se aplican sobre el volumen maestro (`DEFAULT_SOUND_VOLUME = 0.75`) en `src/config/audio.js`.
 
@@ -32,6 +35,9 @@ Los volúmenes relativos se aplican sobre el volumen maestro (`DEFAULT_SOUND_VOL
 - **Nueva en álbum** — confirmación elegante, tono de desbloqueo/colección.
 - **Llegada a destino** — ding corto tipo UI/navegación, claro pero breve.
 - **Error / fuera de rango** — tono negativo mínimo; nunca agresivo.
+- **Inicio navegación** — confirmación positiva al elegir destino (`Ir al punto` / `Rumbo a`).
+- **Cancelar navegación** — cierre suave al salir del modo exploración o seguimiento.
+- **GPS encontrado** — tick casi imperceptible; una vez por sesión al obtener primera señal usable.
 
 Ninguno de los samples elegidos es arcade, infantil ni tipo videojuego retro.
 

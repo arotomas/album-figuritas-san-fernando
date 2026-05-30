@@ -3,7 +3,7 @@
 Infraestructura inicial de sonido para el Álbum de Figuritas de San Fernando.  
 Sin archivos de audio asignados todavía: las llamadas son no-op hasta configurar `src` en el catálogo.
 
-> **Actualización:** los cinco SFX iniciales ya están en `public/sounds/`. Ver `docs/AUDIO_ASSETS.md`.
+> **Actualización:** ocho SFX en `public/sounds/` (capa 1 + capa 2). Ver `docs/AUDIO_ASSETS.md`.
 
 ## Principios
 
@@ -22,6 +22,7 @@ Sin archivos de audio asignados todavía: las llamadas son no-op hasta configura
 | Motor (play/stop/volumen/mute) | `src/services/audio/SoundService.js` |
 | API de eventos de juego | `src/services/audio/playGameSound.js` |
 | Llegada navegación | `src/hooks/useNavigationArrivalSound.js` |
+| GPS listo (sesión) | `src/hooks/useGpsReadySound.js` |
 | Preferencias usuario | `useAppStore.soundsEnabled` / `musicEnabled` |
 
 ### API rápida
@@ -50,6 +51,9 @@ soundService.stop('captura_exitosa')
 | `FIGURITA_NUEVA_EN_ALBUM` | Confirmación visual en álbum | `UnlockAnimation.jsx` | `useEffect` de montaje — junto a `vibrateUnlock` |
 | `LLEGADA_A_DESTINO` | Navegación: dentro de `ARRIVAL_RADIUS_METERS` | `NavigationMetricsPanel.jsx` | `useNavigationArrivalSound(arrived)` |
 | `ERROR_O_FUERA_DE_RANGO` | Captura sin GPS o fuera de radio | `useCaptureFlow.js` | `validateDistanceForOpen` — al bloquear |
+| `INICIO_NAVEGACION` | Confirma destino en mapa o álbum | `LeafletMapView.jsx` / `startFigureExploration.js` | `handleConfirmTarget` / `startFigureExploration` |
+| `CANCELAR_NAVEGACION` | Usuario cancela seguimiento | `LeafletMapView.jsx` / `MapScreen.jsx` | `handleCancelTracking` / `handleExitExploration` |
+| `GPS_ENCONTRADO` | Primera señal usable tras búsqueda | `LeafletMapView.jsx` | `useGpsReadySound(gpsPhase, hasPosition)` — una vez por sesión |
 
 ## Dónde colocar archivos
 
