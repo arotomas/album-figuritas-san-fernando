@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { FaWifi, FaArrowsRotate } from 'react-icons/fa6'
+import { FaWifi } from 'react-icons/fa6'
 import { useOfflineStatus } from '../../hooks/useOfflineStatus'
 
-export function ConnectionStatus({ onUpdateAvailable }) {
+export function ConnectionStatus() {
   const { isOffline } = useOfflineStatus()
   const [wasOffline, setWasOffline] = useState(false)
   const [showReconnected, setShowReconnected] = useState(false)
-  const [showUpdate, setShowUpdate] = useState(false)
 
   useEffect(() => {
     if (isOffline) {
@@ -22,21 +21,7 @@ export function ConnectionStatus({ onUpdateAvailable }) {
     }
   }, [isOffline, wasOffline])
 
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return
-
-    const onControllerChange = () => {
-      setShowUpdate(true)
-      onUpdateAvailable?.()
-    }
-
-    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
-    return () => {
-      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
-    }
-  }, [onUpdateAvailable])
-
-  if (!isOffline && !showReconnected && !showUpdate) return null
+  if (!isOffline && !showReconnected) return null
 
   return (
     <div className="safe-top pointer-events-none fixed inset-x-0 top-0 z-[90] flex animate-slide-up justify-center px-4 pt-2">
@@ -64,16 +49,6 @@ export function ConnectionStatus({ onUpdateAvailable }) {
         </div>
       )}
 
-      {showUpdate && !isOffline && (
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/15 bg-zinc-900/95 px-4 py-2.5 shadow-md backdrop-blur-sm"
-        >
-          <FaArrowsRotate className="text-white/80" size={13} aria-hidden />
-          <span className="text-xs font-medium text-white/90">Nueva versión — tocá para actualizar</span>
-        </button>
-      )}
     </div>
   )
 }
