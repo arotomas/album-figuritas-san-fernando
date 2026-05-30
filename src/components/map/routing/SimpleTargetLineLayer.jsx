@@ -29,13 +29,24 @@ function SimpleTargetLineLayerInner({ active, userPosition, targetCoordinates })
       lastLineRef.current = null
     }
 
-    if (
+    const guardFailed =
       !active ||
       !userPosition?.lat ||
       !userPosition?.lng ||
       !targetCoordinates?.lat ||
       !targetCoordinates?.lng
-    ) {
+
+    console.info('[ROUTE_LINE_RENDER]', {
+      source: 'SimpleTargetLineLayer',
+      active,
+      guardFailed,
+      userLat: userPosition?.lat ?? null,
+      userLng: userPosition?.lng ?? null,
+      targetLat: targetCoordinates?.lat ?? null,
+      targetLng: targetCoordinates?.lng ?? null,
+    })
+
+    if (guardFailed) {
       removeLine()
       return undefined
     }
@@ -44,6 +55,11 @@ function SimpleTargetLineLayerInner({ active, userPosition, targetCoordinates })
       [userPosition.lat, userPosition.lng],
       [targetCoordinates.lat, targetCoordinates.lng],
     ]
+
+    console.info('[ROUTE_LINE_POINTS]', {
+      from: { lat: userPosition.lat, lng: userPosition.lng },
+      to: { lat: targetCoordinates.lat, lng: targetCoordinates.lng },
+    })
 
     const last = lastLineRef.current
     if (last) {

@@ -29,6 +29,11 @@ export const useExplorationStore = create((set) => ({
       hasUserLocation: false,
       pendingCamera: true,
     })
+    console.info('[ROUTE_TARGET_SET]', {
+      figureId: figure?.id != null ? String(figure.id) : null,
+      targetName: figure?.nombre ?? 'Destino',
+    })
+    console.info('[ROUTE_TARGET_COORDS]', { lat, lng })
     return true
   },
 

@@ -519,6 +519,17 @@ function LeafletMapViewInner({
   const handleConfirmTarget = useCallback(() => {
     if (!pendingTargetFigure) return
 
+    console.info('[ROUTE_TARGET_SET]', {
+      source: 'handleConfirmTarget:activeTargetFigureId',
+      figureId: pendingTargetFigure.id,
+      figureName: pendingTargetFigure.nombre,
+      explorationActive: useExplorationStore.getState().active,
+    })
+    console.info('[ROUTE_TARGET_COORDS]', {
+      lat: Number(pendingTargetFigure.lat),
+      lng: Number(pendingTargetFigure.lng),
+    })
+
     setActiveTargetFigureId(pendingTargetFigure.id)
     setPendingTargetFigure(null)
 

@@ -75,6 +75,16 @@ function ExplorationControllerInner({
 
   if (!active) return null
 
+  console.info('[ROUTE_LINE_RENDER]', {
+    source: 'ExplorationController',
+    active,
+    simpleRouting: SIMPLE_ROUTING_EXPERIMENT.enabled,
+    userLat: userPosition?.lat ?? null,
+    userLng: userPosition?.lng ?? null,
+    targetLat: targetCoordinates?.lat ?? null,
+    targetLng: targetCoordinates?.lng ?? null,
+  })
+
   const showTargetMarker =
     !SIMPLE_ROUTING_EXPERIMENT.enabled || !SIMPLE_ROUTING_EXPERIMENT.skipTargetMarker
 
