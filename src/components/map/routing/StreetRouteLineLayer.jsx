@@ -11,10 +11,24 @@ import {
   estimateDurationSecondsForProfile,
   fetchOsrmWalkingRoute,
 } from '../../../utils/osrmRoute'
-import { RouteDestinationMarker } from './RouteDestinationMarker'
+
+/** TEMP: círculos rojo/verde en lugar del pin para diagnóstico visual. */
+const ROUTE_END_DIAGNOSTIC_CIRCLES = true
 
 /** Android-safe: overlayPane estándar (sin pane custom). */
 const ROUTE_PANE = 'overlayPane'
+
+function getLastRenderedLatLng(line) {
+  if (!line?.getLatLngs) return null
+  const latlngs = line.getLatLngs()
+  if (!Array.isArray(latlngs) || latlngs.length === 0) return null
+
+  const last = latlngs[latlngs.length - 1]
+  if (Array.isArray(last)) {
+    return { lat: last[0], lng: last[1] }
+  }
+  return { lat: last.lat, lng: last.lng }
+}
 
 function measurePolylinePathMeters(latlngs) {
   if (!Array.isArray(latlngs) || latlngs.length < 2) return 0
@@ -128,6 +142,8 @@ function StreetRouteLineLayerInner({
   const routeRendererRef = useRef(null)
   const lastDrawRef = useRef(null)
   const osrmGeometryRef = useRef(null)
+  const targetCircleRef = useRef(null)
+  const routeEndCircleRef = useRef(null)
   const pendingFetchRef = useRef(null)
   const fetchSeqRef = useRef(0)
   const lineStyle = SIMPLE_ROUTING_EXPERIMENT.line
@@ -149,11 +165,66 @@ function StreetRouteLineLayerInner({
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const removeDiagnosticCircles = () => {
+      targetCircleRef.current?.remove()
+      routeEndCircleRef.current?.remove()
+      targetCircleRef.current = null
+      routeEndCircleRef.current = null
+    }
+
+    const syncDiagnosticCircles = (targetCoords) => {
+      if (!ROUTE_END_DIAGNOSTIC_CIRCLES) {
+        removeDiagnosticCircles()
+        return
+      }
+
+      if (targetCoords?.lat == null || targetCoords?.lng == null) {
+        removeDiagnosticCircles()
+        return
+      }
+
+      const targetLatLng = [targetCoords.lat, targetCoords.lng]
+      if (!targetCircleRef.current) {
+        targetCircleRef.current = L.circleMarker(targetLatLng, {
+          radius: 10,
+          color: '#ef4444',
+          fillColor: '#ef4444',
+          fillOpacity: 0.95,
+          weight: 2,
+          interactive: false,
+        }).addTo(map)
+      } else {
+        targetCircleRef.current.setLatLng(targetLatLng)
+      }
+
+      const routeEnd = getLastRenderedLatLng(lineRef.current)
+      if (!routeEnd) {
+        routeEndCircleRef.current?.remove()
+        routeEndCircleRef.current = null
+        return
+      }
+
+      const routeEndLatLng = [routeEnd.lat, routeEnd.lng]
+      if (!routeEndCircleRef.current) {
+        routeEndCircleRef.current = L.circleMarker(routeEndLatLng, {
+          radius: 10,
+          color: '#22c55e',
+          fillColor: '#22c55e',
+          fillOpacity: 0.95,
+          weight: 2,
+          interactive: false,
+        }).addTo(map)
+      } else {
+        routeEndCircleRef.current.setLatLng(routeEndLatLng)
+      }
+    }
+
     const removeLine = () => {
       if (!lineRef.current) return
       map.removeLayer(lineRef.current)
       lineRef.current = null
       osrmGeometryRef.current = null
+      removeDiagnosticCircles()
     }
 
     const abortPendingFetch = () => {
@@ -168,6 +239,7 @@ function StreetRouteLineLayerInner({
       lineRef.current.setLatLngs(
         buildLiveRenderLatLngs(osrmGeometryRef.current, position),
       )
+      syncDiagnosticCircles(targetCoordinates)
     }
 
     const guardFailed =
@@ -301,6 +373,7 @@ function StreetRouteLineLayerInner({
         ...metrics,
         profile: osrmProfile,
       })
+      syncDiagnosticCircles(requestTo)
     }
 
     const drawStraightFallback = (requestFrom, requestTo) => {
@@ -410,16 +483,14 @@ function StreetRouteLineLayerInner({
       lineRef.current = null
       lastDrawRef.current = null
       osrmGeometryRef.current = null
+      targetCircleRef.current?.remove()
+      routeEndCircleRef.current?.remove()
+      targetCircleRef.current = null
+      routeEndCircleRef.current = null
     }
   }, [map])
 
-  return (
-    <>
-      {NAVIGATION_UX_EXPERIMENT.enabled ? (
-        <RouteDestinationMarker active={active} targetCoordinates={targetCoordinates} />
-      ) : null}
-    </>
-  )
+  return null
 }
 
 export const StreetRouteLineLayer = memo(StreetRouteLineLayerInner)
