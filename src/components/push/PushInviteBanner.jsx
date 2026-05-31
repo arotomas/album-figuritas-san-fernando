@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import {
@@ -96,8 +97,8 @@ export function PushInviteBanner() {
 
   if (!visible) return null
 
-  return (
-    <div className="safe-top pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[85] flex justify-center px-4">
+  const banner = (
+    <div className="safe-top pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[99999] flex justify-center px-4">
       <div
         className="pointer-events-auto w-full max-w-md rounded-2xl border border-white/15 bg-zinc-900/95 p-4 shadow-lg backdrop-blur-sm"
         role="region"
@@ -132,4 +133,8 @@ export function PushInviteBanner() {
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(banner, document.body)
 }
