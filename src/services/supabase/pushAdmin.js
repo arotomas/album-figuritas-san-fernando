@@ -93,3 +93,18 @@ export async function sendPushTest(payload) {
   }
   return data
 }
+
+export async function deactivateAllPushSubscriptionsForUser(userId) {
+  await assertSuperAdminClient()
+
+  const { data, error } = await supabase.rpc('deactivate_all_push_subscriptions_for_user', {
+    p_user_id: userId,
+  })
+
+  if (error) {
+    if (/forbidden/i.test(error.message ?? '')) throw new Error('FORBIDDEN')
+    throw error
+  }
+
+  return data ?? { ok: false, error: 'INTERNAL_ERROR' }
+}

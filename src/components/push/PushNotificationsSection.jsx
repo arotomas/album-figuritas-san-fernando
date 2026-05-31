@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   deactivateCurrentPushSubscription,
+  forceResubscribePushNotifications,
   getPushPermissionState,
   hasActivePushSubscription,
   isPushSupported,
@@ -73,6 +74,28 @@ export function PushNotificationsSection() {
     }
   }
 
+  const handleForceResubscribe = async () => {
+    setBusy(true)
+    setMessage(null)
+    setError(null)
+    try {
+      await forceResubscribePushNotifications()
+      setPermission(getPushPermissionState())
+      setSubscribed(true)
+      setMessage('Suscripción renovada en este dispositivo.')
+    } catch (resubError) {
+      const code = resubError?.message ?? String(resubError)
+      if (code === 'PERMISSION_DENIED') {
+        setError('Permiso denegado. Revisá la configuración del navegador.')
+      } else {
+        setError('No pudimos renovar la suscripción.')
+      }
+      await refreshState()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <h2 className="font-display text-lg font-bold text-ink">Notificaciones push</h2>
@@ -98,14 +121,24 @@ export function PushNotificationsSection() {
           </p>
 
           {permission === 'granted' && subscribed ? (
-            <button
-              type="button"
-              onClick={() => void handleDisable()}
-              disabled={busy}
-              className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-ink"
-            >
-              {busy ? 'Procesando…' : 'Desactivar en este dispositivo'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleForceResubscribe()}
+                disabled={busy}
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-ink"
+              >
+                {busy ? 'Procesando…' : 'Forzar resuscripción en este dispositivo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDisable()}
+                disabled={busy}
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-ink"
+              >
+                {busy ? 'Procesando…' : 'Desactivar en este dispositivo'}
+              </button>
+            </div>
           ) : (
             <button
               type="button"

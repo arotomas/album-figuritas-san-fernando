@@ -150,11 +150,17 @@ export async function refreshPushSubscriptionIfGranted() {
   try {
     const registration = await getServiceWorkerRegistration()
     await navigator.serviceWorker.ready
-    const subscription = await ensurePushSubscription(registration)
+    const subscription = await registration.pushManager.getSubscription()
+    if (!subscription) return null
     return upsertPushSubscription(subscription)
   } catch {
     return null
   }
+}
+
+/** Renueva suscripción local: unsubscribe, desactiva endpoint viejo, crea uno nuevo. */
+export async function forceResubscribePushNotifications() {
+  return subscribeToPushNotifications()
 }
 
 export async function hasActivePushSubscription() {
@@ -176,7 +182,7 @@ export function initPushSubscriptionResync() {
   navigator.serviceWorker.ready
     .then((registration) => {
       registration.addEventListener('pushsubscriptionchange', () => {
-        void refreshPushSubscriptionIfGranted()
+        void forceResubscribePushNotifications().catch(() => {})
       })
     })
     .catch(() => {})

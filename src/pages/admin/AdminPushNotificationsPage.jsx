@@ -13,6 +13,7 @@ import {
   lookupPushTestRecipient,
   sendPushBroadcast,
   sendPushTest,
+  deactivateAllPushSubscriptionsForUser,
 } from '../../services/supabase/pushAdmin'
 import { getArgentineMobileValidation } from '../../utils/argentinePhone'
 import { isSuperAdminProfile } from '../../utils/roles'
@@ -143,6 +144,8 @@ export function AdminPushNotificationsPage() {
   const [testDeliveries, setTestDeliveries] = useState(null)
   const [searching, setSearching] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [cleanupBusy, setCleanupBusy] = useState(false)
+  const [cleanupMessage, setCleanupMessage] = useState(null)
 
   const previewTitle = useMemo(() => form.title.trim(), [form.title])
   const phoneValidation = useMemo(() => getArgentineMobileValidation(testPhone), [testPhone])
@@ -207,6 +210,8 @@ export function AdminPushNotificationsPage() {
     setLookupResult(null)
     setTestSendMessage(null)
     setTestSendError(null)
+    setTestDeliveries(null)
+    setCleanupMessage(null)
 
     try {
       const result = await lookupPushTestRecipient(testPhone)
@@ -255,6 +260,34 @@ export function AdminPushNotificationsPage() {
       setTestSendError(testError?.message ?? 'No pudimos enviar la prueba.')
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleDeactivateAllSubscriptions = async () => {
+    if (!lookupResult?.ok || !lookupResult.user_id) return
+
+    setCleanupBusy(true)
+    setCleanupMessage(null)
+    setLookupError(null)
+    try {
+      const result = await deactivateAllPushSubscriptionsForUser(lookupResult.user_id)
+      if (!result.ok) {
+        setLookupError('No pudimos desactivar las suscripciones.')
+        return
+      }
+      setCleanupMessage(
+        `Desactivadas ${Number(result.deactivated_count ?? 0).toLocaleString('es-AR')} suscripción(es). El usuario debe renovar en el celular.`,
+      )
+      const refreshed = await lookupPushTestRecipient(testPhone)
+      if (refreshed.ok) {
+        setLookupResult(refreshed)
+      }
+      setTestDeliveries(null)
+      setTestSendMessage(null)
+    } catch (cleanupError) {
+      setLookupError(cleanupError?.message ?? 'No pudimos desactivar las suscripciones.')
+    } finally {
+      setCleanupBusy(false)
     }
   }
 
@@ -502,6 +535,21 @@ export function AdminPushNotificationsPage() {
                   Tras reactivar notificaciones en el celular, `last_seen_at` y `updated_at` deben ser recientes.
                 </p>
               </div>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => void handleDeactivateAllSubscriptions()}
+                disabled={cleanupBusy || searching || testing}
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-800 disabled:opacity-50"
+              >
+                {cleanupBusy ? 'Desactivando…' : 'Desactivar todas las suscripciones de este usuario'}
+              </button>
+            </div>
+            {cleanupMessage && (
+              <p className="mt-3 text-sm text-amber-800" role="status">
+                {cleanupMessage}
+              </p>
             )}
           </div>
         )}

@@ -4,6 +4,7 @@
  */
 const DEFAULT_TITLE = 'Album Figuritas SF'
 const DEFAULT_URL = '/map'
+const PUSH_MESSAGE_TYPE = 'PUSH_RECEIVED'
 
 function resolveAssetUrl(path) {
   if (!path) return `${self.location.origin}/pwa-192.png`
@@ -43,6 +44,22 @@ function parsePushPayload(event) {
   }
 }
 
+async function notifyOpenClients(payload) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  for (const client of clients) {
+    client.postMessage({
+      type: PUSH_MESSAGE_TYPE,
+      payload: {
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon,
+        data: payload.data,
+      },
+    })
+  }
+  return clients.length
+}
+
 self.addEventListener('install', () => {
   console.log('[PUSH_SW] service worker installed')
   self.skipWaiting()
@@ -68,8 +85,11 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration
-      .showNotification(payload.title, options)
+    notifyOpenClients(payload)
+      .then((clientCount) => {
+        console.log('[PUSH_SW] foreground clients notified', { clientCount })
+        return self.registration.showNotification(payload.title, options)
+      })
       .then(() => {
         console.log('[PUSH_SW] showNotification called', { title: payload.title, tag })
       })

@@ -11,6 +11,7 @@ import { initAppUpdateRecovery } from './utils/appUpdateRecovery.js'
 import { initPwaInstallCapture } from './utils/pwaInstallController.js'
 import { useExplorationStore } from './store/explorationStore.js'
 import { refreshPushSubscriptionIfGranted, initPushSubscriptionResync } from './services/push/pushSubscription.js'
+import { initPushForegroundListener } from './services/push/pushForeground.js'
 import { soundService } from './services/audio/index.js'
 
 bootLog('main entry')
@@ -32,6 +33,7 @@ try {
 syncQaFromUrl()
 soundService.schedulePreload()
 initPushSubscriptionResync()
+initPushForegroundListener()
 void refreshPushSubscriptionIfGranted()
 
 createRoot(document.getElementById('root')).render(

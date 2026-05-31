@@ -8,6 +8,7 @@ import { SplashScreen } from './components/splash'
 import { ViewportProvider } from './components/layout/ViewportProvider'
 import { AppSkeleton } from './components/performance/AppSkeleton'
 import { PushInviteBanner } from './components/push/PushInviteBanner'
+import { PushForegroundToast } from './components/push/PushForegroundToast'
 import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
@@ -90,6 +91,7 @@ function App() {
         >
           <ConnectionStatus />
           <PushInviteBanner />
+          <PushForegroundToast />
           <QaDevShell />
           <Suspense fallback={<AppSkeleton />}>
             <AppRoutes />
