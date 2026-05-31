@@ -1,4 +1,5 @@
 import webpush from 'npm:web-push@3.6.7'
+import { deliverPushBatch } from '../_shared/pushDelivery.ts'
 import {
   buildWebPushPayload,
   corsHeaders,
@@ -8,8 +9,6 @@ import {
 } from '../_shared/push.ts'
 import { lookupPushTestRecipient } from '../_shared/phone.ts'
 import { assertSuperAdmin } from '../_shared/superAdmin.ts'
-
-const BATCH_SIZE = 20
 
 function configureWebPush() {
   const publicKey = Deno.env.get('VAPID_PUBLIC_KEY')
@@ -80,9 +79,10 @@ Deno.serve(async (req) => {
 
     const { data: subscriptions, error: subError } = await adminClient
       .from('push_subscriptions')
-      .select('id, user_id, endpoint, p256dh, auth')
+      .select('id, user_id, endpoint, p256dh, auth, platform, last_seen_at, updated_at')
       .eq('user_id', lookup.user_id)
       .eq('is_active', true)
+      .order('last_seen_at', { ascending: false })
 
     if (subError) {
       throw subError
@@ -104,49 +104,50 @@ Deno.serve(async (req) => {
     configureWebPush()
     const payload = buildWebPushPayload(validated)
 
-    let successCount = 0
-    let failureCount = 0
-    const inactiveEndpoints: string[] = []
+    console.log('[send-push-test] sending', {
+      user_id: lookup.user_id,
+      device_count: rows.length,
+      endpoints: rows.map((row) => row.endpoint.slice(-40)),
+    })
 
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE)
-      await Promise.all(
-        batch.map(async (row) => {
-          try {
-            await webpush.sendNotification(
-              {
-                endpoint: row.endpoint,
-                keys: { p256dh: row.p256dh, auth: row.auth },
-              },
-              payload,
-              { TTL: 86400 },
-            )
-            successCount += 1
-          } catch (error) {
-            failureCount += 1
-            const statusCode = (error as { statusCode?: number })?.statusCode
-            if (statusCode === 404 || statusCode === 410) {
-              inactiveEndpoints.push(row.endpoint)
-            }
-          }
-        }),
-      )
-    }
+    const { deliveries, inactiveEndpoints, successCount, failureCount } = await deliverPushBatch(
+      webpush,
+      rows,
+      payload,
+      'send-push-test',
+    )
 
     if (inactiveEndpoints.length > 0) {
-      await adminClient
+      const { error: deactivateError } = await adminClient
         .from('push_subscriptions')
         .update({ is_active: false })
         .in('endpoint', inactiveEndpoints)
+
+      if (deactivateError) {
+        console.error('[send-push-test] deactivate failed', deactivateError)
+      } else {
+        console.log('[send-push-test] deactivated expired subscriptions', {
+          count: inactiveEndpoints.length,
+          endpoints: inactiveEndpoints.map((endpoint) => endpoint.slice(-40)),
+        })
+      }
     }
+
+    const allFailed = successCount === 0 && failureCount > 0
 
     return jsonResponse(
       {
         device_count: rows.length,
         success_count: successCount,
         failure_count: failureCount,
+        deactivated_count: inactiveEndpoints.length,
+        deliveries,
         ok: successCount > 0,
-        message: 'Prueba enviada correctamente.',
+        message: allFailed
+          ? 'Ningún envío llegó al push service (revisá deliveries).'
+          : successCount > 0 && failureCount > 0
+            ? 'Prueba parcial: algunos dispositivos fallaron (revisá deliveries).'
+            : 'Prueba enviada correctamente.',
       },
       200,
       origin,

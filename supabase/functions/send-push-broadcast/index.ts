@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import webpush from 'npm:web-push@3.6.7'
+import { deliverPushBatch } from '../_shared/pushDelivery.ts'
 import {
   buildWebPushPayload,
   computeStatus,
@@ -67,40 +68,23 @@ async function sendToSubscriptions(
 ) {
   configureWebPush()
 
-  let successCount = 0
-  let failureCount = 0
-  const inactiveEndpoints: string[] = []
-
-  for (let i = 0; i < subscriptions.length; i += BATCH_SIZE) {
-    const batch = subscriptions.slice(i, i + BATCH_SIZE)
-    await Promise.all(
-      batch.map(async (row) => {
-        try {
-          await webpush.sendNotification(
-            {
-              endpoint: row.endpoint,
-              keys: { p256dh: row.p256dh, auth: row.auth },
-            },
-            payload,
-            { TTL: 86400 },
-          )
-          successCount += 1
-        } catch (error) {
-          failureCount += 1
-          const statusCode = (error as { statusCode?: number })?.statusCode
-          if (statusCode === 404 || statusCode === 410) {
-            inactiveEndpoints.push(row.endpoint)
-          }
-        }
-      }),
-    )
-  }
+  const { inactiveEndpoints, successCount, failureCount } = await deliverPushBatch(
+    webpush,
+    subscriptions,
+    payload,
+    'send-push-broadcast',
+    BATCH_SIZE,
+  )
 
   if (inactiveEndpoints.length > 0) {
     await adminClient
       .from('push_subscriptions')
       .update({ is_active: false })
       .in('endpoint', inactiveEndpoints)
+
+    console.log('[send-push-broadcast] deactivated expired subscriptions', {
+      count: inactiveEndpoints.length,
+    })
   }
 
   return { successCount, failureCount }

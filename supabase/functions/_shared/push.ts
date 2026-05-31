@@ -33,6 +33,9 @@ export type PushSubscriptionRow = {
   endpoint: string
   p256dh: string
   auth: string
+  platform?: string | null
+  last_seen_at?: string | null
+  updated_at?: string | null
 }
 
 export function validatePushPayload(input: PushPayloadInput) {

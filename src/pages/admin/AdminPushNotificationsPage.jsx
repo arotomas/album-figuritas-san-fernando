@@ -140,6 +140,7 @@ export function AdminPushNotificationsPage() {
   const [lookupError, setLookupError] = useState(null)
   const [testSendMessage, setTestSendMessage] = useState(null)
   const [testSendError, setTestSendError] = useState(null)
+  const [testDeliveries, setTestDeliveries] = useState(null)
   const [searching, setSearching] = useState(false)
   const [testing, setTesting] = useState(false)
 
@@ -190,6 +191,7 @@ export function AdminPushNotificationsPage() {
     setLookupError(null)
     setTestSendMessage(null)
     setTestSendError(null)
+    setTestDeliveries(null)
   }
 
   const handleTestPhoneChange = (value) => {
@@ -238,11 +240,13 @@ export function AdminPushNotificationsPage() {
     setTesting(true)
     setTestSendError(null)
     setTestSendMessage(null)
+    setTestDeliveries(null)
     try {
       const result = await sendPushTest({
         ...buildPayload(),
         local_phone: testPhone,
       })
+      setTestDeliveries(result.deliveries ?? null)
       setTestSendMessage(
         result.message ??
           `Prueba enviada correctamente a ${result.device_count} dispositivo(s) (${result.success_count} ok).`,
@@ -481,6 +485,49 @@ export function AdminPushNotificationsPage() {
                 <dd className="text-ink">{Number(lookupResult.active_devices ?? 0).toLocaleString('es-AR')}</dd>
               </div>
             </dl>
+            {Array.isArray(lookupResult.devices) && lookupResult.devices.length > 0 && (
+              <div className="mt-4 space-y-3 border-t border-border pt-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted">Suscripciones en Supabase</p>
+                {lookupResult.devices.map((device) => (
+                  <div key={device.id} className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed">
+                    <p className="font-mono text-ink">…{device.endpoint_tail}</p>
+                    <p className="mt-1 text-muted">
+                      {device.platform || 'other'} · last_seen{' '}
+                      {device.last_seen_at ? formatDate(device.last_seen_at) : '—'} · updated{' '}
+                      {device.updated_at ? formatDate(device.updated_at) : '—'}
+                    </p>
+                  </div>
+                ))}
+                <p className="text-xs text-muted">
+                  Tras reactivar notificaciones en el celular, `last_seen_at` y `updated_at` deben ser recientes.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {testDeliveries?.length > 0 && (
+          <div className="max-w-2xl rounded-xl border border-border bg-white p-4 text-sm">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted">Resultado webpush (diagnóstico)</p>
+            <ul className="mt-3 space-y-3">
+              {testDeliveries.map((delivery) => (
+                <li key={delivery.subscription_id} className="rounded-lg bg-slate-50 p-3 text-xs">
+                  <p className="font-mono text-ink">{delivery.endpoint_tail}</p>
+                  <p className="mt-1">
+                    {delivery.status === 'sent' ? '🟢' : '🔴'} HTTP {delivery.http_status ?? '—'}
+                    {delivery.deactivated ? ' · desactivada en Supabase' : ''}
+                  </p>
+                  {delivery.error && <p className="mt-1 text-red-700">{delivery.error}</p>}
+                  <p className="mt-1 text-muted">
+                    last_seen {delivery.last_seen_at ? formatDate(delivery.last_seen_at) : '—'}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-muted">
+              Si HTTP es 201 pero el celular no muestra nada, inspeccioná el service worker (`[PUSH_SW] push event
+              received`) con la app cerrada.
+            </p>
           </div>
         )}
 

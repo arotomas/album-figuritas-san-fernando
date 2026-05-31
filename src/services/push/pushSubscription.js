@@ -79,8 +79,22 @@ export async function upsertPushSubscription(subscription) {
   return data
 }
 
-async function ensurePushSubscription(registration) {
+async function deactivatePushEndpoint(endpoint) {
+  if (!endpoint) return
+  const { error } = await supabase.rpc('deactivate_push_subscription', {
+    p_endpoint: endpoint,
+  })
+  if (error) throw error
+}
+
+async function ensurePushSubscription(registration, { forceRenew = false } = {}) {
   let subscription = await registration.pushManager.getSubscription()
+  if (subscription && forceRenew) {
+    const previousEndpoint = subscription.endpoint
+    await subscription.unsubscribe()
+    await deactivatePushEndpoint(previousEndpoint)
+    subscription = null
+  }
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
@@ -103,8 +117,16 @@ export async function subscribeToPushNotifications() {
   const registration = await getServiceWorkerRegistration()
   await navigator.serviceWorker.ready
 
-  const subscription = await ensurePushSubscription(registration)
-  return upsertPushSubscription(subscription)
+  const subscription = await ensurePushSubscription(registration, { forceRenew: true })
+  const saved = await upsertPushSubscription(subscription)
+  if (import.meta.env.DEV) {
+    console.log('[PUSH_CLIENT] subscription saved', {
+      endpoint_tail: subscription.endpoint.slice(-40),
+      updated_at: saved?.updated_at,
+      last_seen_at: saved?.last_seen_at,
+    })
+  }
+  return saved
 }
 
 export async function deactivateCurrentPushSubscription() {
@@ -117,11 +139,7 @@ export async function deactivateCurrentPushSubscription() {
   const endpoint = subscription.endpoint
   await subscription.unsubscribe()
 
-  const { error } = await supabase.rpc('deactivate_push_subscription', {
-    p_endpoint: endpoint,
-  })
-
-  if (error) throw error
+  await deactivatePushEndpoint(endpoint)
   return { ok: true, reason: 'deactivated' }
 }
 
