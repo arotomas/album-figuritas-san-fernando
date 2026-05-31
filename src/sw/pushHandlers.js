@@ -1,7 +1,5 @@
-/**
- * Legacy push handler (generateSW importScripts).
- * Fuente de verdad: src/sw/pushHandlers.js (bundled en sw.js vía injectManifest).
- */
+/** Push + notificationclick — debe cargarse antes que Workbox (sin deps async). */
+
 const DEFAULT_TITLE = 'Album Figuritas SF'
 const DEFAULT_URL = '/map'
 

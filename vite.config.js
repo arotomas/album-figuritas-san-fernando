@@ -14,7 +14,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      },
       includeAssets: [
         'favicom.png',
         'favicon.ico',
@@ -59,24 +66,6 @@ export default defineConfig({
             sizes: '180x180',
             type: 'image/png',
             purpose: 'any',
-          },
-        ],
-      },
-      workbox: {
-        importScripts: ['push-sw-handler.js'],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'osm-tiles',
-              expiration: { maxEntries: 80, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 4,
-            },
           },
         ],
       },

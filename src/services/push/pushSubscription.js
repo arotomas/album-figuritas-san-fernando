@@ -44,8 +44,12 @@ function detectPlatform() {
 
 async function getServiceWorkerRegistration() {
   const existing = await navigator.serviceWorker.getRegistration('/')
-  if (existing) return existing
-  return navigator.serviceWorker.register('/sw.js', { scope: '/' })
+  if (existing) {
+    await existing.update().catch(() => {})
+    return existing
+  }
+  await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+  return navigator.serviceWorker.ready
 }
 
 function subscriptionToPayload(subscription) {
@@ -75,6 +79,17 @@ export async function upsertPushSubscription(subscription) {
   return data
 }
 
+async function ensurePushSubscription(registration) {
+  let subscription = await registration.pushManager.getSubscription()
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    })
+  }
+  return subscription
+}
+
 export async function subscribeToPushNotifications() {
   if (!isPushSupported()) {
     throw new Error('PUSH_NOT_SUPPORTED')
@@ -88,14 +103,7 @@ export async function subscribeToPushNotifications() {
   const registration = await getServiceWorkerRegistration()
   await navigator.serviceWorker.ready
 
-  let subscription = await registration.pushManager.getSubscription()
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    })
-  }
-
+  const subscription = await ensurePushSubscription(registration)
   return upsertPushSubscription(subscription)
 }
 
@@ -124,8 +132,7 @@ export async function refreshPushSubscriptionIfGranted() {
   try {
     const registration = await getServiceWorkerRegistration()
     await navigator.serviceWorker.ready
-    const subscription = await registration.pushManager.getSubscription()
-    if (!subscription) return null
+    const subscription = await ensurePushSubscription(registration)
     return upsertPushSubscription(subscription)
   } catch {
     return null
@@ -139,4 +146,20 @@ export async function hasActivePushSubscription() {
   const registration = await navigator.serviceWorker.getRegistration('/')
   const subscription = await registration?.pushManager.getSubscription()
   return Boolean(subscription)
+}
+
+let pushResubscribeBound = false
+
+/** Re-suscribe tras actualización del SW (pushsubscriptionchange). */
+export function initPushSubscriptionResync() {
+  if (pushResubscribeBound || !isPushSupported()) return
+  pushResubscribeBound = true
+
+  navigator.serviceWorker.ready
+    .then((registration) => {
+      registration.addEventListener('pushsubscriptionchange', () => {
+        void refreshPushSubscriptionIfGranted()
+      })
+    })
+    .catch(() => {})
 }

@@ -10,7 +10,7 @@ import { bootLog, bootWarn } from './utils/bootLog.js'
 import { initAppUpdateRecovery } from './utils/appUpdateRecovery.js'
 import { initPwaInstallCapture } from './utils/pwaInstallController.js'
 import { useExplorationStore } from './store/explorationStore.js'
-import { refreshPushSubscriptionIfGranted } from './services/push/pushSubscription.js'
+import { refreshPushSubscriptionIfGranted, initPushSubscriptionResync } from './services/push/pushSubscription.js'
 import { soundService } from './services/audio/index.js'
 
 bootLog('main entry')
@@ -31,6 +31,7 @@ try {
 }
 syncQaFromUrl()
 soundService.schedulePreload()
+initPushSubscriptionResync()
 void refreshPushSubscriptionIfGranted()
 
 createRoot(document.getElementById('root')).render(
