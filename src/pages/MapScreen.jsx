@@ -38,6 +38,7 @@ export function MapScreen() {
   }, [stopExploration])
   const { mapPosition } = useGeolocation()
   const [routeMetrics, setRouteMetrics] = useState(null)
+  const [captureOverlayVisible, setCaptureOverlayVisible] = useState(false)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())
   const mainProgress = useMemo(() => getMainProgressState(figures), [figures])
   const visiblePlayerFigures = useMemo(
@@ -174,13 +175,16 @@ export function MapScreen() {
         onNearFigureChange={handleNearFigureChange}
         onOpenCamera={handleOpenCamera}
         onRouteMetricsChange={handleRouteMetricsChange}
+        onCaptureOverlayVisibleChange={setCaptureOverlayVisible}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[510] px-4 pb-2">
-        <div className="pointer-events-auto rounded-2xl border border-progress/35 bg-warm-white p-4 shadow-[0_8px_24px_rgba(17,17,19,0.1),0_2px_10px_rgba(140,198,63,0.07)]">
-          <ProgressBar showSimulateLink={false} variant="dark" />
+      {!captureOverlayVisible && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[510] px-4 pb-2">
+          <div className="pointer-events-auto rounded-2xl border border-progress/35 bg-warm-white p-4 shadow-[0_8px_24px_rgba(17,17,19,0.1),0_2px_10px_rgba(140,198,63,0.07)]">
+            <ProgressBar showSimulateLink={false} variant="dark" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

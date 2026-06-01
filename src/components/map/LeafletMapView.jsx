@@ -447,6 +447,7 @@ function LeafletMapViewInner({
   onOpenCamera,
   onBonusDiscovered,
   onRouteMetricsChange,
+  onCaptureOverlayVisibleChange,
 }) {
   const mapRef = useRef(null)
   const mapContainerRef = useRef(null)
@@ -660,6 +661,15 @@ function LeafletMapViewInner({
   const showSecondaryHint = useStableBoolean(Boolean(secondaryNearFigure), {
     holdOffMs: TARGET_LOCK_SECONDARY_HINT_HOLD_MS,
   })
+
+  const captureOverlayVisible = showFocusOverlay && Boolean(nearFigure)
+
+  useEffect(() => {
+    onCaptureOverlayVisibleChange?.(captureOverlayVisible)
+    return () => {
+      onCaptureOverlayVisibleChange?.(false)
+    }
+  }, [captureOverlayVisible, onCaptureOverlayVisibleChange])
 
   const rawNearest = useMemo(
     () => findNearestPendingFigure(mapPosition, figures),
