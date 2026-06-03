@@ -48,6 +48,7 @@ import {
   shouldRejectFixForGeoPolicy,
 } from '../geo/geoPolicy'
 import { isDebugGpsLoggingEnabled } from '../qa/qaCore'
+import { CAPTURE_FIX_STALE_MS } from '../config/captureLocation'
 
 const GEOLOCATION_AVAILABLE =
   typeof navigator !== 'undefined' && Boolean(navigator.geolocation)
@@ -62,6 +63,8 @@ function isAcceptedPosition(position) {
  */
 export function useGeolocation(options = {}) {
   const geoOptionsRef = useRef({ ...GPS_HIGH_ACCURACY_OPTIONS, ...options })
+  const captureModeRef = useRef(Boolean(options.captureMode))
+  captureModeRef.current = Boolean(options.captureMode)
 
   const stopRef = useRef(null)
   const permissionStatusRef = useRef(null)
@@ -400,21 +403,31 @@ export function useGeolocation(options = {}) {
       }
 
       const current = positionRef.current
-      const rejectReason = rejectFixReason(current, next, { maximumAge })
+      const currentAge = current ? getFixAgeMs(current) : null
+      const captureRefreshAccept =
+        meta.captureContext &&
+        current &&
+        next.timestamp >= (current.timestamp ?? 0) &&
+        (meta.apiSource === 'captureFreshFix' ||
+          (currentAge != null && currentAge >= CAPTURE_FIX_STALE_MS))
 
-      if (rejectReason) {
-        recordDiscard(next, rejectReason, { source, phase, apiSource })
-        return false
-      }
+      if (!captureRefreshAccept) {
+        const rejectReason = rejectFixReason(current, next, { maximumAge })
 
-      if (!shouldReplacePosition(current, next)) {
-        recordDiscard(next, 'worse_or_redundant', { source, phase, apiSource })
-        return false
-      }
+        if (rejectReason) {
+          recordDiscard(next, rejectReason, { source, phase, apiSource })
+          return false
+        }
 
-      if (current && isAbsurdJump(current, next)) {
-        recordDiscard(next, 'absurd_jump', { source, phase, apiSource })
-        return false
+        if (!shouldReplacePosition(current, next)) {
+          recordDiscard(next, 'worse_or_redundant', { source, phase, apiSource })
+          return false
+        }
+
+        if (current && isAbsurdJump(current, next)) {
+          recordDiscard(next, 'absurd_jump', { source, phase, apiSource })
+          return false
+        }
       }
 
       const isFirst = !hasAcceptedFixRef.current
@@ -579,6 +592,18 @@ export function useGeolocation(options = {}) {
       }
 
       const current = positionRef.current
+      const currentAge = current ? getFixAgeMs(current) : null
+
+      if (captureModeRef.current && current && currentAge != null && currentAge >= CAPTURE_FIX_STALE_MS) {
+        tryApplyFix(geoPosition, {
+          phase: 'refined',
+          maximumAge: geoOptionsRef.current.maximumAge,
+          apiSource,
+          captureContext: true,
+        })
+        return
+      }
+
       const shouldApplyImmediate =
         !current || preview.accuracy < (current.accuracy ?? Infinity) - 4
 
@@ -780,6 +805,23 @@ export function useGeolocation(options = {}) {
       })
   }, [handleWatchError, ingestPosition])
 
+  const requestCaptureFreshFix = useCallback(() => {
+    if (!GEOLOCATION_AVAILABLE) return
+
+    getCurrentPosition({ ...geoOptionsRef.current, maximumAge: 0 })
+      .then((geoPosition) => {
+        tryApplyFix(geoPosition, {
+          phase: 'refined',
+          maximumAge: 0,
+          apiSource: 'captureFreshFix',
+          captureContext: true,
+        })
+      })
+      .catch(() => {
+        // watchPosition sigue activo; el repoll reintentará
+      })
+  }, [tryApplyFix])
+
   useGpsRecovery({ stopWatching, requestPermission: retryPreciseLocation })
 
   startWatchingRef.current = startWatching
@@ -913,6 +955,7 @@ export function useGeolocation(options = {}) {
     requestPermission: retryPreciseLocation,
     retryPreciseLocation,
     requestSingleFix,
+    requestCaptureFreshFix,
     startTracking: startWatching,
     stopTracking: stopWatching,
     stopWatching,

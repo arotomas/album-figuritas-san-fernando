@@ -14,6 +14,8 @@ import { withTimeout } from '../utils/withTimeout'
 import { vibrateCapture, vibrateReady, vibrateProximityPulse } from '../utils/vibration'
 import { playGameSound } from '../services/audio'
 import { getDistanceMeters } from '../utils/geo'
+import { getFixAgeMs } from '../utils/gpsFilter'
+import { CAPTURE_FIX_STALE_MS } from '../config/captureLocation'
 import { GPS_APPROXIMATE_CAPTURE_WARNING_M } from '../config/gps'
 import { REWARD_ENTRY_BEAT_MS, FLASH_MIN_HOLD_MS } from '../config/captureFeel'
 import {
@@ -260,6 +262,9 @@ export function useCaptureFlow({
   const sessionSnapshot = captureSession?.locationSnapshot ?? null
 
   const hasLiveGps = livePosition?.lat != null && livePosition?.lng != null
+  const liveFixAgeMs = hasLiveGps ? getFixAgeMs(livePosition) : null
+  const liveFixIsFresh =
+    liveFixAgeMs == null || liveFixAgeMs <= CAPTURE_FIX_STALE_MS
 
   const liveDistanceMeters = useMemo(() => {
     if (!hasLiveGps || !resolvedFigure) return null
@@ -273,8 +278,11 @@ export function useCaptureFlow({
     return null
   }, [bootstrapPosition, resolvedFigure])
 
-  /** Siempre recalcular desde coords en vivo; snapshot solo si aún no hay fix. */
-  const ringDistanceMeters = liveDistanceMeters ?? bootstrapDistanceMeters
+  /** Live fresco gana; snapshot solo mientras no hay fix aceptado o el fix está viejo. */
+  const ringDistanceMeters = useMemo(() => {
+    if (liveDistanceMeters != null && liveFixIsFresh) return liveDistanceMeters
+    return bootstrapDistanceMeters ?? liveDistanceMeters
+  }, [bootstrapDistanceMeters, liveDistanceMeters, liveFixIsFresh])
 
   const activeFigure = pendingFigureRef.current ?? pendingFigure ?? resolvedFigure
 

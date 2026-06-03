@@ -5,6 +5,7 @@ import { CameraView } from '../components/camera'
 import { CameraAccessGate } from '../components/camera/CameraAccessGate'
 import { PermissionFallback } from '../components/qa/PermissionFallback'
 import { useGeolocation } from '../hooks/useGeolocation'
+import { useCaptureLocationRefresh } from '../hooks/useCaptureLocationRefresh'
 import { useCaptureFlow, CAPTURE_PHASES, isPostCaptureFlowPhase } from '../hooks/useCaptureFlow'
 import { CaptureChallengeInterstitial } from '../components/camera/CaptureChallengeInterstitial'
 import { CaptureRewardErrorBoundary } from '../components/reward/CaptureRewardErrorBoundary'
@@ -99,7 +100,8 @@ export function CaptureFlow() {
     errorType: geoErrorType,
     isLoading: geoLoading,
     requestPermission,
-  } = useGeolocation()
+    requestCaptureFreshFix,
+  } = useGeolocation({ captureMode: true })
 
   const handleObtain = useCallback(
     (figureId, photoData) => {
@@ -191,6 +193,13 @@ export function CaptureFlow() {
     isRewardPhase || isUnlockSubmitted || isPostCaptureFlowPhase(phase)
 
   const isChallengePhase = phase === CAPTURE_PHASES.CHALLENGE
+
+  const isCameraPhase = phase === CAPTURE_PHASES.CAMERA
+
+  useCaptureLocationRefresh({
+    enabled: isCameraPhase && !isRetake && Boolean(captureFigure),
+    requestCaptureFreshFix,
+  })
 
   const isCaptureSessionActive =
     isChallengePhase ||
@@ -706,9 +715,9 @@ export function CaptureFlow() {
         </div>
       )}
 
-      {!inCaptureRange && mapPosition && (
-        <div className="safe-top pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
-          <p className="rounded-full bg-black/75 px-4 py-2 text-xs text-white/85">
+      {!isCameraPhase && !inCaptureRange && mapPosition && (
+        <div className="safe-top pointer-events-none absolute inset-x-0 top-16 z-30 flex justify-start px-4">
+          <p className="max-w-[11rem] rounded-full bg-black/60 px-3 py-1.5 text-[10px] leading-snug text-white/75">
             {gpsStatusLabel}
           </p>
         </div>

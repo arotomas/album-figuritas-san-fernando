@@ -16,3 +16,9 @@
  */
 
 export const CAPTURE_LOCATION_MODEL = 'coords-source-of-truth'
+
+/** Fix aceptado en captura más viejo que esto → pedir lectura nueva (ms). */
+export const CAPTURE_FIX_STALE_MS = 5_000
+
+/** Intervalo de repregunta mientras la cámara está abierta y el fix sigue viejo (ms). */
+export const CAPTURE_FRESH_FIX_POLL_MS = 3_000
