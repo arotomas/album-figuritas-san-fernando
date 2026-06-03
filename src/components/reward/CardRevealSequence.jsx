@@ -15,6 +15,12 @@ import {
   isSpecialRarityDiscovery,
 } from '../../utils/rarityDiscovery'
 import { vibrateRarityDiscovery } from '../../utils/vibration'
+import { PointsBurstOverlay } from '../points/PointsBurstOverlay'
+import {
+  resolveFigurePointsFromCatalog,
+  shouldShowPointsBurst,
+} from '../../utils/figurePoints'
+import { usePlayerPointsStore } from '../../store/usePlayerPointsStore'
 
 const PHASES = {
   DISCOVERY: 'discovery',
@@ -60,6 +66,15 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const onCompleteRef = useRef(onComplete)
   const discoveryPlayedRef = useRef(false)
   const mountedRef = useRef(true)
+  const pointsBurstTriggeredRef = useRef(false)
+  const pointsEarned = useMemo(
+    () => resolveFigurePointsFromCatalog(figure),
+    [figure],
+  )
+  const showPointsBurst = useMemo(
+    () => shouldShowPointsBurst(figure),
+    [figure],
+  )
 
   useEffect(() => {
     mountedRef.current = true
@@ -91,7 +106,16 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   }, [onComplete])
 
   useEffect(() => {
+    if (phase !== PHASES.REVEAL || !showPointsBurst || pointsEarned <= 0) return
+    if (pointsBurstTriggeredRef.current) return
+
+    pointsBurstTriggeredRef.current = true
+    usePlayerPointsStore.getState().bumpOptimistic(pointsEarned)
+  }, [phase, pointsEarned, showPointsBurst])
+
+  useEffect(() => {
     discoveryPlayedRef.current = false
+    pointsBurstTriggeredRef.current = false
     setPhase(isSpecial ? PHASES.DISCOVERY : PHASES.ENTER)
     setVisible(false)
     const revealTimer = window.setTimeout(() => setVisible(true), 80)
@@ -192,6 +216,16 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
             (phase === PHASES.REVEAL || phase === PHASES.SHINE) && (
             <MiniConfetti rareza={figure.rareza} />
           )}
+
+          {showPointsBurst &&
+            pointsEarned > 0 &&
+            (phase === PHASES.REVEAL || phase === PHASES.SHINE) && (
+              <PointsBurstOverlay
+                figure={figure}
+                points={pointsEarned}
+                reduced={reduced}
+              />
+            )}
 
           <m.p
             initial={{ opacity: 0, y: -16, letterSpacing: '0.28em' }}

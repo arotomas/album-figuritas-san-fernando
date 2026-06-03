@@ -74,3 +74,5 @@ export {
 } from './profile'
 
 export { fetchPlayerRanking } from './ranking'
+
+export { fetchMyPoints } from './playerPoints'

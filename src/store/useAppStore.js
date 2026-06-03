@@ -36,10 +36,15 @@ import {
   DEFAULT_USER_SOUNDS_ENABLED,
 } from '../config/audio'
 import { stopAllGameSounds } from '../services/audio'
+import { usePlayerPointsStore } from './usePlayerPointsStore'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
 const zustandStorage = createJSONStorage(() => createZustandStorage())
+
+function refreshPlayerPointsAfterUnlock() {
+  void usePlayerPointsStore.getState().refreshPlayerPoints()
+}
 
 /** Catálogo vacío hasta que Supabase responda — nunca mock local. */
 const createInitialFigures = () => []
@@ -606,6 +611,9 @@ export const useAppStore = create(
                 result.uploadError?.reason ?? result.reason ?? 'No se pudo subir la foto a Supabase.',
               )
             }
+            if (result.ok && !isQaFigure) {
+              refreshPlayerPointsAfterUnlock()
+            }
           })
 
           return applyFigureUpdate(state, realFigureId, patch)
@@ -693,6 +701,10 @@ export const useAppStore = create(
           figureId: realFigureId,
           publicUrl: result.remotePhotoUrl,
         })
+
+        if (!isQaFigure) {
+          refreshPlayerPointsAfterUnlock()
+        }
 
         return true
       },
@@ -975,6 +987,7 @@ export const useAppStore = create(
 
           const patch = buildLocalProgressResetPatch(get())
           set({ ...patch, progressResetInFlight: false })
+          usePlayerPointsStore.getState().resetPlayerPoints()
 
           persistLog.persist('reset complete', {
             figures: patch.figures.length,
