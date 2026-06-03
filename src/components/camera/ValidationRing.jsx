@@ -8,7 +8,7 @@ import {
 } from '../../utils/proximityExperience'
 import { PROXIMITY_PHASES } from '../../config/proximity'
 import { formatProximityDistanceLabel } from '../../utils/proximityExperience'
-import { useSmoothedRingDistance } from '../../hooks/useSmoothedRingDistance'
+import { useLiveRingDistanceLabel } from '../../hooks/useLiveRingDistanceLabel'
 
 const SIZE = 220
 const STROKE = 5
@@ -99,11 +99,15 @@ export function ValidationRing({
     progress > 0.02 ? 0.4 : visualStyle.opacity,
   )
 
-  const smoothedDistance = useSmoothedRingDistance(distanceMeters, { isReady })
+  const displayDistance = useLiveRingDistanceLabel(distanceMeters)
 
   const distanceLabel = useMemo(
-    () => formatProximityDistanceLabel(smoothedDistance, { isReady }),
-    [isReady, smoothedDistance],
+    () =>
+      formatProximityDistanceLabel(displayDistance, {
+        isReady,
+        onlyArrivedWhenReady: true,
+      }),
+    [displayDistance, isReady],
   )
 
   return (

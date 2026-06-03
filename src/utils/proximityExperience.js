@@ -262,8 +262,14 @@ export function getRingProgressFeedback(progress) {
 }
 
 /** Distancia restante para el centro del anillo — tono claro, no técnico. */
-export function formatProximityDistanceLabel(meters, { isReady = false } = {}) {
-  if (isReady || (meters != null && meters <= 8)) {
+export function formatProximityDistanceLabel(
+  meters,
+  { isReady = false, onlyArrivedWhenReady = false } = {},
+) {
+  if (
+    isReady ||
+    (!onlyArrivedWhenReady && meters != null && meters <= 8)
+  ) {
     return { mode: 'arrived', primary: 'Estás ahí', secondary: null }
   }
   if (meters == null || !Number.isFinite(meters)) {
