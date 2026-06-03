@@ -66,7 +66,7 @@ export function PointsBurstOverlay({ figure, points, reduced = false }) {
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-[10%] z-30 flex justify-center px-4 sm:top-[11%]"
+      className="pointer-events-none absolute inset-x-0 top-[14%] z-50 flex justify-center px-4 sm:top-[12%]"
       role="status"
       aria-live="polite"
       aria-atomic="true"
@@ -105,10 +105,11 @@ export function PointsBurstOverlay({ figure, points, reduced = false }) {
         aria-hidden="true"
       >
         <div
-          className="rounded-2xl border px-5 py-4 text-center shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          className="rounded-2xl border px-5 py-4 text-center shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-md"
           style={{
-            borderColor: `${rarity.colors.primary}44`,
-            background: `linear-gradient(180deg, rgba(10,10,12,0.82) 0%, rgba(10,10,12,0.68) 100%)`,
+            borderColor: `${rarity.colors.primary}66`,
+            background:
+              'linear-gradient(180deg, rgba(18,18,22,0.94) 0%, rgba(8,8,10,0.88) 100%)',
             boxShadow: `0 16px 40px rgba(0,0,0,0.35), ${copy.duration >= 3.2 ? `0 0 32px ${rarity.colors.glow}` : 'none'}`,
           }}
         >

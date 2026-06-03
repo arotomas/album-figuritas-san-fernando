@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { m } from 'framer-motion'
 import { getRarity } from '../../theme/rarity'
 import { motion as motionTokens } from '../../theme/motion'
@@ -20,6 +20,8 @@ import {
   resolveFigurePointsFromCatalog,
   shouldShowPointsBurst,
   getPointsBurstDurationMs,
+  getPointsBurstBlockReason,
+  logPointsBurst,
 } from '../../utils/figurePoints'
 import { usePlayerPointsStore } from '../../store/usePlayerPointsStore'
 
@@ -69,6 +71,7 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const discoveryPlayedRef = useRef(false)
   const mountedRef = useRef(true)
   const pointsBurstTriggeredRef = useRef(false)
+  const pointsHideTimerRef = useRef(null)
   const pointsEarned = useMemo(
     () => resolveFigurePointsFromCatalog(figure),
     [figure],
@@ -107,31 +110,68 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
     onCompleteRef.current = onComplete
   }, [onComplete])
 
+  const triggerPointsBurst = useCallback(
+    (triggerPhase) => {
+      const blockReason = getPointsBurstBlockReason(figure)
+      const show = blockReason == null && pointsEarned > 0
+
+      logPointsBurst({
+        phase: triggerPhase,
+        show,
+        points: pointsEarned,
+        figureId: figure?.id ?? null,
+        isQa: Boolean(figure?.isQaTest),
+        isRetake: false,
+        wasFirstUnlock: !pointsBurstTriggeredRef.current,
+        overlayMounted: pointsBurstTriggeredRef.current,
+        reason: blockReason ?? (show ? 'triggered' : 'blocked'),
+      })
+
+      if (!show || pointsBurstTriggeredRef.current) return
+
+      pointsBurstTriggeredRef.current = true
+      setPointsOverlayVisible(true)
+      usePlayerPointsStore.getState().bumpOptimistic(pointsEarned)
+
+      if (pointsHideTimerRef.current) {
+        window.clearTimeout(pointsHideTimerRef.current)
+      }
+
+      const holdMs = getPointsBurstDurationMs(figure, { reduced })
+      pointsHideTimerRef.current = window.setTimeout(() => {
+        if (mountedRef.current) setPointsOverlayVisible(false)
+      }, holdMs)
+    },
+    [figure, pointsEarned, reduced],
+  )
+
   useEffect(() => {
-    if (phase !== PHASES.REVEAL || !showPointsBurst || pointsEarned <= 0) return
-    if (pointsBurstTriggeredRef.current) return
-
-    pointsBurstTriggeredRef.current = true
-    setPointsOverlayVisible(true)
-    usePlayerPointsStore.getState().bumpOptimistic(pointsEarned)
-
-    const holdMs = getPointsBurstDurationMs(figure, { reduced })
-    const timer = window.setTimeout(() => {
-      if (mountedRef.current) setPointsOverlayVisible(false)
-    }, holdMs)
-
-    return () => window.clearTimeout(timer)
-  }, [figure, phase, pointsEarned, reduced, showPointsBurst])
+    logPointsBurst({
+      phase,
+      show: showPointsBurst,
+      points: pointsEarned,
+      figureId: figure?.id ?? null,
+      isQa: Boolean(figure?.isQaTest),
+      isRetake: false,
+      wasFirstUnlock: !pointsBurstTriggeredRef.current,
+      overlayMounted: pointsOverlayVisible,
+      reason: getPointsBurstBlockReason(figure) ?? 'phase_tick',
+    })
+  }, [figure, phase, pointsEarned, pointsOverlayVisible, showPointsBurst])
 
   useEffect(() => {
     discoveryPlayedRef.current = false
     pointsBurstTriggeredRef.current = false
     setPointsOverlayVisible(false)
+    if (pointsHideTimerRef.current) {
+      window.clearTimeout(pointsHideTimerRef.current)
+      pointsHideTimerRef.current = null
+    }
     setPhase(isSpecial ? PHASES.DISCOVERY : PHASES.ENTER)
     setVisible(false)
     const revealTimer = window.setTimeout(() => setVisible(true), 80)
     return () => window.clearTimeout(revealTimer)
-  }, [figure?.id, isSpecial])
+  }, [figure?.id])
 
   useEffect(() => {
     if (!visible) return undefined
@@ -162,7 +202,9 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
         if (mountedRef.current) setPhase(PHASES.REVEAL)
       }, offset + timings.flip),
       window.setTimeout(() => {
-        if (mountedRef.current) setPhase(PHASES.SHINE)
+        if (!mountedRef.current) return
+        setPhase(PHASES.SHINE)
+        triggerPointsBurst(PHASES.SHINE)
       }, offset + timings.reveal),
       window.setTimeout(() => {
         if (mountedRef.current) setPhase(PHASES.INFO)
@@ -181,7 +223,7 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
     ]
 
     return () => timers.forEach(clearTimeout)
-  }, [discoveryBeatMs, figure?.id, figure?.rareza, isSpecial, reduced, visible])
+  }, [discoveryBeatMs, figure?.id, figure?.rareza, isSpecial, reduced, triggerPointsBurst, visible])
 
   if (!figure) {
     return (
@@ -212,6 +254,14 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
         <RarityDiscoveryBeat figure={figure} visible={visible} />
       )}
 
+      {showPointsBurst && pointsOverlayVisible && pointsEarned > 0 && (
+        <PointsBurstOverlay
+          figure={figure}
+          points={pointsEarned}
+          reduced={reduced}
+        />
+      )}
+
       {showCardSequence && (
         <>
           <ParticleLayer
@@ -227,14 +277,6 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
             (phase === PHASES.REVEAL || phase === PHASES.SHINE) && (
             <MiniConfetti rareza={figure.rareza} />
           )}
-
-          {showPointsBurst && pointsOverlayVisible && pointsEarned > 0 && (
-              <PointsBurstOverlay
-                figure={figure}
-                points={pointsEarned}
-                reduced={reduced}
-              />
-            )}
 
           <m.p
             initial={{ opacity: 0, y: -16, letterSpacing: '0.28em' }}

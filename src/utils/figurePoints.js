@@ -28,18 +28,21 @@ export function getPointsBurstTier(figure) {
   return rarity.id
 }
 
-export function shouldShowPointsBurst(figure) {
-  if (!figure || figure.isQaTest) return false
+export function getPointsBurstBlockReason(figure) {
+  if (!figure) return 'missing_figure'
+  if (figure.isQaTest) return 'qa_test_flag'
 
   const figureId = String(figure.id ?? '')
-  if (
-    figureId.startsWith(QA_TEST_FIGURE_ID_PREFIX) ||
-    figureId.startsWith('dev-')
-  ) {
-    return false
-  }
+  if (figureId.startsWith(QA_TEST_FIGURE_ID_PREFIX)) return 'qa_id_prefix'
+  if (figureId.startsWith('dev-')) return 'dev_id_prefix'
 
-  return resolveFigurePointsFromCatalog(figure) > 0
+  if (resolveFigurePointsFromCatalog(figure) <= 0) return 'zero_points'
+
+  return null
+}
+
+export function shouldShowPointsBurst(figure) {
+  return getPointsBurstBlockReason(figure) == null
 }
 
 const POINTS_BURST_DURATION_MS = {
@@ -54,4 +57,9 @@ export function getPointsBurstDurationMs(figure, { reduced = false } = {}) {
   if (reduced) return 2800
   const tier = getPointsBurstTier(figure)
   return POINTS_BURST_DURATION_MS[tier] ?? 3000
+}
+
+export function logPointsBurst(payload) {
+  if (!import.meta.env.DEV && import.meta.env.VITE_VERCEL_ENV !== 'preview') return
+  console.info('[POINTS_BURST]', payload)
 }
