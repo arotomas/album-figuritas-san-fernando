@@ -724,16 +724,8 @@ function LeafletMapViewInner({
     onOpenCamera?.({
       figure: nearFigure,
       position: capturePosition,
-      distanceToFigure: nearFigure?.distanceMeters ?? nearestDistance,
     })
-  }, [
-    mapPosition,
-    nearFigure,
-    nearestDistance,
-    onOpenCamera,
-    position,
-    proximityPosition,
-  ])
+  }, [mapPosition, nearFigure, onOpenCamera, position, proximityPosition])
 
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return

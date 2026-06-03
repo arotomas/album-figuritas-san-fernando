@@ -802,7 +802,8 @@ export const useAppStore = create(
 
       clearActiveTargetFigure: () => set({ activeTargetFigureId: null }),
 
-      startCaptureSession: ({ figure, position = null, distanceToFigure = null }) => {
+      /** @param distanceToFigure ignorado — distancia siempre derivada de position + figurita. */
+      startCaptureSession: ({ figure, position = null, distanceToFigure: _distanceToFigure = null }) => {
         if (!figure) return
 
         let locationSnapshot = null
@@ -812,12 +813,10 @@ export const useAppStore = create(
             lat: figure.lat,
             lng: figure.lng,
             accuracy: null,
-            distanceToFigure: distanceToFigure ?? 0,
+            distanceToFigure: 0,
           }
         } else if (position) {
-          const dist =
-            distanceToFigure ??
-            getDistanceMeters(position.lat, position.lng, figure.lat, figure.lng)
+          const dist = getDistanceMeters(position.lat, position.lng, figure.lat, figure.lng)
           locationSnapshot = {
             lat: position.lat,
             lng: position.lng,

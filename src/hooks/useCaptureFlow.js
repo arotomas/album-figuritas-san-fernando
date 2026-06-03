@@ -118,7 +118,7 @@ function cloneLocationSnapshot(snapshot) {
   }
 }
 
-function buildLocationSnapshot(targetFigure, targetPosition, distanceToFigure = null) {
+function buildLocationSnapshot(targetFigure, targetPosition) {
   if (!targetFigure) return null
 
   if (targetFigure.isQaTest && !targetPosition) {
@@ -126,7 +126,7 @@ function buildLocationSnapshot(targetFigure, targetPosition, distanceToFigure = 
       lat: targetFigure.lat,
       lng: targetFigure.lng,
       accuracy: null,
-      distanceToFigure: distanceToFigure ?? 0,
+      distanceToFigure: 0,
     }
   }
 
@@ -136,9 +136,7 @@ function buildLocationSnapshot(targetFigure, targetPosition, distanceToFigure = 
     lat: targetPosition.lat,
     lng: targetPosition.lng,
     accuracy: targetPosition.accuracy ?? null,
-    distanceToFigure:
-      distanceToFigure ??
-      getDistanceToFigure(targetPosition, targetFigure),
+    distanceToFigure: getDistanceToFigure(targetPosition, targetFigure),
   }
 }
 
@@ -429,7 +427,7 @@ export function useCaptureFlow({
 
       const locationSnapshot =
         cloneLocationSnapshot(sessionLocationSnapshot) ??
-        buildLocationSnapshot(snapshot, null, snapshot.isQaTest ? 0 : null)
+        buildLocationSnapshot(snapshot, null)
 
       syncPendingState(snapshot, locationSnapshot)
       captureLog.pendingFigureSet({
@@ -542,11 +540,13 @@ export function useCaptureFlow({
       const captureRadius = getProximityRadii(targetFigure).captureMeters
       const trustedSnapshot =
         pendingLocationSnapshotRef.current ?? captureSession?.locationSnapshot ?? null
+      const snapshotPosition = trustedSnapshot
+        ? snapshotToPosition(trustedSnapshot)
+        : null
       const snapshotDistance =
-        trustedSnapshot?.distanceToFigure ??
-        (trustedSnapshot && targetFigure
-          ? getDistanceToFigure(snapshotToPosition(trustedSnapshot), targetFigure)
-          : null)
+        snapshotPosition && targetFigure
+          ? getDistanceToFigure(snapshotPosition, targetFigure)
+          : null
 
       if (
         snapshotDistance != null &&
@@ -751,7 +751,7 @@ export function useCaptureFlow({
     }
 
     if (figureSnapshot?.isQaTest) {
-      const qaSnapshot = buildLocationSnapshot(figureSnapshot, null, 0)
+      const qaSnapshot = buildLocationSnapshot(figureSnapshot, null)
       if (afterNativePhoto) {
         captureLog.skippingGpsConfirmationAfterPhoto({
           figureId: figureSnapshot.id,
@@ -807,9 +807,7 @@ export function useCaptureFlow({
 
       setPhotoPreview(compressed)
 
-      const distanceToFigure =
-        locationSnapshot?.distanceToFigure ??
-        getDistanceToFigure(capturePosition, figureSnapshot)
+      const distanceToFigure = getDistanceToFigure(capturePosition, figureSnapshot)
 
       const captureRecord = buildCaptureRecord({
         figureId: figureSnapshot.id,
