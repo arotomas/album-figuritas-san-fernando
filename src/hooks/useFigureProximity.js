@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getDistanceMeters } from '../utils/geo'
+import { MAP_CAPTURE_SWITCH_DELTA_M } from '../config/mapNavigation'
 import {
   buildProximitySnapshot,
   compareFigureProximityPriority,
   getProximityRadii,
-  pickPriorityFigure,
-  resolveProximityFocus,
+  pickNearestCapturableFigure,
+  resolveMapCapturableFocus,
 } from '../utils/proximityExperience'
 
 /**
@@ -15,6 +16,7 @@ import {
  */
 export function useFigureProximity(userPosition, figures, { activeTargetFigureId = null } = {}) {
   const nearStateRef = useRef({})
+  const localFocusHoldRef = useRef(null)
   const [tick, setTick] = useState(0)
 
   const figuresWithDistance = useMemo(() => {
@@ -40,6 +42,7 @@ export function useFigureProximity(userPosition, figures, { activeTargetFigureId
   useEffect(() => {
     if (!userPosition) {
       nearStateRef.current = {}
+      localFocusHoldRef.current = null
       setTick((v) => v + 1)
       return
     }
@@ -83,13 +86,14 @@ export function useFigureProximity(userPosition, figures, { activeTargetFigureId
         figuresWithDistance: [],
         nearestFigure: null,
         nearestDistance: null,
+        nearestCapturableFigure: null,
         isNearFigure: false,
         nearFigure: null,
         nearFigures: [],
-        priorityNearFigure: null,
         secondaryNearFigure: null,
         isFocusNear: false,
         activeTargetFigureId,
+        localFocusOverride: false,
       }
     }
 
@@ -97,26 +101,57 @@ export function useFigureProximity(userPosition, figures, { activeTargetFigureId
       (figure) => nearStateRef.current[figure.id],
     )
 
-    const priorityNearFigure = pickPriorityFigure(nearFigures)
-    const nearestFigure = figuresWithDistance[0] ?? null
-    const focus = resolveProximityFocus({
+    const nearestCapturableAmongNear = pickNearestCapturableFigure(nearFigures)
+    const focus = resolveMapCapturableFocus({
       figuresWithDistance,
       nearFigures,
       activeTargetFigureId,
     })
 
+    let focusFigure = focus.focusFigure
+    const nearestCapturableFigure =
+      nearestCapturableAmongNear ?? focus.nearestCapturableFigure ?? null
+
+    if (
+      focus.localFocusOverride &&
+      focusFigure &&
+      localFocusHoldRef.current &&
+      String(localFocusHoldRef.current) !== String(focusFigure.id)
+    ) {
+      const held = nearFigures.find(
+        (figure) => String(figure.id) === String(localFocusHoldRef.current),
+      )
+      const candidate = focusFigure
+      if (
+        held &&
+        candidate?.distanceMeters != null &&
+        held.distanceMeters - candidate.distanceMeters < MAP_CAPTURE_SWITCH_DELTA_M
+      ) {
+        focusFigure = held
+      }
+    }
+
+    if (focusFigure?.id != null) {
+      localFocusHoldRef.current = String(focusFigure.id)
+    } else {
+      localFocusHoldRef.current = null
+    }
+
+    const nearestByDistance = pickNearestCapturableFigure(figuresWithDistance)
+
     return {
       figuresWithDistance,
-      nearestFigure,
-      nearestDistance: nearestFigure?.distanceMeters ?? null,
+      nearestFigure: nearestByDistance,
+      nearestDistance: nearestByDistance?.distanceMeters ?? null,
+      nearestCapturableFigure,
       isNearFigure: nearFigures.length > 0,
-      nearFigure: focus.focusFigure,
+      nearFigure: focusFigure,
       nearFigures,
-      priorityNearFigure,
       secondaryNearFigure: focus.secondaryNearFigure,
       isFocusNear: focus.isFocusNear,
       activeTargetStale: focus.activeTargetStale ?? false,
       activeTargetFigureId,
+      localFocusOverride: focus.localFocusOverride ?? false,
     }
     // tick + debounced position
   }, [activeTargetFigureId, figures, figuresWithDistance, tick, userPosition])

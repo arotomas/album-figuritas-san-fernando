@@ -2,6 +2,12 @@ import {
   PROXIMITY_PHASES,
   PROXIMITY_RARITY_CONFIG,
 } from '../config/proximity'
+import {
+  MAP_CAPTURE_SWITCH_DELTA_M,
+  MAP_LOCAL_ZONE_MIN_NEAR_COUNT,
+  MAP_MANUAL_TARGET_FAR_M,
+  MAP_RARITY_TIEBREAK_MAX_M,
+} from '../config/mapNavigation'
 import { getRarity } from '../theme/rarity'
 
 export function normalizeFigureRarity(figure) {
@@ -102,6 +108,23 @@ export function pickPriorityFigure(figures) {
   return [...figures].sort(compareFigureProximityPriority)[0]
 }
 
+/** Pendientes ordenadas por distancia real; rareza solo en empate cercano. */
+export function compareByDistanceThenRarity(a, b) {
+  if (a.distanceMeters == null || b.distanceMeters == null) {
+    return compareFigureProximityPriority(a, b)
+  }
+  const delta = a.distanceMeters - b.distanceMeters
+  if (Math.abs(delta) > MAP_RARITY_TIEBREAK_MAX_M) return delta
+  return compareFigureProximityPriority(a, b)
+}
+
+export function pickNearestCapturableFigure(figures) {
+  if (!figures?.length) return null
+  const pending = figures.filter((figure) => !figure.obtenida)
+  if (!pending.length) return null
+  return [...pending].sort(compareByDistanceThenRarity)[0]
+}
+
 /** Active target wins; otherwise nearest-by-priority (legacy behavior). */
 export function resolveProximityFocus({
   figuresWithDistance,
@@ -141,6 +164,87 @@ export function resolveProximityFocus({
     isFocusNear: nearFigures.some(
       (figure) => String(figure.id) === String(activeTargetFigureId),
     ),
+  }
+}
+
+/**
+ * Foco de mapa / "Estoy acá": misión manual lejos; capturable más cercana en zona local.
+ * No modifica activeTargetFigureId — solo qué figurita muestra el overlay local.
+ */
+export function resolveMapCapturableFocus({
+  figuresWithDistance,
+  nearFigures,
+  activeTargetFigureId,
+  manualTargetFarM = MAP_MANUAL_TARGET_FAR_M,
+  switchDeltaM = MAP_CAPTURE_SWITCH_DELTA_M,
+  localZoneMinNearCount = MAP_LOCAL_ZONE_MIN_NEAR_COUNT,
+} = {}) {
+  const nearestCapturableFigure = pickNearestCapturableFigure(nearFigures)
+
+  if (!activeTargetFigureId) {
+    return {
+      focusFigure: nearestCapturableFigure,
+      secondaryNearFigure: null,
+      isFocusNear: Boolean(nearestCapturableFigure),
+      nearestCapturableFigure,
+      localFocusOverride: false,
+    }
+  }
+
+  const active = figuresWithDistance.find(
+    (figure) => String(figure.id) === String(activeTargetFigureId),
+  )
+
+  if (!active || active.obtenida) {
+    return {
+      focusFigure: nearestCapturableFigure,
+      secondaryNearFigure: null,
+      isFocusNear: Boolean(nearestCapturableFigure),
+      activeTargetStale: true,
+      nearestCapturableFigure,
+      localFocusOverride: false,
+    }
+  }
+
+  const activeInNear = nearFigures.some(
+    (figure) => String(figure.id) === String(activeTargetFigureId),
+  )
+  const denseLocalZone = nearFigures.length >= localZoneMinNearCount
+  const activeIsFar = active.distanceMeters > manualTargetFarM
+  const nearestIsLocal =
+    nearestCapturableFigure != null &&
+    nearestCapturableFigure.distanceMeters <= manualTargetFarM
+
+  const nearestBeatsActive =
+    nearestCapturableFigure != null &&
+    String(nearestCapturableFigure.id) !== String(activeTargetFigureId) &&
+    nearestCapturableFigure.distanceMeters + switchDeltaM <= active.distanceMeters
+
+  const shouldOverrideToNearest =
+    nearestCapturableFigure != null &&
+    nearestBeatsActive &&
+    (denseLocalZone || nearestIsLocal || (activeIsFar && activeInNear))
+
+  if (shouldOverrideToNearest) {
+    return {
+      focusFigure: nearestCapturableFigure,
+      secondaryNearFigure: active,
+      isFocusNear: true,
+      nearestCapturableFigure,
+      localFocusOverride: true,
+    }
+  }
+
+  const othersNear = nearFigures.filter(
+    (figure) => String(figure.id) !== String(activeTargetFigureId),
+  )
+
+  return {
+    focusFigure: active,
+    secondaryNearFigure: pickNearestCapturableFigure(othersNear),
+    isFocusNear: activeInNear,
+    nearestCapturableFigure: nearestCapturableFigure ?? active,
+    localFocusOverride: false,
   }
 }
 

@@ -47,6 +47,8 @@ import { MapGpsStatus } from './MapGpsStatus'
 import { GeoPolicyBanner } from './GeoPolicyBanner'
 import { MapQaOverlay } from '../qa/MapQaOverlay'
 import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
+import { getDistanceMeters } from '../../utils/geo'
+import { MAP_ROUTE_HIDE_DIRECT_M } from '../../config/mapNavigation'
 import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
 import { FigureTargetPrompt } from './FigureTargetPrompt'
@@ -524,9 +526,11 @@ function LeafletMapViewInner({
     nearFigures,
     nearestFigure,
     nearestDistance,
+    nearestCapturableFigure,
     secondaryNearFigure,
     isFocusNear,
     activeTargetStale,
+    localFocusOverride,
   } = useFigureProximity(debouncedProximity, proximityFigures, { activeTargetFigureId })
 
   const activeTargetFigure = useMemo(() => {
@@ -554,6 +558,23 @@ function LeafletMapViewInner({
     (explorationActive || Boolean(activeTargetFigureId)) &&
     simpleRouteTargetCoordinates != null
 
+  const routeDirectMeters = useMemo(() => {
+    if (!mapPosition?.lat || !mapPosition?.lng || !simpleRouteTargetCoordinates) return null
+    return getDistanceMeters(
+      mapPosition.lat,
+      mapPosition.lng,
+      simpleRouteTargetCoordinates.lat,
+      simpleRouteTargetCoordinates.lng,
+    )
+  }, [mapPosition, simpleRouteTargetCoordinates])
+
+  const mapRouteVisible =
+    simpleRouteActive &&
+    (routeDirectMeters == null || routeDirectMeters > MAP_ROUTE_HIDE_DIRECT_M)
+
+  const osrmRouteVisible =
+    mapRouteVisible && STREET_ROUTING_OSRM_EXPERIMENT.enabled
+
   const navigationSuppressedFigureId = useMemo(() => {
     if (!NAVIGATION_UX_EXPERIMENT.enabled || !simpleRouteActive) return null
     if (explorationActive) return explorationTargetFigureId
@@ -566,11 +587,10 @@ function LeafletMapViewInner({
   ])
 
   useEffect(() => {
-    if (!simpleRouteActive) {
-      setRouteMetrics(null)
-      onRouteMetricsChange?.(null)
-    }
-  }, [onRouteMetricsChange, simpleRouteActive])
+    if (mapRouteVisible) return
+    setRouteMetrics(null)
+    onRouteMetricsChange?.(null)
+  }, [mapRouteVisible, onRouteMetricsChange])
 
   useEffect(() => {
     if (activeTargetStale) clearActiveTargetFigure()
@@ -721,11 +741,19 @@ function LeafletMapViewInner({
 
   const handleOpenCamera = useCallback(() => {
     const capturePosition = proximityPosition ?? mapPosition ?? position
+    const captureFigure = nearestCapturableFigure ?? nearFigure
     onOpenCamera?.({
-      figure: nearFigure,
+      figure: captureFigure,
       position: capturePosition,
     })
-  }, [mapPosition, nearFigure, onOpenCamera, position, proximityPosition])
+  }, [
+    mapPosition,
+    nearFigure,
+    nearestCapturableFigure,
+    onOpenCamera,
+    position,
+    proximityPosition,
+  ])
 
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return
@@ -917,7 +945,7 @@ function LeafletMapViewInner({
             onFollowPausedChange={handleFollowPausedChange}
             onRotationPausedChange={handleRotationPausedChange}
           />
-          {simpleRouteActive ? (
+          {mapRouteVisible ? (
             STREET_ROUTING_OSRM_EXPERIMENT.enabled ? (
               <>
                 <StreetRouteLineLayer
@@ -1092,7 +1120,8 @@ function LeafletMapViewInner({
 
       {STREET_ROUTING_OSRM_EXPERIMENT.enabled &&
       activeTargetFigure &&
-      !explorationActive ? (
+      !explorationActive &&
+      mapRouteVisible ? (
         <RouteMetricsBadge
           visible={Boolean(routeMetrics)}
           metrics={routeMetrics}
@@ -1107,7 +1136,7 @@ function LeafletMapViewInner({
       />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500]">
-        {activeTargetFigureId && showSecondaryHint && (
+        {activeTargetFigureId && showSecondaryHint && !localFocusOverride && (
           <p className="pointer-events-none mb-2 px-4 text-center text-xs font-medium text-white/45">
             Hay otra figurita cerca…
           </p>
