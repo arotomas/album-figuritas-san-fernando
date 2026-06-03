@@ -246,6 +246,17 @@
     scroll-padding-bottom: 1rem;
   }
 
+  /* Auth (login, registro, profile-setup): teclado iOS — sin banda oscura ni campos tapados */
+  html.keyboard-open:has([data-auth-layout]) body {
+    background-color: var(--color-warm-white);
+  }
+
+  html.keyboard-open:has([data-auth-layout]) .auth-keyboard-scroll {
+    transform: translate3d(0, var(--vv-offset-top, 0px), 0);
+    scroll-padding-bottom: max(10rem, env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+  }
+
   .bottom-nav {
     min-height: var(--bottom-nav-height);
   }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useKeyboardAwareFieldFocus } from '../hooks/useKeyboardAwareFieldFocus'
 import { motion } from 'framer-motion'
 import { AuthBrandHeader } from '../components/auth'
 import { Button } from '../components/Button'
@@ -23,6 +24,9 @@ export function ProfileSetupScreen() {
   const [selectedAddress, setSelectedAddress] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
+  const formRef = useRef(null)
+
+  useKeyboardAwareFieldFocus(formRef)
 
   useEffect(() => {
     if (!supabaseProfile) return
@@ -68,10 +72,11 @@ export function ProfileSetupScreen() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-8 pt-1">
+    <div className="flex min-h-0 flex-1 flex-col px-6 pb-8 pt-1">
       <AuthBrandHeader className="mb-6" />
 
       <motion.form
+        ref={formRef}
         variants={staggerContainer}
         initial="initial"
         animate="animate"

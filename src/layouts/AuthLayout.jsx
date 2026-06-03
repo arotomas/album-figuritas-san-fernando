@@ -5,13 +5,16 @@ import { LegalNotice } from '../components/legal/LegalNotice'
 
 export function AuthLayout() {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-warm-white">
+    <div
+      data-auth-layout
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-warm-white"
+    >
       <motion.main
         variants={pageVariants}
         initial="initial"
         animate="animate"
         exit="exit"
-        className="safe-top safe-x scroll-y-app flex min-h-0 flex-1 flex-col"
+        className="auth-keyboard-scroll safe-top safe-x scroll-y-app flex min-h-0 flex-1 flex-col"
       >
         <Outlet />
       </motion.main>

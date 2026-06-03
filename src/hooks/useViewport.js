@@ -49,10 +49,13 @@ function applyViewportVars() {
   const heightDelta = Math.abs(height - lastViewportHeight)
   const offsetDelta = Math.abs(offsetTop - lastViewportOffsetTop)
 
+  const keyboardOpen = height < window.innerHeight * 0.78
+
   if (
     lastViewportHeight > 0 &&
     heightDelta < 3 &&
-    offsetDelta < 3
+    offsetDelta < 3 &&
+    !keyboardOpen
   ) {
     return
   }
@@ -60,7 +63,6 @@ function applyViewportVars() {
   lastViewportHeight = height
   lastViewportOffsetTop = offsetTop
 
-  const keyboardOpen = height < window.innerHeight * 0.78
   const standalone = isStandaloneMode()
 
   root.style.setProperty('--app-height', `${height}px`)
@@ -102,11 +104,13 @@ export function useViewport() {
     const onChange = () => applyViewportVars()
 
     window.visualViewport?.addEventListener('resize', onChange)
+    window.visualViewport?.addEventListener('scroll', onChange)
     window.addEventListener('resize', onChange)
     window.addEventListener('orientationchange', onChange)
 
     return () => {
       window.visualViewport?.removeEventListener('resize', onChange)
+      window.visualViewport?.removeEventListener('scroll', onChange)
       window.removeEventListener('resize', onChange)
       window.removeEventListener('orientationchange', onChange)
     }
