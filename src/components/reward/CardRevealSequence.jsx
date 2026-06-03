@@ -19,6 +19,7 @@ import { PointsBurstOverlay } from '../points/PointsBurstOverlay'
 import {
   resolveFigurePointsFromCatalog,
   shouldShowPointsBurst,
+  getPointsBurstDurationMs,
 } from '../../utils/figurePoints'
 import { usePlayerPointsStore } from '../../store/usePlayerPointsStore'
 
@@ -61,6 +62,7 @@ function MiniConfetti({ rareza }) {
 export function CardRevealSequence({ figure, photoUrl, onComplete }) {
   const [phase, setPhase] = useState(PHASES.ENTER)
   const [visible, setVisible] = useState(false)
+  const [pointsOverlayVisible, setPointsOverlayVisible] = useState(false)
   const rarity = getRarity(figure?.rareza)
   const reduced = prefersReducedMotion()
   const onCompleteRef = useRef(onComplete)
@@ -110,12 +112,21 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
     if (pointsBurstTriggeredRef.current) return
 
     pointsBurstTriggeredRef.current = true
+    setPointsOverlayVisible(true)
     usePlayerPointsStore.getState().bumpOptimistic(pointsEarned)
-  }, [phase, pointsEarned, showPointsBurst])
+
+    const holdMs = getPointsBurstDurationMs(figure, { reduced })
+    const timer = window.setTimeout(() => {
+      if (mountedRef.current) setPointsOverlayVisible(false)
+    }, holdMs)
+
+    return () => window.clearTimeout(timer)
+  }, [figure, phase, pointsEarned, reduced, showPointsBurst])
 
   useEffect(() => {
     discoveryPlayedRef.current = false
     pointsBurstTriggeredRef.current = false
+    setPointsOverlayVisible(false)
     setPhase(isSpecial ? PHASES.DISCOVERY : PHASES.ENTER)
     setVisible(false)
     const revealTimer = window.setTimeout(() => setVisible(true), 80)
@@ -217,9 +228,7 @@ export function CardRevealSequence({ figure, photoUrl, onComplete }) {
             <MiniConfetti rareza={figure.rareza} />
           )}
 
-          {showPointsBurst &&
-            pointsEarned > 0 &&
-            (phase === PHASES.REVEAL || phase === PHASES.SHINE) && (
+          {showPointsBurst && pointsOverlayVisible && pointsEarned > 0 && (
               <PointsBurstOverlay
                 figure={figure}
                 points={pointsEarned}

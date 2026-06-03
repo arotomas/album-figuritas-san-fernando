@@ -8,22 +8,26 @@ function PlayerPointsBadgeInner({ className = '' }) {
 
   return (
     <div
-      className={`inline-flex max-w-[7.5rem] items-center gap-1 rounded-full border border-progress/25 bg-progress/10 px-2.5 py-1 text-[11px] font-semibold text-ink shadow-sm sm:max-w-none sm:px-3 sm:text-xs ${className}`}
-      aria-label={
-        loading && totalPoints == null
-          ? 'Cargando puntos'
-          : `${totalPoints ?? 0} puntos totales`
-      }
-      title="Tus puntos totales"
+      className={`flex justify-end border-t border-border/40 bg-warm-white px-4 py-1.5 ${className}`}
     >
-      <span aria-hidden className="shrink-0 text-sm leading-none">
-        ⭐
-      </span>
-      {loading && totalPoints == null ? (
-        <span className="h-3 w-10 animate-pulse rounded bg-border/70" aria-hidden />
-      ) : (
-        <span className="truncate tabular-nums">{totalPoints ?? 0} pts</span>
-      )}
+      <div
+        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-progress/25 bg-progress/10 px-3 py-1 text-[11px] font-semibold text-ink shadow-sm sm:text-xs"
+        aria-label={
+          loading && totalPoints == null
+            ? 'Cargando puntos'
+            : `${totalPoints ?? 0} puntos totales`
+        }
+        title="Tus puntos totales"
+      >
+        <span aria-hidden className="shrink-0 text-sm leading-none">
+          ⭐
+        </span>
+        {loading && totalPoints == null ? (
+          <span className="h-3 w-10 animate-pulse rounded bg-border/70" aria-hidden />
+        ) : (
+          <span className="truncate tabular-nums">{totalPoints ?? 0} pts</span>
+        )}
+      </div>
     </div>
   )
 }

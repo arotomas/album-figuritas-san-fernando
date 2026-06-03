@@ -41,3 +41,17 @@ export function shouldShowPointsBurst(figure) {
 
   return resolveFigurePointsFromCatalog(figure) > 0
 }
+
+const POINTS_BURST_DURATION_MS = {
+  común: 3000,
+  rara: 3100,
+  épica: 3200,
+  legendaria: 3350,
+  bonus: 3500,
+}
+
+export function getPointsBurstDurationMs(figure, { reduced = false } = {}) {
+  if (reduced) return 2800
+  const tier = getPointsBurstTier(figure)
+  return POINTS_BURST_DURATION_MS[tier] ?? 3000
+}
