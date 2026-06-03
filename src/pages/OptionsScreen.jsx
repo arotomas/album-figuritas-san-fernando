@@ -15,6 +15,7 @@ import { getFullName } from '../utils/profileValidation'
 import { hasValidAddress } from '../utils/parseGooglePlace'
 import { LegalNotice } from '../components/legal/LegalNotice'
 import { InstallAppSection } from '../components/profile/InstallAppSection'
+import { PlayerRankingSection } from '../components/profile/PlayerRankingSection'
 import { PushNotificationsSection } from '../components/push/PushNotificationsSection'
 
 const STATUS_LABELS = {
@@ -311,6 +312,8 @@ export function OptionsScreen() {
           </div>
         )}
       </div>
+
+      <PlayerRankingSection />
 
       <InstallAppSection />
 

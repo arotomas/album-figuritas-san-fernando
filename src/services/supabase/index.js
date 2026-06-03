@@ -72,3 +72,5 @@ export {
   updateProfileFields,
   isUsernameAvailable,
 } from './profile'
+
+export { fetchPlayerRanking } from './ranking'
