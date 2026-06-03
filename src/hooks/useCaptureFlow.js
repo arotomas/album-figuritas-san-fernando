@@ -41,6 +41,10 @@ import { getQaState, setQaFlag } from '../utils/diagnostics'
 import { cameraLog } from '../utils/cameraLog'
 import { captureLog, albumLog, rewardLog } from '../utils/devLog'
 import {
+  captureGpsDiagEnabled,
+  captureGpsDiagRecordPipeline,
+} from '../utils/captureGpsDiagnostics'
+import {
   capturePipelineTrace,
   prefetchRewardChunks,
   traceAsync,
@@ -277,6 +281,28 @@ export function useCaptureFlow({
 
   /** Siempre recalcular desde coords en vivo; snapshot solo si aún no hay fix. */
   const ringDistanceMeters = liveDistanceMeters ?? bootstrapDistanceMeters
+
+  useEffect(() => {
+    if (!captureGpsDiagEnabled()) return
+    const ringSource =
+      liveDistanceMeters != null
+        ? 'live'
+        : bootstrapDistanceMeters != null
+          ? 'bootstrap'
+          : 'none'
+    captureGpsDiagRecordPipeline({
+      liveDistanceMeters,
+      ringDistanceMeters,
+      bootstrapDistanceMeters,
+      hasLiveGps,
+      ringSource,
+    })
+  }, [
+    bootstrapDistanceMeters,
+    hasLiveGps,
+    liveDistanceMeters,
+    ringDistanceMeters,
+  ])
 
   const activeFigure = pendingFigureRef.current ?? pendingFigure ?? resolvedFigure
 

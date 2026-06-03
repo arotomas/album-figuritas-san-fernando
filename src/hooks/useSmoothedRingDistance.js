@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  captureGpsDiagEnabled,
+  captureGpsDiagRecordDisplay,
+} from '../utils/captureGpsDiagnostics'
 
 const APPROACH_UPDATE_MS = 700
 const REGRESS_UPDATE_MS = 2400
@@ -11,6 +15,11 @@ function bucketDisplayMeters(meters) {
   if (meters >= 45) return Math.round(meters / 5) * 5
   if (meters >= 14) return Math.round(meters / 3) * 3
   return Math.max(1, Math.round(meters))
+}
+
+function reportDisplay(payload) {
+  if (!captureGpsDiagEnabled()) return
+  captureGpsDiagRecordDisplay(payload)
 }
 
 /**
@@ -29,10 +38,24 @@ export function useSmoothedRingDistance(distanceMeters, { isReady = false } = {}
       arrivedRef.current = true
       displayedRef.current = 0
       setDisplayMeters(0)
+      reportDisplay({
+        inputMeters: distanceMeters,
+        displayMeters: 0,
+        smoothInternal: smoothRef.current,
+        isReady: true,
+        skipReason: 'ready_lock',
+      })
       return
     }
 
     if (distanceMeters == null || !Number.isFinite(distanceMeters)) {
+      reportDisplay({
+        inputMeters: distanceMeters,
+        displayMeters: displayedRef.current,
+        smoothInternal: smoothRef.current,
+        isReady: false,
+        skipReason: 'input_invalid',
+      })
       return
     }
 
@@ -53,6 +76,21 @@ export function useSmoothedRingDistance(distanceMeters, { isReady = false } = {}
       if (displayedRef.current !== 0) {
         displayedRef.current = 0
         setDisplayMeters(0)
+        reportDisplay({
+          inputMeters: distanceMeters,
+          displayMeters: 0,
+          smoothInternal: smooth,
+          isReady: false,
+          skipReason: 'arrived_lock',
+        })
+      } else {
+        reportDisplay({
+          inputMeters: distanceMeters,
+          displayMeters: 0,
+          smoothInternal: smooth,
+          isReady: false,
+          skipReason: 'arrived_hold',
+        })
       }
       return
     }
@@ -65,21 +103,49 @@ export function useSmoothedRingDistance(distanceMeters, { isReady = false } = {}
       displayedRef.current = bucketed
       lastUpdateRef.current = now
       setDisplayMeters(bucketed)
+      reportDisplay({
+        inputMeters: distanceMeters,
+        displayMeters: bucketed,
+        smoothInternal: smooth,
+        isReady: false,
+        skipReason: 'display_updated',
+      })
       return
     }
 
     if (bucketed === prev) {
+      reportDisplay({
+        inputMeters: distanceMeters,
+        displayMeters: prev,
+        smoothInternal: smooth,
+        isReady: false,
+        skipReason: 'bucket_unchanged',
+      })
       return
     }
 
     const interval = bucketed < prev ? APPROACH_UPDATE_MS : REGRESS_UPDATE_MS
     if (now - lastUpdateRef.current < interval) {
+      reportDisplay({
+        inputMeters: distanceMeters,
+        displayMeters: prev,
+        smoothInternal: smooth,
+        isReady: false,
+        skipReason: bucketed < prev ? 'throttle_approach' : 'throttle_regress',
+      })
       return
     }
 
     displayedRef.current = bucketed
     lastUpdateRef.current = now
     setDisplayMeters(bucketed)
+    reportDisplay({
+      inputMeters: distanceMeters,
+      displayMeters: bucketed,
+      smoothInternal: smooth,
+      isReady: false,
+      skipReason: 'display_updated',
+    })
   }, [distanceMeters, isReady])
 
   useEffect(() => {
@@ -88,6 +154,13 @@ export function useSmoothedRingDistance(distanceMeters, { isReady = false } = {}
       displayedRef.current = null
       arrivedRef.current = false
       setDisplayMeters(null)
+      reportDisplay({
+        inputMeters: null,
+        displayMeters: null,
+        smoothInternal: null,
+        isReady: false,
+        skipReason: 'reset',
+      })
     }
   }, [distanceMeters])
 

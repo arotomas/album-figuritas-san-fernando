@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "VITE_DEBUG_CAPTURE_GPS=true npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {

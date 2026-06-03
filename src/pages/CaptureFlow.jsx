@@ -27,6 +27,13 @@ import {
   unlockTrace,
   updateCapturePipelineSnapshot,
 } from '../utils/capturePipelineTrace'
+import {
+  captureGpsDiagEnabled,
+  captureGpsDiagEndSession,
+  captureGpsDiagRecordFix,
+  captureGpsDiagSetCameraOpen,
+  captureGpsDiagStartSession,
+} from '../utils/captureGpsDiagnostics'
 
 function lazyRewardModule(load, label) {
   return lazy(() =>
@@ -99,6 +106,7 @@ export function CaptureFlow() {
     errorType: geoErrorType,
     isLoading: geoLoading,
     requestPermission,
+    updateCount,
   } = useGeolocation()
 
   const handleObtain = useCallback(
@@ -294,6 +302,45 @@ export function CaptureFlow() {
       useNativeFallback: camera.useNativeFallback,
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!captureGpsDiagEnabled()) return undefined
+    captureGpsDiagStartSession({
+      figureId: captureFigure?.id ?? captureSession?.figure?.id ?? null,
+      phase,
+    })
+    return () => captureGpsDiagEndSession('capture_flow_unmount')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!captureGpsDiagEnabled()) return
+    if (!liveGpsPosition) return
+    const source = trustedPosition
+      ? 'trusted'
+      : proximityPosition
+        ? 'proximity'
+        : 'map'
+    captureGpsDiagRecordFix({
+      position: liveGpsPosition,
+      updateCount,
+      source,
+    })
+  }, [
+    liveGpsPosition?.lat,
+    liveGpsPosition?.lng,
+    liveGpsPosition?.timestamp,
+    liveGpsPosition?.accuracy,
+    proximityPosition,
+    trustedPosition,
+    updateCount,
+  ])
+
+  useEffect(() => {
+    if (!captureGpsDiagEnabled()) return
+    const cameraOpen =
+      phase === CAPTURE_PHASES.CAMERA && !isProcessing && !camera.useNativeFallback
+    captureGpsDiagSetCameraOpen(cameraOpen)
+  }, [camera.useNativeFallback, isProcessing, phase])
 
   useEffect(() => {
     camera.initPermission()
