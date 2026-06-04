@@ -58,6 +58,11 @@ const AdminFiguresPage = lazy(() =>
 const AdminAlbumsPage = lazy(() =>
   import('../pages/admin/AdminAlbumsPage').then((m) => ({ default: m.AdminAlbumsPage })),
 )
+const AdminAlbumFiguresPage = lazy(() =>
+  import('../pages/admin/AdminAlbumFiguresPage').then((m) => ({
+    default: m.AdminAlbumFiguresPage,
+  })),
+)
 const AdminCollectionsPage = lazy(() =>
   import('../pages/admin/AdminCollectionsPage').then((m) => ({ default: m.AdminCollectionsPage })),
 )
@@ -277,6 +282,16 @@ export function AppRoutes() {
               <AdminRoleGate minRole="admin">
                 <LazyPage>
                   <AdminFiguresPage />
+                </LazyPage>
+              </AdminRoleGate>
+            }
+          />
+          <Route
+            path="albums/:albumId/figures"
+            element={
+              <AdminRoleGate minRole="admin">
+                <LazyPage label="AdminAlbumFiguresPage">
+                  <AdminAlbumFiguresPage />
                 </LazyPage>
               </AdminRoleGate>
             }

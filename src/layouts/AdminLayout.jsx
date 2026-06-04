@@ -34,11 +34,18 @@ function navLinkClass({ isActive }) {
   }`
 }
 
+function resolvePageTitle(pathname) {
+  if (/^\/admin\/albums\/[^/]+\/figures$/.test(pathname)) {
+    return 'Figuritas del álbum'
+  }
+  return PAGE_TITLES[pathname] ?? 'Administración'
+}
+
 export function AdminLayout() {
   useAdminHistoryGuard()
   const location = useLocation()
   const supabaseProfile = useAppStore((state) => state.supabaseProfile)
-  const pageTitle = PAGE_TITLES[location.pathname] ?? 'Administración'
+  const pageTitle = resolvePageTitle(location.pathname)
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     hasMinimumRole(supabaseProfile, item.minRole),
   )

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   createAlbumAdmin,
   fetchAlbumsAdmin,
@@ -433,6 +434,12 @@ export function AdminAlbumsPage() {
                     >
                       Editar
                     </button>
+                    <Link
+                      to={`/admin/albums/${album.id}/figures`}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold"
+                    >
+                      Gestionar figuritas
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleToggleActive(album)}

@@ -139,3 +139,16 @@ export async function setDefaultAlbum(id) {
   if (error) throw error
   return normalizeAlbumRow(data)
 }
+
+export async function fetchAlbumAdminById(albumId) {
+  if (!albumId) return null
+
+  const { data, error } = await supabase
+    .from('albums')
+    .select(ALBUM_COLUMNS)
+    .eq('id', albumId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ? normalizeAlbumRow(data) : null
+}

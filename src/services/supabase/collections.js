@@ -125,6 +125,20 @@ export async function getCollectionsAdmin() {
   return (data ?? []).map(normalizeRemoteCollection).filter(Boolean)
 }
 
+/** Capítulos de un álbum (admin). */
+export async function getCollectionsForAlbumAdmin(albumId) {
+  if (!albumId) return []
+
+  const { data, error } = await supabase
+    .from('album_collections')
+    .select(COLLECTION_COLUMNS)
+    .eq('album_id', albumId)
+    .order('sort_order', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []).map(normalizeRemoteCollection).filter(Boolean)
+}
+
 export async function createCollectionAdmin(collection) {
   const payload = {
     ...normalizeCollectionPayload(collection),

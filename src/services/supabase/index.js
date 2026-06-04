@@ -86,6 +86,16 @@ export {
   toggleAlbumActive,
   updateAlbumStatus,
   setDefaultAlbum,
+  fetchAlbumAdminById,
 } from './albumsAdmin'
+
+export {
+  fetchAlbumFiguresAdmin,
+  addFigureToAlbumAdmin,
+  updateAlbumFigureAdmin,
+  toggleAlbumFigureActiveAdmin,
+  removeFigureFromAlbumAdmin,
+  countActiveAlbumFiguresAdmin,
+} from './albumFiguresAdmin'
 
 export { resetMyProgressRemote } from './playerProgressReset'
