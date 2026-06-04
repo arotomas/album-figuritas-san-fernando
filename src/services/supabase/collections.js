@@ -6,7 +6,7 @@ import {
 } from '../../config/albumCollections'
 
 const COLLECTION_COLUMNS =
-  'id, slug, label, description, icon, cover_image, page, sort_order, track, visibility, edition, event_id, available_from, available_until, hidden_until_discovered, unlock_condition, active, created_at, updated_at'
+  'id, slug, label, description, icon, cover_image, page, sort_order, track, visibility, edition, event_id, available_from, available_until, hidden_until_discovered, unlock_condition, active, album_id, created_at, updated_at'
 
 export function normalizeRemoteCollection(row) {
   if (!row?.id) return null
@@ -32,11 +32,15 @@ export function normalizeRemoteCollection(row) {
   }
 }
 
-export async function fetchAlbumCollections({ includeInactive = false } = {}) {
+export async function fetchAlbumCollections({ includeInactive = false, albumId = null } = {}) {
   let query = supabase
     .from('album_collections')
     .select(COLLECTION_COLUMNS)
     .order('sort_order', { ascending: true })
+
+  if (albumId) {
+    query = query.eq('album_id', albumId)
+  }
 
   if (!includeInactive) {
     query = query.eq('active', true)
@@ -59,6 +63,9 @@ export async function fetchAlbumCollections({ includeInactive = false } = {}) {
 export async function fetchAlbumCollectionsSafe(options = {}) {
   try {
     const collections = await fetchAlbumCollections(options)
+    if (options.albumId && collections.length === 0) {
+      return { collections: null, source: 'static', reason: 'empty-remote-album' }
+    }
     if (collections.length === 0) {
       return { collections: null, source: 'static', reason: 'empty-remote' }
     }

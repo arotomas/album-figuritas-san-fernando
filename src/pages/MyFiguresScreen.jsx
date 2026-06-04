@@ -33,6 +33,7 @@ import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailabi
 import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
 import { getMapProximityHint } from '../utils/proximityExperience'
 import { startFigureExploration } from '../utils/startFigureExploration'
+import { ActiveAlbumSelector } from '../components/album/ActiveAlbumSelector'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -48,6 +49,7 @@ function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
     <div className="album-sticky-bar safe-x shrink-0">
       <div className="px-5 py-3.5 sm:px-6">
         <div className="mx-auto w-full max-w-[720px]">
+          <ActiveAlbumSelector className="mb-3" variant="album" />
           <div className="flex items-center justify-between gap-3">
             <p className="text-[13px] font-bold tabular-nums text-ink">
               {mainProgress.obtained}
@@ -547,7 +549,7 @@ export function MyFiguresScreenInner() {
         <section className="album-page-shell mx-auto w-full max-w-[720px] rounded-[2rem] px-3 py-2 sm:px-5">
           <div className="mb-3 flex items-center justify-between px-1">
             <h2 className="font-display text-sm font-bold uppercase tracking-wide text-ink/80">
-              Álbum principal
+              Capítulos
             </h2>
             <span className="rounded-full bg-progress/15 px-2.5 py-0.5 text-[10px] font-black tabular-nums text-ink">
               {mainProgress.obtained}/{mainProgress.total}

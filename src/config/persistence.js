@@ -22,6 +22,7 @@ export const PERSISTED_FIELDS = [
   'discoveredCollectionIds',
   'acknowledgedDiscoveryCollectionIds',
   'activeTargetFigureId',
+  'activeAlbumId',
   'soundsEnabled',
   'musicEnabled',
 ]

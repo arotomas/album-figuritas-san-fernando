@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAppStore } from '../store/useAppStore'
 import { fetchAlbumCollectionsSafe } from '../services/supabase/collections'
 import { fetchAlbumEventsSafe } from '../services/supabase/events'
 import {
@@ -10,17 +11,21 @@ import { logUniverseBootstrap } from '../utils/universeDiagnostics'
 
 /** Carga colecciones + eventos remotos con fallback estático (admin + player). */
 export function useAlbumCollectionsBootstrap(enabled = true) {
+  const activeAlbumId = useAppStore((state) => state.activeAlbumId)
   const [meta, setMeta] = useState(() => ({
     collections: getCollectionRegistryMeta(),
     events: getEventRegistryMeta(),
   }))
 
   useEffect(() => {
-    if (!enabled) return undefined
+    if (!enabled || !activeAlbumId) return undefined
 
     let cancelled = false
 
-    void Promise.all([fetchAlbumCollectionsSafe(), fetchAlbumEventsSafe()]).then(
+    void Promise.all([
+      fetchAlbumCollectionsSafe({ albumId: activeAlbumId }),
+      fetchAlbumEventsSafe(),
+    ]).then(
       ([collectionsResult, eventsResult]) => {
         if (cancelled) return
         if (collectionsResult.collections) {
@@ -45,7 +50,7 @@ export function useAlbumCollectionsBootstrap(enabled = true) {
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [activeAlbumId, enabled])
 
   return meta
 }

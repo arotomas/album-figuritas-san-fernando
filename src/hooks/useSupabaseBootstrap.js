@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppStore } from '../store/useAppStore'
 import {
@@ -8,11 +8,7 @@ import {
 } from '../services/supabase/auth'
 import { ensureProfileFromAuthUser, touchProfileLogin } from '../services/supabase/profile'
 import { isAdmin, isModeratorOrAdmin } from '../services/supabase/admin'
-import { fetchPublicFigures } from '../services/supabase/figures'
-import { fetchAlbumCollectionsSafe } from '../services/supabase/collections'
-import { fetchAlbumEventsSafe } from '../services/supabase/events'
-import { setRemoteAlbumCollections } from '../utils/collectionRegistry'
-import { setRemoteAlbumEvents } from '../utils/eventRegistry'
+import { bootstrapAlbumUniverse, syncAlbumUniverse } from '../utils/albumUniverseSync'
 import { pullRemoteAlbum } from '../services/supabase/sync'
 import { hasStoredSupabaseSession } from '../services/supabase/sessionRestore'
 import { supabaseLog } from '../utils/supabaseLog'
@@ -20,26 +16,25 @@ import { authLog } from '../utils/authLog'
 import { authRestoreLog } from '../utils/authRestoreLog'
 import { isProfileComplete } from '../utils/profileValidation'
 
-async function syncRemoteUniverse(replaceCatalogFromRemote) {
-  const remoteCatalog = await fetchPublicFigures()
-  replaceCatalogFromRemote(remoteCatalog)
-
-  const collectionsResult = await fetchAlbumCollectionsSafe()
-  if (collectionsResult.collections) {
-    setRemoteAlbumCollections(collectionsResult.collections, {
-      reason: collectionsResult.reason,
-    })
-  }
-
-  const eventsResult = await fetchAlbumEventsSafe()
-  if (eventsResult.events) {
-    setRemoteAlbumEvents(eventsResult.events, { reason: eventsResult.reason })
-  }
-
-  return remoteCatalog
+async function syncRemoteUniverse(replaceCatalogFromRemote, getState, setAlbumState) {
+  const preferredAlbumId = getState?.()?.activeAlbumId ?? null
+  return bootstrapAlbumUniverse({
+    replaceCatalogFromRemote,
+    preferredAlbumId,
+    setAlbumState,
+  })
 }
 
-async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, replaceCatalogFromRemote, mergeRemoteUserFigures }) {
+async function hydrateAuthFromSession({
+  session,
+  user,
+  setSupabaseAuth,
+  login,
+  replaceCatalogFromRemote,
+  mergeRemoteUserFigures,
+  getState,
+  setAlbumState,
+}) {
   const userId = session.user.id
   let profile = await fetchProfile(userId)
 
@@ -53,7 +48,11 @@ async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, r
 
   const admin = await isAdmin(userId)
   const moderatorOrAdmin = await isModeratorOrAdmin(userId)
-  const remoteCatalog = await syncRemoteUniverse(replaceCatalogFromRemote)
+  const { catalogCount } = await syncRemoteUniverse(
+    replaceCatalogFromRemote,
+    getState,
+    setAlbumState,
+  )
 
   setSupabaseAuth({
     userId,
@@ -91,7 +90,7 @@ async function hydrateAuthFromSession({ session, user, setSupabaseAuth, login, r
     userId,
     isAdmin: admin,
     remoteFigures: remoteRows.length,
-    remoteCatalog: remoteCatalog.length,
+    remoteCatalog: catalogCount,
     profileCompleted: completed,
   })
 }
@@ -107,6 +106,13 @@ export function useSupabaseBootstrap(enabled) {
   const replaceCatalogFromRemote = useAppStore((state) => state.replaceCatalogFromRemote)
   const mergeRemoteUserFigures = useAppStore((state) => state.mergeRemoteUserFigures)
   const login = useAppStore((state) => state.login)
+  const getState = useAppStore.getState
+  const setAlbumState = useCallback(
+    ({ publishedAlbums, activeAlbumId }) => {
+      useAppStore.setState({ publishedAlbums, activeAlbumId })
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!enabled) return
@@ -123,7 +129,7 @@ export function useSupabaseBootstrap(enabled) {
         if (!result?.session?.user?.id) {
           authRestoreLog.info('no session')
           clearAuthState()
-          await syncRemoteUniverse(replaceCatalogFromRemote)
+          await syncRemoteUniverse(replaceCatalogFromRemote, getState, setAlbumState)
           return
         }
 
@@ -131,7 +137,7 @@ export function useSupabaseBootstrap(enabled) {
           authLog.info('legacy anonymous session cleared — real auth required')
           await signOutSupabase().catch(() => {})
           clearAuthState()
-          await syncRemoteUniverse(replaceCatalogFromRemote)
+          await syncRemoteUniverse(replaceCatalogFromRemote, getState, setAlbumState)
           return
         }
 
@@ -142,6 +148,8 @@ export function useSupabaseBootstrap(enabled) {
           login,
           replaceCatalogFromRemote,
           mergeRemoteUserFigures,
+          getState,
+          setAlbumState,
         })
       } catch (error) {
         authLog.error('bootstrap failed', { message: error?.message ?? String(error) })
@@ -163,6 +171,8 @@ export function useSupabaseBootstrap(enabled) {
                 login,
                 replaceCatalogFromRemote,
                 mergeRemoteUserFigures,
+                getState,
+                setAlbumState,
               })
               return
             }
@@ -178,7 +188,7 @@ export function useSupabaseBootstrap(enabled) {
         if (!cancelled) {
           clearAuthState()
           try {
-            await syncRemoteUniverse(replaceCatalogFromRemote)
+            await syncRemoteUniverse(replaceCatalogFromRemote, getState, setAlbumState)
           } catch (catalogError) {
             authLog.error('catalog sync failed after bootstrap error', {
               message: catalogError?.message ?? String(catalogError),
@@ -206,6 +216,8 @@ export function useSupabaseBootstrap(enabled) {
     replaceCatalogFromRemote,
     setAuthBootstrapped,
     setSupabaseAuth,
+    getState,
+    setAlbumState,
   ])
 
   useEffect(() => {
@@ -217,9 +229,13 @@ export function useSupabaseBootstrap(enabled) {
       if (event === 'SIGNED_OUT') {
         authRestoreLog.info('no session', { reason: 'signed_out_event' })
         clearAuthState()
-        void fetchPublicFigures()
-          .then((catalog) => useAppStore.getState().replaceCatalogFromRemote(catalog))
-          .catch(() => useAppStore.getState().replaceCatalogFromRemote([]))
+        void bootstrapAlbumUniverse({
+          replaceCatalogFromRemote: useAppStore.getState().replaceCatalogFromRemote,
+          preferredAlbumId: useAppStore.getState().activeAlbumId,
+          setAlbumState: ({ publishedAlbums, activeAlbumId }) => {
+            useAppStore.setState({ publishedAlbums, activeAlbumId })
+          },
+        }).catch(() => useAppStore.getState().replaceCatalogFromRemote([]))
       }
 
       if (event === 'TOKEN_REFRESHED' && session?.user?.id) {

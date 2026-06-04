@@ -44,6 +44,10 @@ export function sanitizePersistedState(raw) {
       : [],
     activeTargetFigureId:
       source.activeTargetFigureId != null ? source.activeTargetFigureId : null,
+    activeAlbumId:
+      typeof source.activeAlbumId === 'string' && source.activeAlbumId.trim() !== ''
+        ? source.activeAlbumId.trim()
+        : null,
     soundsEnabled:
       typeof source.soundsEnabled === 'boolean' ? source.soundsEnabled : null,
     musicEnabled:

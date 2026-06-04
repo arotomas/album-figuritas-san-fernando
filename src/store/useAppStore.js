@@ -190,6 +190,7 @@ function buildPersistedSnapshot(state) {
       ? state.acknowledgedDiscoveryCollectionIds
       : [],
     activeTargetFigureId: state.activeTargetFigureId ?? null,
+    activeAlbumId: state.activeAlbumId ?? null,
     soundsEnabled:
       typeof state.soundsEnabled === 'boolean'
         ? state.soundsEnabled
@@ -252,6 +253,9 @@ export const useAppStore = create(
       user: null,
       figures: createInitialFigures(),
       _figureProgressRecords: [],
+      publishedAlbums: [],
+      activeAlbumId: null,
+      albumUniverseLoading: false,
     nearFigure: null,
     qaTestFigure: null,
       captureSession: null,
@@ -289,6 +293,19 @@ export const useAppStore = create(
       setHasHydrated: (value) => set({ _hasHydrated: value }),
 
       setAuthBootstrapped: (value) => set({ authBootstrapped: value }),
+
+      setPublishedAlbums: (publishedAlbums) =>
+        set({
+          publishedAlbums: Array.isArray(publishedAlbums) ? publishedAlbums : [],
+        }),
+
+      setActiveAlbumId: (activeAlbumId) =>
+        set({
+          activeAlbumId: activeAlbumId != null ? String(activeAlbumId) : null,
+          lastSavedAt: Date.now(),
+        }),
+
+      setAlbumUniverseLoading: (value) => set({ albumUniverseLoading: Boolean(value) }),
 
       clearAuthState: () =>
         set({
