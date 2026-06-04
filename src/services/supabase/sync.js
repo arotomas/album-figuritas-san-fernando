@@ -1,4 +1,4 @@
-import { QA_TEST_FIGURE_ID_PREFIX } from '../../config/qaConstants'
+import { isEphemeralQaFigureId, QA_TEST_FIGURE_ID_PREFIX } from '../../config/qaConstants'
 import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
@@ -9,7 +9,7 @@ import { uploadCapturePhoto, deleteUserCaptureStorage } from './storage'
 
 function resolveRealFigureId(figureId, qaTargetFigureId = null) {
   const figureKey = String(figureId)
-  if (figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')) {
+  if (isEphemeralQaFigureId(figureKey) || figureKey.startsWith('dev-')) {
     return qaTargetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
   }
   return figureId

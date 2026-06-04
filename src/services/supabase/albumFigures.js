@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { isQaCatalogFigureId } from '../../config/qaConstants'
 import {
   FIGURE_CORE_COLUMNS,
   FIGURE_GAMEPLAY_DEFAULTS,
@@ -52,9 +53,13 @@ function normalizeRemoteFigureRow(row, membership) {
       ? String(membership.collection_id).trim()
       : row.collection_id ?? null
 
+  const figureId = String(row.id)
+  const isQaCatalogFigure = isQaCatalogFigureId(figureId)
+
   return {
-    id: String(row.id),
-    slug: String(row.id),
+    id: figureId,
+    slug: figureId,
+    isQaTest: isQaCatalogFigure,
     nombre: title,
     title,
     description: row.description ?? '',

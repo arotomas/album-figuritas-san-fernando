@@ -18,7 +18,11 @@ import { offsetCoordinates } from '../utils/geoOffset'
 import { getDistanceMeters } from '../utils/geo'
 import { syncUnlockToSupabase, syncReplaceFigurePhoto, syncDeleteFigurePhoto, syncResetUserProgressToSupabase } from '../services/supabase/sync'
 import { isSupabaseConfigured } from '../services/supabase/auth'
-import { QA_TEST_FIGURE_ID_PREFIX } from '../config/qaConstants'
+import {
+  isEphemeralQaFigureId,
+  isQaCatalogFigureId,
+  QA_TEST_FIGURE_ID_PREFIX,
+} from '../config/qaConstants'
 import { canUseTestFigure } from '../qa/qaCore'
 import { myFiguresLog } from '../utils/myFiguresLog'
 import { sessionDebug, inspectSupabaseAuthStorage } from '../utils/sessionDebug'
@@ -534,8 +538,9 @@ export const useAppStore = create(
       ) => {
         let saved = false
         const figureKey = String(figureId)
-        const isQaFigure =
-          figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')
+        const isEphemeralQa = isEphemeralQaFigureId(figureKey)
+        const isQaCatalog = isQaCatalogFigureId(figureKey)
+        const isQaFigure = isEphemeralQa || isQaCatalog
 
         set((state) => {
           const withinLimit =
@@ -547,7 +552,7 @@ export const useAppStore = create(
           }
 
           let realFigureId = figureId
-          if (isQaFigure) {
+          if (isEphemeralQa) {
             realFigureId =
               state.qaTestFigure?.targetFigureId ??
               figureKey.replace(/^(qa-|dev-)/, '')
@@ -557,7 +562,7 @@ export const useAppStore = create(
           if (existing?.obtenida) {
             persistLog.persist('obtain skipped — already obtained', realFigureId)
             saved = true
-            const qaTargetFigureId = isQaFigure
+            const qaTargetFigureId = isEphemeralQa
               ? state.qaTestFigure?.targetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
               : null
 
@@ -600,7 +605,7 @@ export const useAppStore = create(
           persistLog.persist('figure obtained', realFigureId)
           saved = true
 
-          const qaTargetFigureId = isQaFigure
+          const qaTargetFigureId = isEphemeralQa
             ? state.qaTestFigure?.targetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
             : null
 
@@ -644,8 +649,9 @@ export const useAppStore = create(
         { foto, fotoSizeBytes, obtenidaEn, captureRecord, photoSource = null },
       ) => {
         const figureKey = String(figureId)
-        const isQaFigure =
-          figureKey.startsWith(QA_TEST_FIGURE_ID_PREFIX) || figureKey.startsWith('dev-')
+        const isEphemeralQa = isEphemeralQaFigureId(figureKey)
+        const isQaCatalog = isQaCatalogFigureId(figureKey)
+        const isQaFigure = isEphemeralQa || isQaCatalog
         const state = get()
         const withinLimit = isQaFigure || storageService.isPhotoWithinLimit(fotoSizeBytes)
 
@@ -655,13 +661,13 @@ export const useAppStore = create(
         }
 
         let realFigureId = figureId
-        if (isQaFigure) {
+        if (isEphemeralQa) {
           realFigureId =
             state.qaTestFigure?.targetFigureId ??
             figureKey.replace(/^(qa-|dev-)/, '')
         }
 
-        const qaTargetFigureId = isQaFigure
+        const qaTargetFigureId = isEphemeralQa
           ? state.qaTestFigure?.targetFigureId ?? figureKey.replace(/^(qa-|dev-)/, '')
           : null
 
