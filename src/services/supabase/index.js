@@ -76,3 +76,5 @@ export {
 export { fetchPlayerRanking } from './ranking'
 
 export { fetchMyPoints } from './playerPoints'
+
+export { resetMyProgressRemote } from './playerProgressReset'

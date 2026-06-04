@@ -3,9 +3,10 @@ import { supabaseLog } from '../../utils/supabaseLog'
 import { captureSyncLog } from '../../utils/captureSyncLog'
 import { useMobilePhotoDebugStore } from '../../store/useMobilePhotoDebugStore'
 import { getSessionUserId, isSupabaseConfigured } from './auth'
-import { fetchUserFigures, deleteUserFigurePhoto, deleteAllUserFigures, replaceUserFigurePhoto, upsertUserFigure } from './figures'
-import { insertCapture, deleteAllUserCaptures } from './captures'
+import { fetchUserFigures, deleteUserFigurePhoto, replaceUserFigurePhoto, upsertUserFigure } from './figures'
+import { insertCapture } from './captures'
 import { uploadCapturePhoto, deleteUserCaptureStorage } from './storage'
+import { resetMyProgressRemote } from './playerProgressReset'
 
 function resolveRealFigureId(figureId, qaTargetFigureId = null) {
   const figureKey = String(figureId)
@@ -360,7 +361,7 @@ export async function pullRemoteAlbum() {
 }
 
 /**
- * Reset remoto completo: user_figures, captures e imágenes del bucket.
+ * Reset remoto completo: RPC (ledger + captures + user_figures) + imágenes del bucket.
  */
 export async function syncResetUserProgressToSupabase() {
   if (!isSupabaseConfigured()) {
@@ -378,21 +379,21 @@ export async function syncResetUserProgressToSupabase() {
     supabaseLog.sync.info('progress reset start', { userId })
     captureSyncLog.info('progress reset start', { userId })
 
-    const [figuresResult, capturesResult, storageResult] = await Promise.all([
-      deleteAllUserFigures(userId),
-      deleteAllUserCaptures(userId),
-      deleteUserCaptureStorage(userId).catch((error) => {
-        captureSyncLog.error('progress reset storage cleanup failed', {
-          userId,
-          message: error?.message ?? String(error),
-        })
-        return { deleted: 0, storageError: error?.message ?? String(error) }
-      }),
-    ])
+    const rpcResult = await resetMyProgressRemote()
+
+    const storageResult = await deleteUserCaptureStorage(userId).catch((error) => {
+      captureSyncLog.error('progress reset storage cleanup failed', {
+        userId,
+        message: error?.message ?? String(error),
+      })
+      return { deleted: 0, storageError: error?.message ?? String(error) }
+    })
 
     const summary = {
-      userFiguresDeleted: figuresResult.deleted ?? 0,
-      capturesDeleted: capturesResult.deleted ?? 0,
+      userFiguresDeleted: rpcResult.deletedUserFigures,
+      capturesDeleted: rpcResult.deletedCaptures,
+      ledgerRowsDeleted: rpcResult.deletedLedgerRows,
+      totalPointsAfter: rpcResult.totalPointsAfter,
       storageFilesDeleted: storageResult.deleted ?? 0,
       storageError: storageResult.storageError ?? null,
     }

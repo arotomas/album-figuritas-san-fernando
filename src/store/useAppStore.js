@@ -13,7 +13,7 @@ import {
   sanitizePersistedState,
 } from '../services/storage/migrationService'
 import { computeAlbumStatus } from './albumUtils'
-import { persistLog } from '../utils/persistLog'
+import { notifyPlayerProgressReset } from '../utils/playerProgressReset'
 import { offsetCoordinates } from '../utils/geoOffset'
 import { getDistanceMeters } from '../utils/geo'
 import { syncUnlockToSupabase, syncReplaceFigurePhoto, syncDeleteFigurePhoto, syncResetUserProgressToSupabase } from '../services/supabase/sync'
@@ -1004,12 +1004,16 @@ export const useAppStore = create(
 
         set({ progressResetInFlight: true })
 
+        let remoteSkipped = true
+
         try {
           if (state.supabaseReady && isSupabaseConfigured()) {
             const remote = await syncResetUserProgressToSupabase()
             if (!remote.ok && !remote.skipped) {
               throw new Error(remote.reason ?? 'REMOTE_RESET_FAILED')
             }
+
+            remoteSkipped = Boolean(remote.skipped)
 
             if (import.meta.env.DEV) {
               console.info('[RESET] remote complete', remote)
@@ -1018,16 +1022,24 @@ export const useAppStore = create(
 
           const patch = buildLocalProgressResetPatch(get())
           set({ ...patch, progressResetInFlight: false })
-          usePlayerPointsStore.getState().resetPlayerPoints()
+
+          const pointsStore = usePlayerPointsStore.getState()
+          pointsStore.resetPlayerPoints()
+          if (!remoteSkipped) {
+            await pointsStore.refreshPlayerPoints()
+          }
+          notifyPlayerProgressReset({ remoteSkipped })
 
           persistLog.persist('reset complete', {
             figures: patch.figures.length,
+            remoteSkipped,
           })
 
           if (import.meta.env.DEV) {
             console.info('[RESET] local complete', {
               figures: patch.figures.length,
               albumStatus: patch.albumStatus,
+              remoteSkipped,
             })
           }
 

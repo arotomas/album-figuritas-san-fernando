@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchPlayerRanking } from '../services/supabase/ranking'
+import { PLAYER_PROGRESS_RESET_EVENT } from '../utils/playerProgressReset'
 
 function getErrorMessage(error) {
   if (error?.message === 'UNAUTHENTICATED') {
@@ -33,6 +34,19 @@ export function usePlayerRanking(limit = 20) {
 
   useEffect(() => {
     void reload()
+  }, [reload])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleProgressReset = () => {
+      void reload()
+    }
+
+    window.addEventListener(PLAYER_PROGRESS_RESET_EVENT, handleProgressReset)
+    return () => {
+      window.removeEventListener(PLAYER_PROGRESS_RESET_EVENT, handleProgressReset)
+    }
   }, [reload])
 
   return {
