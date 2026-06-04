@@ -9,6 +9,7 @@ import {
   updateAlbumStatus,
 } from '../../services/supabase/albumsAdmin'
 import { AdminErrorBanner } from '../../components/admin/adminShared'
+import { AlbumCoverUploadField } from '../../components/admin/AlbumCoverUploadField'
 import {
   ALBUM_STATUS,
   ALBUM_STATUS_OPTIONS,
@@ -29,6 +30,7 @@ export function AdminAlbumsPage() {
   const [form, setForm] = useState(DEFAULT_ALBUM_FORM)
   const [formError, setFormError] = useState(null)
   const [formMessage, setFormMessage] = useState(null)
+  const [coverUploadError, setCoverUploadError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
@@ -61,6 +63,7 @@ export function AdminAlbumsPage() {
     setForm(DEFAULT_ALBUM_FORM)
     setFormError(null)
     setFormMessage(null)
+    setCoverUploadError(null)
     setFormOpen(true)
   }
 
@@ -69,6 +72,7 @@ export function AdminAlbumsPage() {
     setForm(toAlbumForm(album))
     setFormError(null)
     setFormMessage(null)
+    setCoverUploadError(null)
     setFormOpen(true)
   }
 
@@ -181,7 +185,7 @@ export function AdminAlbumsPage() {
                 {editingId ? 'Editar álbum' : 'Nuevo álbum'}
               </h3>
               <p className="mt-1 text-sm text-muted">
-                Creá en borrador y publicá cuando esté listo. La portada es una URL por ahora.
+                Creá en borrador y publicá cuando esté listo. Subí la portada desde acá.
               </p>
             </div>
             <button
@@ -200,6 +204,11 @@ export function AdminAlbumsPage() {
           {formError && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
               {formError}
+            </div>
+          )}
+          {coverUploadError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {coverUploadError}
             </div>
           )}
           {formMessage && (
@@ -254,15 +263,13 @@ export function AdminAlbumsPage() {
                 className="mt-1 block w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
               />
             </label>
-            <label className="md:col-span-2 block text-xs font-bold uppercase tracking-wide text-muted">
-              Portada URL
-              <input
-                value={form.cover_image}
-                onChange={(event) => updateForm('cover_image', event.target.value)}
-                placeholder="https://..."
-                className="mt-1 block w-full rounded-xl border border-border bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink"
-              />
-            </label>
+            <AlbumCoverUploadField
+              albumId={editingId ?? form.id}
+              coverUrl={form.cover_image || null}
+              onCoverChange={(nextUrl) => updateForm('cover_image', nextUrl)}
+              onUploadError={setCoverUploadError}
+              disabled={saving}
+            />
             <label className="block text-xs font-bold uppercase tracking-wide text-muted">
               Estado
               <select

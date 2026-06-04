@@ -22,6 +22,8 @@ export const FIGURE_IMAGE_MIME_TYPES = [
   'image/jpeg',
   'image/jpg',
 ]
+export const ALBUM_COVER_MAX_BYTES = 200 * 1024
+export const ALBUM_COVER_MIME_TYPES = FIGURE_IMAGE_MIME_TYPES
 
 /** Límite del bucket en Supabase (migration 001). */
 export const STORAGE_BUCKET_MAX_BYTES = 524_288
@@ -77,6 +79,21 @@ export function buildChallengeExampleStoragePath(figureId, filename, timestamp =
   const safeFigureId = sanitizeStorageSegment(figureId, 'temp')
   const safeFilename = sanitizeStorageSegment(filename, 'challenge-example')
   return `challenge-examples/${safeFigureId}/${timestamp}-${safeFilename}`
+}
+
+/** Portada de álbum: un archivo fijo por álbum (reemplazo con upsert). */
+export function buildAlbumCoverStoragePath(albumId, extension = 'webp') {
+  const safeAlbumId = sanitizeStorageSegment(albumId, 'album')
+  const safeExt = sanitizeStorageSegment(extension, 'webp').replace(/\./g, '')
+  return `album-covers/${safeAlbumId}/cover.${safeExt}`
+}
+
+export function extractMarkerIconsStoragePath(publicUrl) {
+  if (!publicUrl || typeof publicUrl !== 'string') return null
+  const marker = `/storage/v1/object/public/${MARKER_ICONS_BUCKET}/`
+  const index = publicUrl.indexOf(marker)
+  if (index === -1) return null
+  return publicUrl.slice(index + marker.length)
 }
 
 export function validateMarkerIconFile(file) {
@@ -276,6 +293,130 @@ export async function optimizeFigureImageFile(file) {
   )
 
   return { ok: true, file: optimizedFile, transformed: true, sourceWidth: srcW, sourceHeight: srcH }
+}
+
+/** Portada de álbum: relación de aspecto libre, lado mayor hasta 1600px, <= 300 KB. */
+export async function optimizeAlbumCoverFile(file) {
+  if (!file) return { ok: false, reason: 'NOT_A_FILE' }
+  if (!FIGURE_IMAGE_MIME_TYPES.includes(file.type)) {
+    return { ok: false, reason: 'INVALID_MIME', type: file.type }
+  }
+  if (file.size <= 0) {
+    return { ok: false, reason: 'EMPTY_FILE', size: file.size }
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    return { ok: false, reason: 'FILE_TOO_LARGE_SOURCE', size: file.size, maxBytes: 8 * 1024 * 1024 }
+  }
+
+  const image = await loadImageFromFile(file)
+  const srcW = image.width
+  const srcH = image.height
+  if (!srcW || !srcH) return { ok: false, reason: 'INVALID_IMAGE_DIMENSIONS' }
+
+  const maxSide = 1600
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH))
+  const targetW = Math.max(1, Math.round(srcW * scale))
+  const targetH = Math.max(1, Math.round(srcH * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = targetW
+  canvas.height = targetH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return { ok: false, reason: 'CANVAS_UNAVAILABLE' }
+
+  ctx.clearRect(0, 0, targetW, targetH)
+  ctx.drawImage(image, 0, 0, targetW, targetH)
+
+  let encoded = await canvasToBlob(canvas, 'image/webp', 0.88)
+  let quality = 0.88
+  while (encoded.size > ALBUM_COVER_MAX_BYTES && quality > 0.4) {
+    quality -= 0.08
+    encoded = await canvasToBlob(canvas, 'image/webp', quality)
+  }
+
+  if (encoded.size > ALBUM_COVER_MAX_BYTES) {
+    encoded = await canvasToBlob(canvas, 'image/jpeg', 0.82)
+    quality = 0.82
+    while (encoded.size > ALBUM_COVER_MAX_BYTES && quality > 0.4) {
+      quality -= 0.08
+      encoded = await canvasToBlob(canvas, 'image/jpeg', quality)
+    }
+  }
+
+  if (encoded.size > ALBUM_COVER_MAX_BYTES) {
+    return {
+      ok: false,
+      reason: 'FILE_TOO_LARGE',
+      size: encoded.size,
+      maxBytes: ALBUM_COVER_MAX_BYTES,
+    }
+  }
+
+  const extension = encoded.type === 'image/jpeg' ? 'jpg' : 'webp'
+  const optimizedFile = new File([encoded], `cover.${extension}`, {
+    type: encoded.type,
+    lastModified: Date.now(),
+  })
+
+  return {
+    ok: true,
+    file: optimizedFile,
+    transformed: true,
+    sourceWidth: srcW,
+    sourceHeight: srcH,
+    extension,
+  }
+}
+
+export async function uploadAlbumCover({ albumId, file }) {
+  if (!albumId?.trim()) {
+    return { ok: false, reason: 'MISSING_ALBUM_ID' }
+  }
+
+  const optimization = await optimizeAlbumCoverFile(file)
+  if (!optimization.ok) return { ok: false, ...optimization }
+
+  const coverFile = optimization.file
+  const path = buildAlbumCoverStoragePath(albumId, optimization.extension ?? 'webp')
+
+  const { data, error } = await supabase.storage.from(MARKER_ICONS_BUCKET).upload(path, coverFile, {
+    contentType: coverFile.type,
+    upsert: true,
+    cacheControl: '31536000',
+  })
+
+  if (error) {
+    return { ok: false, reason: error.message, error: summarizeUploadError(error), path }
+  }
+
+  const { data: publicData } = supabase.storage.from(MARKER_ICONS_BUCKET).getPublicUrl(path)
+  const publicUrl = publicData?.publicUrl
+    ? `${publicData.publicUrl}?v=${Date.now()}`
+    : null
+
+  if (!publicUrl) return { ok: false, reason: 'NO_PUBLIC_URL', path, data }
+
+  return { ok: true, path, publicUrl, data }
+}
+
+export async function deleteAlbumCoverStorage({ albumId, publicUrl = null }) {
+  const path =
+    extractMarkerIconsStoragePath(publicUrl) ??
+    buildAlbumCoverStoragePath(albumId, 'webp')
+
+  const pathsToTry = [path]
+  if (albumId) {
+    pathsToTry.push(buildAlbumCoverStoragePath(albumId, 'jpg'))
+  }
+
+  const uniquePaths = [...new Set(pathsToTry.filter(Boolean))]
+  const { error } = await supabase.storage.from(MARKER_ICONS_BUCKET).remove(uniquePaths)
+
+  if (error) {
+    return { ok: false, reason: error.message, error: summarizeUploadError(error) }
+  }
+
+  return { ok: true, paths: uniquePaths }
 }
 
 export function dataUrlToBlob(dataUrl) {

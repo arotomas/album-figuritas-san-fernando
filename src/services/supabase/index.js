@@ -21,13 +21,19 @@ export { isAdmin, isModeratorOrAdmin, isSuperAdmin, getProfileAccess } from './a
 export {
   uploadCapturePhoto,
   uploadMarkerIcon,
+  uploadFigureImageAsset,
+  uploadAlbumCover,
+  deleteAlbumCoverStorage,
   testStorageUpload,
   buildCaptureStoragePath,
   buildMarkerIconStoragePath,
+  buildAlbumCoverStoragePath,
   CAPTURES_BUCKET,
   MARKER_ICONS_BUCKET,
   MARKER_ICON_MAX_BYTES,
   MARKER_ICON_MIME_TYPES,
+  ALBUM_COVER_MIME_TYPES,
+  ALBUM_COVER_MAX_BYTES,
   STORAGE_BUCKET_MAX_BYTES,
 } from './storage'
 
