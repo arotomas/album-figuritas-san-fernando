@@ -34,6 +34,7 @@ import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
 import { getMapProximityHint } from '../utils/proximityExperience'
 import { startFigureExploration } from '../utils/startFigureExploration'
 import { ActiveAlbumSelector } from '../components/album/ActiveAlbumSelector'
+import { syncAlbumUniverse } from '../utils/albumUniverseSync'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -49,7 +50,7 @@ function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
     <div className="album-sticky-bar safe-x shrink-0">
       <div className="px-5 py-3.5 sm:px-6">
         <div className="mx-auto w-full max-w-[720px]">
-          <ActiveAlbumSelector className="mb-3" variant="album" />
+          <ActiveAlbumSelector className="mb-3" />
           <div className="flex items-center justify-between gap-3">
             <p className="text-[13px] font-bold tabular-nums text-ink">
               {mainProgress.obtained}
@@ -186,6 +187,8 @@ export function MyFiguresScreenInner() {
   useAlbumCollectionsBootstrap(true)
   const navigate = useNavigate()
   const { withQa } = useQaMode()
+  const activeAlbumId = useAppStore((state) => state.activeAlbumId)
+  const replaceCatalogFromRemote = useAppStore((state) => state.replaceCatalogFromRemote)
   const rawFigures = useAppStore((state) => state.figures)
   const albumStatus = useAppStore((state) => state.albumStatus)
   const lastObtenidaFigureId = useAppStore((state) => state.lastObtenidaFigureId)
@@ -251,6 +254,11 @@ export function MyFiguresScreenInner() {
       albumTrace('MyFiguresScreen unmount')
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!activeAlbumId || rawFigures.length > 0) return
+    void syncAlbumUniverse(activeAlbumId, replaceCatalogFromRemote)
+  }, [activeAlbumId, rawFigures.length, replaceCatalogFromRemote])
 
   useEffect(() => {
     if (!hasHydrated) {

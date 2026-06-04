@@ -24,11 +24,20 @@ export const ADMIN_HOME_PATH = '/admin/players'
 /** Destino por defecto del jugador. */
 export const PLAYER_HOME_PATH = '/map'
 
+/** Elección de álbum cuando hay más de un published. */
+export const ALBUM_SELECTION_PATH = '/choose-album'
+
+export function getPlayerHomePath(publishedAlbums = []) {
+  const albums = Array.isArray(publishedAlbums) ? publishedAlbums : []
+  if (albums.length > 1) return ALBUM_SELECTION_PATH
+  return PLAYER_HOME_PATH
+}
+
 /**
  * Ruta inicial tras login, OAuth o bootstrap según rol y perfil.
  * Todos los usuarios (incluido staff) entran al mapa; el panel admin solo con ?admin=1 o /admin.
  */
-export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
+export function getPostAuthPath({ profile, profileCompleted, search = '', publishedAlbums = [] }) {
   if (typeof window !== 'undefined') {
     syncQaFromUrl(search)
   }
@@ -47,7 +56,7 @@ export function getPostAuthPath({ profile, profileCompleted, search = '' }) {
     return withQaParam(ADMIN_HOME_PATH, qa)
   }
 
-  return withQaParam(PLAYER_HOME_PATH, qa)
+  return withQaParam(getPlayerHomePath(publishedAlbums), qa)
 }
 
 export function getPostAuthPathFromStore(state, search = '') {
@@ -55,5 +64,6 @@ export function getPostAuthPathFromStore(state, search = '') {
     profile: state.supabaseProfile,
     profileCompleted: state.profileCompleted,
     search,
+    publishedAlbums: state.publishedAlbums,
   })
 }

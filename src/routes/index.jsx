@@ -9,6 +9,8 @@ import { NotFoundRedirect } from './NotFoundRedirect'
 import { AdminRoute, AdminRoleGate } from './AdminRoute'
 import { PageSkeleton } from '../components/performance/AppSkeleton'
 import { MyFiguresRoute } from './MyFiguresRoute'
+import { AlbumSelectionRoute } from './AlbumSelectionRoute'
+import { RequireAlbumChoiceRoute } from './RequireAlbumChoiceRoute'
 import { RoutePipelineObserver } from './RoutePipelineObserver'
 import { routeTrace } from '../utils/capturePipelineTrace'
 
@@ -29,6 +31,11 @@ const ResetPasswordScreen = lazy(() =>
 )
 const MapScreen = lazy(() =>
   import('../pages/MapScreen').then((m) => ({ default: m.MapScreen })),
+)
+const AlbumSelectionScreen = lazy(() =>
+  import('../pages/AlbumSelectionScreen').then((m) => ({
+    default: m.AlbumSelectionScreen,
+  })),
 )
 const CaptureScreen = lazy(() =>
   import('../pages/CaptureScreen').then((m) => ({ default: m.CaptureScreen })),
@@ -195,11 +202,23 @@ export function AppRoutes() {
           }
         >
           <Route
+            path="/choose-album"
+            element={
+              <AlbumSelectionRoute>
+                <LazyPage label="choose-album">
+                  <AlbumSelectionScreen />
+                </LazyPage>
+              </AlbumSelectionRoute>
+            }
+          />
+          <Route
             path="/map"
             element={
-              <LazyPage>
-                <MapScreen />
-              </LazyPage>
+              <RequireAlbumChoiceRoute>
+                <LazyPage>
+                  <MapScreen />
+                </LazyPage>
+              </RequireAlbumChoiceRoute>
             }
           />
           <Route

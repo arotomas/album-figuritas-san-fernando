@@ -1,63 +1,27 @@
 import { useActiveAlbum } from '../../hooks/useActiveAlbum'
 
 /**
- * Selector de álbum producto (San Fernando, Histórico, etc.).
- * Solo visible si hay más de un álbum published.
+ * Selector de álbum en Mi Álbum (cambio entre álbumes published).
  */
-export function ActiveAlbumSelector({ className = '', variant = 'map' }) {
+export function ActiveAlbumSelector({ className = '' }) {
   const {
     publishedAlbums,
     activeAlbumId,
-    activeAlbum,
-    showSelector,
     albumUniverseLoading,
     switchActiveAlbum,
   } = useActiveAlbum()
 
-  if (!activeAlbum && publishedAlbums.length === 0) {
+  if (!Array.isArray(publishedAlbums) || publishedAlbums.length <= 1) {
     return null
   }
 
-  const baseClass =
-    variant === 'album'
-      ? 'rounded-xl border border-border/60 bg-warm-white/95 px-3 py-2 shadow-sm'
-      : 'rounded-xl border border-white/20 bg-charcoal/85 px-3 py-2 text-white shadow-lg backdrop-blur-md'
-
-  if (!showSelector) {
-    if (!activeAlbum?.title) return null
-    return (
-      <div className={`${baseClass} ${className}`.trim()} aria-live="polite">
-        <p
-          className={
-            variant === 'album'
-              ? 'text-[10px] font-bold uppercase tracking-wide text-muted'
-              : 'text-[10px] font-bold uppercase tracking-wide text-white/60'
-          }
-        >
-          Álbum
-        </p>
-        <p
-          className={
-            variant === 'album'
-              ? 'font-display text-sm font-bold text-ink'
-              : 'font-display text-sm font-bold text-white'
-          }
-        >
-          {activeAlbum.title}
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <div className={`${baseClass} ${className}`.trim()}>
+    <div
+      className={`rounded-xl border border-border/60 bg-warm-white/95 px-3 py-2 shadow-sm ${className}`.trim()}
+    >
       <label
         htmlFor="active-album-select"
-        className={
-          variant === 'album'
-            ? 'mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted'
-            : 'mb-1 block text-[10px] font-bold uppercase tracking-wide text-white/60'
-        }
+        className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted"
       >
         Álbum
       </label>
@@ -66,13 +30,9 @@ export function ActiveAlbumSelector({ className = '', variant = 'map' }) {
         value={activeAlbumId ?? ''}
         disabled={albumUniverseLoading}
         onChange={(event) => {
-          void switchActiveAlbum(event.target.value)
+          void switchActiveAlbum(event.target.value, { acknowledgeSession: true })
         }}
-        className={
-          variant === 'album'
-            ? 'w-full rounded-lg border border-border/70 bg-white px-2 py-1.5 font-display text-sm font-bold text-ink'
-            : 'w-full rounded-lg border border-white/25 bg-black/40 px-2 py-1.5 font-display text-sm font-bold text-white'
-        }
+        className="w-full rounded-lg border border-border/70 bg-white px-2 py-1.5 font-display text-sm font-bold text-ink"
         aria-busy={albumUniverseLoading}
       >
         {publishedAlbums.map((album) => (

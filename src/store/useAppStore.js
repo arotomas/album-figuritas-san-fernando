@@ -259,6 +259,7 @@ export const useAppStore = create(
       _figureProgressRecords: [],
       publishedAlbums: [],
       activeAlbumId: null,
+      albumSessionChosen: false,
       albumUniverseLoading: false,
     nearFigure: null,
     qaTestFigure: null,
@@ -311,6 +312,10 @@ export const useAppStore = create(
 
       setAlbumUniverseLoading: (value) => set({ albumUniverseLoading: Boolean(value) }),
 
+      acknowledgeAlbumSession: () => set({ albumSessionChosen: true }),
+
+      resetAlbumSessionChoice: () => set({ albumSessionChosen: false }),
+
       clearAuthState: () =>
         set({
           isAuthenticated: false,
@@ -325,6 +330,7 @@ export const useAppStore = create(
           supabaseProfileAddress: null,
           supabaseProfileLocalidad: null,
           supabaseProfile: null,
+          albumSessionChosen: false,
         }),
 
       setSupabaseAuth: ({
@@ -502,6 +508,7 @@ export const useAppStore = create(
         return set({
           isAuthenticated: true,
           profileCompleted,
+          albumSessionChosen: false,
           user: {
             username: trimmed,
             displayName: trimmed,
@@ -524,6 +531,7 @@ export const useAppStore = create(
           supabaseProfileAddress: null,
           supabaseProfileLocalidad: null,
           supabaseProfile: null,
+          albumSessionChosen: false,
           lastSavedAt: Date.now(),
         }),
 

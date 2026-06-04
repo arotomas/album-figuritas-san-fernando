@@ -12,6 +12,7 @@ export function useActiveAlbum() {
   const albumUniverseLoading = useAppStore((state) => state.albumUniverseLoading)
   const setActiveAlbumId = useAppStore((state) => state.setActiveAlbumId)
   const setAlbumUniverseLoading = useAppStore((state) => state.setAlbumUniverseLoading)
+  const acknowledgeAlbumSession = useAppStore((state) => state.acknowledgeAlbumSession)
   const replaceCatalogFromRemote = useAppStore((state) => state.replaceCatalogFromRemote)
 
   const activeAlbum = useMemo(
@@ -25,29 +26,58 @@ export function useActiveAlbum() {
   )
 
   const switchActiveAlbum = useCallback(
-    async (nextAlbumId) => {
-      if (!nextAlbumId || String(nextAlbumId) === String(activeAlbumId)) return
+    async (nextAlbumId, { acknowledgeSession = false, forceCatalogSync = false } = {}) => {
+      if (!nextAlbumId) return false
+
+      const nextId = String(nextAlbumId)
+      const sameAlbum = String(activeAlbumId) === nextId
+      const shouldSyncCatalog =
+        forceCatalogSync || !sameAlbum || useAppStore.getState().figures.length === 0
 
       setAlbumUniverseLoading(true)
-      setActiveAlbumId(String(nextAlbumId))
+      if (!sameAlbum) {
+        setActiveAlbumId(nextId)
+      }
 
       try {
-        await syncAlbumUniverse(String(nextAlbumId), replaceCatalogFromRemote)
-        useAppStore.setState({
-          nearFigure: null,
-          captureSession: null,
-          activeTargetFigureId: null,
+        if (shouldSyncCatalog) {
+          await syncAlbumUniverse(nextId, replaceCatalogFromRemote)
+          useAppStore.setState({
+            nearFigure: null,
+            captureSession: null,
+            activeTargetFigureId: null,
+          })
+        }
+        if (acknowledgeSession) {
+          acknowledgeAlbumSession()
+        }
+        return true
+      } catch (error) {
+        console.error('[active-album]', 'switch failed', {
+          albumId: nextId,
+          message: error?.message,
         })
+        return false
       } finally {
         setAlbumUniverseLoading(false)
       }
     },
     [
       activeAlbumId,
+      acknowledgeAlbumSession,
       replaceCatalogFromRemote,
       setActiveAlbumId,
       setAlbumUniverseLoading,
     ],
+  )
+
+  const playAlbum = useCallback(
+    (albumId) =>
+      switchActiveAlbum(albumId, {
+        acknowledgeSession: true,
+        forceCatalogSync: true,
+      }),
+    [switchActiveAlbum],
   )
 
   return {
@@ -57,5 +87,6 @@ export function useActiveAlbum() {
     showSelector,
     albumUniverseLoading,
     switchActiveAlbum,
+    playAlbum,
   }
 }

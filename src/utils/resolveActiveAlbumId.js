@@ -24,6 +24,11 @@ export function shouldShowAlbumSelector(publishedAlbums) {
   return Array.isArray(publishedAlbums) && publishedAlbums.length > 1
 }
 
+/** Pantalla inicial de elección (varios álbumes y aún no eligió en esta sesión). */
+export function needsAlbumSelectionScreen(publishedAlbums, albumSessionChosen = false) {
+  return shouldShowAlbumSelector(publishedAlbums) && !albumSessionChosen
+}
+
 export function getActiveAlbumMeta(publishedAlbums, activeAlbumId) {
   if (!activeAlbumId) return null
   return (
