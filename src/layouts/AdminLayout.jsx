@@ -7,6 +7,7 @@ import { hasMinimumRole } from '../utils/roles'
 const NAV_ITEMS = [
   { to: '/admin', end: true, label: 'Dashboard', minRole: 'admin' },
   { to: '/admin/players', label: 'Jugadores', minRole: 'moderator' },
+  { to: '/admin/albums', label: 'Álbumes', minRole: 'admin' },
   { to: '/admin/figures', label: 'Figuritas', minRole: 'admin' },
   { to: '/admin/collections', label: 'Colecciones', minRole: 'admin' },
   { to: '/admin/events', label: 'Eventos', minRole: 'admin' },
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
 const PAGE_TITLES = {
   '/admin': 'Dashboard',
   '/admin/players': 'Jugadores',
+  '/admin/albums': 'Álbumes',
   '/admin/figures': 'Figuritas',
   '/admin/collections': 'Colecciones',
   '/admin/events': 'Eventos',

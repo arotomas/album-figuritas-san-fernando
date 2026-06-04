@@ -77,4 +77,15 @@ export { fetchPlayerRanking } from './ranking'
 
 export { fetchMyPoints } from './playerPoints'
 
+export { fetchPublishedAlbums, normalizePublishedAlbum } from './albums'
+
+export {
+  fetchAlbumsAdmin,
+  createAlbumAdmin,
+  updateAlbumAdmin,
+  toggleAlbumActive,
+  updateAlbumStatus,
+  setDefaultAlbum,
+} from './albumsAdmin'
+
 export { resetMyProgressRemote } from './playerProgressReset'
