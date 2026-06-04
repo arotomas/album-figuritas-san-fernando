@@ -9,6 +9,9 @@ import { countAlbumProgressFromMemberships } from '../utils/albumSelectionProgre
 import { useQaMode } from '../utils/qaMode'
 import { PLAYER_HOME_PATH } from '../utils/postAuthRedirect'
 
+/** Mismo inset horizontal que las cards (alineado con el contenido de AppLayout). */
+const ALBUM_SELECTION_GUTTER = 'px-5 sm:px-6'
+
 function AlbumCover({ album }) {
   const src = album?.coverImage
   if (src) {
@@ -158,25 +161,27 @@ export function AlbumSelectionScreen() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-white">
-      <div className="safe-x mx-auto w-full max-w-lg flex-1 px-5 py-5 sm:px-6 sm:py-6">
-        <header className="mb-5 sm:mb-6">
-          <h1 className="font-display text-xl font-bold text-ink">Elegí tu álbum</h1>
-          <p className="mt-1 font-body text-sm text-muted">
-            Cada álbum tiene su mapa y figuritas. Tu progreso en figuritas compartidas se
-            mantiene entre álbumes.
-          </p>
-        </header>
+      <div className="safe-x mx-auto flex w-full max-w-lg flex-1 flex-col py-5 sm:py-6">
+        <div className={`flex min-h-0 flex-1 flex-col gap-5 sm:gap-6 ${ALBUM_SELECTION_GUTTER}`}>
+          <header>
+            <h1 className="font-display text-xl font-bold text-ink">Elegí tu álbum</h1>
+            <p className="mt-1 font-body text-sm text-muted">
+              Cada álbum tiene su mapa y figuritas. Tu progreso en figuritas compartidas se
+              mantiene entre álbumes.
+            </p>
+          </header>
 
-        <div className="flex flex-col gap-4 sm:gap-5">
-          {publishedAlbums.map((album) => (
-            <AlbumSelectionCard
-              key={album.id}
-              album={album}
-              progress={progressByAlbumId[album.id] ?? { obtained: 0, total: 0 }}
-              loading={albumUniverseLoading || loadingProgress}
-              onPlay={handlePlay}
-            />
-          ))}
+          <div className="flex flex-col gap-4 sm:gap-5">
+            {publishedAlbums.map((album) => (
+              <AlbumSelectionCard
+                key={album.id}
+                album={album}
+                progress={progressByAlbumId[album.id] ?? { obtained: 0, total: 0 }}
+                loading={albumUniverseLoading || loadingProgress}
+                onPlay={handlePlay}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
