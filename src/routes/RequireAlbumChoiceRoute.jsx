@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore'
 import { needsAlbumSelectionScreen } from '../utils/resolveActiveAlbumId'
 import { ALBUM_SELECTION_PATH } from '../utils/postAuthRedirect'
 
-/** Bloquea /map hasta elegir álbum cuando hay varios published. */
+/** Bloquea /map hasta elegir álbum en esta sesión (1 o N published). */
 export function RequireAlbumChoiceRoute({ children }) {
   const publishedAlbums = useAppStore((state) => state.publishedAlbums)
   const albumSessionChosen = useAppStore((state) => state.albumSessionChosen)

@@ -53,7 +53,6 @@ export async function bootstrapAlbumUniverse({
   setAlbumState,
 }) {
   const publishedAlbums = await fetchPublishedAlbums()
-  const multiAlbum = publishedAlbums.length > 1
   const activeAlbumId = resolveActiveAlbumId(publishedAlbums, preferredAlbumId)
 
   setAlbumState?.({ publishedAlbums, activeAlbumId })
@@ -63,9 +62,9 @@ export async function bootstrapAlbumUniverse({
     return { publishedAlbums, activeAlbumId: null, catalogCount: 0 }
   }
 
-  if (multiAlbum) {
+  if (publishedAlbums.length >= 1) {
     replaceCatalogFromRemote([])
-    console.info('[album-universe]', 'bootstrap deferred catalog (multi-album)', {
+    console.info('[album-universe]', 'bootstrap deferred catalog (album gate)', {
       activeAlbumId,
       publishedCount: publishedAlbums.length,
     })

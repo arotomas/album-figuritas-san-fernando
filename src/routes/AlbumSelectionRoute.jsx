@@ -1,17 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom'
-import { useAppStore } from '../store/useAppStore'
-import { PLAYER_HOME_PATH } from '../utils/postAuthRedirect'
-
-/** Un solo álbum published → ir directo al mapa. */
+/** Siempre muestra la pantalla de elección (1 o N álbumes); vacío se maneja en la screen. */
 export function AlbumSelectionRoute({ children }) {
-  const publishedAlbums = useAppStore((state) => state.publishedAlbums)
-  const location = useLocation()
-
-  if (!Array.isArray(publishedAlbums) || publishedAlbums.length <= 1) {
-    return (
-      <Navigate to={`${PLAYER_HOME_PATH}${location.search}`} replace />
-    )
-  }
-
   return children
 }

@@ -24,12 +24,12 @@ export const ADMIN_HOME_PATH = '/admin/players'
 /** Destino por defecto del jugador. */
 export const PLAYER_HOME_PATH = '/map'
 
-/** Elección de álbum cuando hay más de un published. */
+/** Puerta de entrada: elección consciente del álbum/recorrido. */
 export const ALBUM_SELECTION_PATH = '/choose-album'
 
 export function getPlayerHomePath(publishedAlbums = []) {
   const albums = Array.isArray(publishedAlbums) ? publishedAlbums : []
-  if (albums.length > 1) return ALBUM_SELECTION_PATH
+  if (albums.length >= 1) return ALBUM_SELECTION_PATH
   return PLAYER_HOME_PATH
 }
 

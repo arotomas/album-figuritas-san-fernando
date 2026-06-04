@@ -171,17 +171,32 @@ export function AlbumSelectionScreen() {
             </p>
           </header>
 
-          <div className="flex flex-col gap-4 sm:gap-5">
-            {publishedAlbums.map((album) => (
-              <AlbumSelectionCard
-                key={album.id}
-                album={album}
-                progress={progressByAlbumId[album.id] ?? { obtained: 0, total: 0 }}
-                loading={albumUniverseLoading || loadingProgress}
-                onPlay={handlePlay}
-              />
-            ))}
-          </div>
+          {publishedAlbums.length === 0 ? (
+            <div
+              className="rounded-2xl border border-border/70 bg-warm-white px-4 py-8 text-center shadow-sm"
+              role="status"
+            >
+              <p className="font-display text-base font-bold text-ink">
+                No hay álbumes disponibles
+              </p>
+              <p className="mt-2 font-body text-sm text-muted">
+                En este momento no hay recorridos publicados para jugar. Probá de nuevo más tarde
+                o contactá al municipio si el problema continúa.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 sm:gap-5">
+              {publishedAlbums.map((album) => (
+                <AlbumSelectionCard
+                  key={album.id}
+                  album={album}
+                  progress={progressByAlbumId[album.id] ?? { obtained: 0, total: 0 }}
+                  loading={albumUniverseLoading || loadingProgress}
+                  onPlay={handlePlay}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
