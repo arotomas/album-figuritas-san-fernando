@@ -16,7 +16,7 @@ function AlbumCover({ album }) {
       <img
         src={src}
         alt=""
-        className="h-full w-full object-cover"
+        className="h-full w-full rounded-xl object-cover"
         loading="lazy"
         decoding="async"
       />
@@ -24,8 +24,8 @@ function AlbumCover({ album }) {
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-surface px-2 text-center">
-      <span className="font-body text-[11px] leading-snug text-muted">
+    <div className="flex h-full min-h-[5.5rem] w-full items-center justify-center rounded-xl bg-surface/90 px-3 py-4 text-center">
+      <span className="font-body text-[10px] leading-snug text-muted sm:text-[11px]">
         Foto destacada del álbum
       </span>
     </div>
@@ -51,20 +51,22 @@ function AlbumSelectionCard({ album, progress, loading, onPlay }) {
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border/70 bg-warm-white shadow-[0_4px_18px_rgba(17,17,19,0.06)]">
-      <div className="flex min-h-[7.5rem]">
-        <div className="w-[34%] shrink-0 border-r border-border/50 bg-surface">
-          <AlbumCover album={album} />
+      <div className="flex min-h-[8rem]">
+        <div className="w-[30%] max-w-[7.25rem] shrink-0 border-r border-border/40 bg-surface p-3 sm:p-4">
+          <div className="h-full min-h-[5.5rem] overflow-hidden">
+            <AlbumCover album={album} />
+          </div>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2.5 px-3 py-3 sm:px-4">
-          <div className="min-w-0 pr-1">
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 py-4 pl-4 pr-4 sm:gap-3.5 sm:py-4 sm:pl-5 sm:pr-5">
+          <div className="min-w-0">
             <h2 className="font-display text-lg font-bold leading-tight text-ink">
               {album.title}
             </h2>
-            <p className="mt-1 font-body text-sm leading-snug text-muted line-clamp-2">
+            <p className="mt-1.5 font-body text-sm leading-snug text-muted line-clamp-2">
               {description}
             </p>
           </div>
-          <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <AlbumProgressLine obtained={progress.obtained} total={progress.total} />
             <Button
               type="button"
