@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { FaXmark } from 'react-icons/fa6'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Button } from '../Button'
 import { usePwaInstall } from '../../hooks/usePwaInstall'
 import { InstallAppInstructions } from './InstallAppInstructions'
@@ -23,7 +23,13 @@ function writeDismissed() {
   }
 }
 
+function isMapPlayerRoute(pathname = '') {
+  const path = String(pathname).split('?')[0]
+  return path === '/map' || path.endsWith('/map')
+}
+
 export function PwaInstallBanner() {
+  const location = useLocation()
   const {
     isInstalled,
     isIos,
@@ -47,6 +53,7 @@ export function PwaInstallBanner() {
     await promptInstall()
   }, [promptInstall])
 
+  if (!isMapPlayerRoute(location.pathname)) return null
   if (isInstalled || !showInstallCta) return null
   if (dismissed && !isInAppBrowser) return null
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
+import { FigureStickerIcon } from '../components/album/FigureStickerIcon'
 import { useActiveAlbum } from '../hooks/useActiveAlbum'
 import { useAppStore } from '../store/useAppStore'
 import { fetchAlbumFigureMemberships } from '../services/supabase/albumFigures'
@@ -31,6 +32,17 @@ function AlbumCover({ album }) {
   )
 }
 
+function AlbumProgressLine({ obtained, total }) {
+  return (
+    <p className="flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-[11px] font-bold leading-none tabular-nums text-ink sm:text-xs">
+      <FigureStickerIcon className="h-4 w-4 opacity-90" />
+      <span className="min-w-0 truncate">
+        {obtained} / {total} figuritas
+      </span>
+    </p>
+  )
+}
+
 function AlbumSelectionCard({ album, progress, loading, onPlay }) {
   const description =
     album.description?.trim() ||
@@ -43,8 +55,8 @@ function AlbumSelectionCard({ album, progress, loading, onPlay }) {
         <div className="w-[34%] shrink-0 border-r border-border/50 bg-surface">
           <AlbumCover album={album} />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 px-4 py-3">
-          <div>
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2.5 px-3 py-3 sm:px-4">
+          <div className="min-w-0 pr-1">
             <h2 className="font-display text-lg font-bold leading-tight text-ink">
               {album.title}
             </h2>
@@ -52,15 +64,13 @@ function AlbumSelectionCard({ album, progress, loading, onPlay }) {
               {description}
             </p>
           </div>
-          <div className="flex items-end justify-between gap-3">
-            <p className="text-sm font-bold tabular-nums text-ink">
-              {progress.obtained}
-              <span className="font-normal text-muted"> / {progress.total}</span>
-            </p>
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <AlbumProgressLine obtained={progress.obtained} total={progress.total} />
             <Button
               type="button"
+              variant="progress"
               size="sm"
-              className="shrink-0 px-4"
+              className="!w-auto shrink-0 px-4 py-2 text-xs sm:text-sm"
               disabled={loading}
               onClick={() => onPlay(album.id)}
             >
@@ -146,8 +156,8 @@ export function AlbumSelectionScreen() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-white">
-      <div className="safe-x mx-auto w-full max-w-lg flex-1 px-4 py-5">
-        <header className="mb-5">
+      <div className="safe-x mx-auto w-full max-w-lg flex-1 px-5 py-5 sm:px-6 sm:py-6">
+        <header className="mb-5 sm:mb-6">
           <h1 className="font-display text-xl font-bold text-ink">Elegí tu álbum</h1>
           <p className="mt-1 font-body text-sm text-muted">
             Cada álbum tiene su mapa y figuritas. Tu progreso en figuritas compartidas se
@@ -155,7 +165,7 @@ export function AlbumSelectionScreen() {
           </p>
         </header>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:gap-5">
           {publishedAlbums.map((album) => (
             <AlbumSelectionCard
               key={album.id}
