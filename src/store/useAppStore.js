@@ -41,6 +41,7 @@ import {
 } from '../config/audio'
 import { stopAllGameSounds } from '../services/audio'
 import { usePlayerPointsStore } from './usePlayerPointsStore'
+import { persistLog } from '../utils/persistLog'
 
 export { QA_TEST_FIGURE_ID_PREFIX }
 
