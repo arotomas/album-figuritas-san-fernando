@@ -1005,16 +1005,25 @@ export const useAppStore = create(
 
         set({ progressResetInFlight: true })
 
-        let remoteSkipped = true
+        const requiresRemoteReset =
+          Boolean(state.supabaseUserId) && isSupabaseConfigured()
+        let remoteSkipped = !requiresRemoteReset
 
         try {
-          if (state.supabaseReady && isSupabaseConfigured()) {
-            const remote = await syncResetUserProgressToSupabase()
-            if (!remote.ok && !remote.skipped) {
-              throw new Error(remote.reason ?? 'REMOTE_RESET_FAILED')
+          if (requiresRemoteReset) {
+            if (!state.supabaseReady) {
+              throw new Error('SUPABASE_NOT_READY')
             }
 
-            remoteSkipped = Boolean(remote.skipped)
+            const remote = await syncResetUserProgressToSupabase()
+            if (!remote.ok) {
+              throw new Error(remote.reason ?? 'REMOTE_RESET_FAILED')
+            }
+            if (remote.skipped) {
+              throw new Error('REMOTE_RESET_SKIPPED')
+            }
+
+            remoteSkipped = false
 
             if (import.meta.env.DEV) {
               console.info('[RESET] remote complete', remote)
@@ -1026,7 +1035,7 @@ export const useAppStore = create(
 
           const pointsStore = usePlayerPointsStore.getState()
           pointsStore.resetPlayerPoints()
-          if (!remoteSkipped) {
+          if (requiresRemoteReset) {
             await pointsStore.refreshPlayerPoints()
           }
           notifyPlayerProgressReset({ remoteSkipped })

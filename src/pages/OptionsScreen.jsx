@@ -85,9 +85,11 @@ export function OptionsScreen() {
 
     setResetPhase('error')
     setResetError(
-      result.reason === 'REMOTE_RESET_FAILED' || result.reason?.includes('policy')
-        ? 'No pudimos borrar tu progreso en el servidor. Probá de nuevo en unos segundos.'
-        : 'No pudimos reiniciar tu progreso. Probá de nuevo.',
+      result.reason === 'SUPABASE_NOT_READY' || result.reason === 'REMOTE_RESET_SKIPPED'
+        ? 'Tu sesión aún no está lista. Esperá unos segundos y probá de nuevo.'
+        : result.reason === 'REMOTE_RESET_FAILED' || result.reason?.includes('policy')
+          ? 'No pudimos borrar tu progreso en el servidor. Probá de nuevo en unos segundos.'
+          : 'No pudimos reiniciar tu progreso. Probá de nuevo.',
     )
   }
 
