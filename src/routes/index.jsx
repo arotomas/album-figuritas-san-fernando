@@ -63,9 +63,6 @@ const AdminAlbumFiguresPage = lazy(() =>
     default: m.AdminAlbumFiguresPage,
   })),
 )
-const AdminEventsPage = lazy(() =>
-  import('../pages/admin/AdminEventsPage').then((m) => ({ default: m.AdminEventsPage })),
-)
 const AdminCapturesPage = lazy(() =>
   import('../pages/admin/AdminCapturesPage').then((m) => ({ default: m.AdminCapturesPage })),
 )
@@ -309,13 +306,7 @@ export function AppRoutes() {
           />
           <Route
             path="events"
-            element={
-              <AdminRoleGate minRole="admin">
-                <LazyPage>
-                  <AdminEventsPage />
-                </LazyPage>
-              </AdminRoleGate>
-            }
+            element={<Navigate to="/admin/albums" replace />}
           />
           <Route
             path="captures"
