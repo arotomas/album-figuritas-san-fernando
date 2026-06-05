@@ -16,6 +16,30 @@ const EMPTY_VIEW = {
   globalProgress: null,
   mainProgress: { obtained: 0, total: 0, visibleTotal: 0, normalFigures: [] },
   mainFigures: [],
+  flatAlbumFigures: [],
+}
+
+function sortAlbumFiguresForDisplay(figures) {
+  return [...(Array.isArray(figures) ? figures : [])].sort((a, b) => {
+    const sortA = Number(a.album_sort_order)
+    const sortB = Number(b.album_sort_order)
+    const hasSortA = Number.isFinite(sortA)
+    const hasSortB = Number.isFinite(sortB)
+    if (hasSortA && hasSortB && sortA !== sortB) return sortA - sortB
+    if (hasSortA !== hasSortB) return hasSortA ? -1 : 1
+
+    const slotA = Number(a.album_slot_number)
+    const slotB = Number(b.album_slot_number)
+    const hasSlotA = Number.isFinite(slotA)
+    const hasSlotB = Number.isFinite(slotB)
+    if (hasSlotA && hasSlotB && slotA !== slotB) return slotA - slotB
+    if (hasSlotA !== hasSlotB) return hasSlotA ? -1 : 1
+
+    const orderA = Number(a.unlock_order) || Number.MAX_SAFE_INTEGER
+    const orderB = Number(b.unlock_order) || Number.MAX_SAFE_INTEGER
+    if (orderA !== orderB) return orderA - orderB
+    return String(a.id).localeCompare(String(b.id), 'es')
+  })
 }
 
 function dedupeFiguresById(figures) {
@@ -52,9 +76,12 @@ export function buildAlbumViewModel(sanitizedFigures, availabilityOptions) {
     const mainProgress = getMainProgressState(sanitizedFigures)
     const mainFigures = getRevealedNormalFigures(sanitizedFigures)
 
+    const revealedFigures = getRevealedNormalFigures(sanitizedFigures)
+
     return {
       mainProgress,
       mainFigures,
+      flatAlbumFigures: dedupeFiguresById(sortAlbumFiguresForDisplay(revealedFigures)),
       mainCollectionGroups: sanitizeGroups(
         getMainAlbumCollectionGroups(sanitizedFigures, availabilityOptions),
       ),
