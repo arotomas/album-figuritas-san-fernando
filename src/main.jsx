@@ -7,6 +7,7 @@ import { syncQaFromUrl } from './qa/qaCore'
 import './lib/supabase.js'
 import './styles/index.css'
 import { bootLog, bootWarn } from './utils/bootLog.js'
+import { scheduleStaticSplashFallback } from './utils/staticSplash.js'
 import { initAppUpdateRecovery } from './utils/appUpdateRecovery.js'
 import { initPwaInstallCapture } from './utils/pwaInstallController.js'
 import { useExplorationStore } from './store/explorationStore.js'
@@ -15,6 +16,7 @@ import { initPushForegroundListener } from './services/push/pushForeground.js'
 import { soundService } from './services/audio/index.js'
 
 bootLog('main entry')
+scheduleStaticSplashFallback()
 try {
   useExplorationStore.getState().stopExploration()
 } catch (error) {

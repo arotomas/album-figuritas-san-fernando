@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { LazyMotion, domAnimation, m } from 'framer-motion'
 import { SPLASH_EXIT_FADE_MS, SPLASH_MIN_DISPLAY_MS } from '../../config/splash'
+import { dismissStaticSplash } from '../../utils/staticSplash'
 import { motion as motionTokens } from '../../theme/motion'
 
 /** Arte institucional completo (diseño BASE) — sin overlays ni logos extra. */
 const SPLASH_ARTWORK = '/assets/splash/splash-screen.png'
-
-const introTransition = {
-  duration: 1.2,
-  ease: [0.22, 1, 0.36, 1],
-}
 
 const exitTransition = {
   duration: SPLASH_EXIT_FADE_MS / 1000,
@@ -22,6 +18,7 @@ export function SplashScreen({ onComplete }) {
   const completedRef = useRef(false)
 
   useEffect(() => {
+    dismissStaticSplash()
     const minTimer = window.setTimeout(() => setCanContinue(true), SPLASH_MIN_DISPLAY_MS)
     return () => window.clearTimeout(minTimer)
   }, [])
@@ -41,12 +38,12 @@ export function SplashScreen({ onComplete }) {
     <LazyMotion features={domAnimation} strict>
       <m.div
         className="splash-screen fixed inset-0 z-[9000] flex min-h-0 flex-col overflow-hidden bg-[#8cc63f]"
-        initial={{ opacity: 0, scale: 0.98 }}
+        initial={{ opacity: 1, scale: 1 }}
         animate={{
           opacity: isExiting ? 0 : 1,
-          scale: isExiting ? 1 : 1,
+          scale: 1,
         }}
-        transition={isExiting ? exitTransition : introTransition}
+        transition={isExiting ? exitTransition : { duration: 0 }}
         onAnimationComplete={handleExitComplete}
         aria-hidden={isExiting}
       >

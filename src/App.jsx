@@ -13,6 +13,7 @@ import { ConnectionStatus } from './components/qa/ConnectionStatus'
 import { QaDevShell } from './components/qa/QaDevShell'
 import { useAppBootGate } from './hooks/useAppBootGate'
 import { isAdminExperiencePath } from './utils/postAuthRedirect'
+import { dismissStaticSplash } from './utils/staticSplash'
 import { useAppStore } from './store/useAppStore'
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
   useEffect(() => {
     if (isAdminExperience) {
       setSplashComplete(true)
+      dismissStaticSplash()
     }
   }, [isAdminExperience])
 
