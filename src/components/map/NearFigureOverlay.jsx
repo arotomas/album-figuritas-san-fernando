@@ -30,13 +30,13 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
             </span>
           </div>
         )}
-        <div className="border-b border-white/8 px-4 py-3.5">
-          <p className={`${typeClasses.label} text-center ${isBonus ? 'text-amber-100' : 'text-progress'}`}>
+        <div className="border-b border-white/8 px-4 py-4">
+          <p className={`${typeClasses.micro} text-center ${isBonus ? 'text-amber-100/90' : 'text-progress/90'}`}>
             {hint}
           </p>
-          <p className="mt-1.5 text-center font-body text-xs text-white/50">
+          <h2 className="mt-2 line-clamp-2 text-center font-display text-xl font-black uppercase leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:text-2xl">
             {nearFigure.nombre}
-          </p>
+          </h2>
         </div>
 
         <div className="p-4">

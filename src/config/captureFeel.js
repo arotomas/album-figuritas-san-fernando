@@ -12,6 +12,12 @@ export const READY_SNAP_MS = 120
 /** Duración total unlock screen (ms). */
 export const UNLOCK_SEQUENCE_MS = 3000
 
+/** Recompensa fullscreen post-captura (ms). */
+export const FULLSCREEN_REWARD_MS = {
+  full: { hold: 3200 },
+  reduced: { hold: 1800 },
+}
+
 /** Card reveal — stagger cinematográfico (ms desde inicio). */
 export const REWARD_TIMINGS = {
   full: {

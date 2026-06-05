@@ -5,14 +5,12 @@ import { useAppStore, ALBUM_STATUS } from '../store/useAppStore'
 import { AlbumBackground } from '../components/album/AlbumBackground'
 import { AlbumScreenSkeleton } from '../components/album/AlbumFigureSkeleton'
 import { LockedFigureCard } from '../components/album/LockedFigureCard'
-import { NewBadge } from '../components/album/NewBadge'
 import { FigureDetailSheet } from '../components/album/FigureDetailSheet'
 import { FigureCollectionViewer } from '../components/album/FigureCollectionViewer'
 import { CollectionCompleteAnimation } from '../components/album/CollectionCompleteAnimation'
 import { CollectionDiscoverAnimation } from '../components/album/CollectionDiscoverAnimation'
 import { RarityBadge } from '../components/ui/RarityBadge'
 import { useQaMode } from '../utils/qaMode'
-import { getRarity } from '../theme/rarity'
 import { vibrateAlbumSwipe } from '../utils/vibration'
 import {
   myFiguresLog,
@@ -30,7 +28,6 @@ import { useCollectionAvailabilityOptions } from '../hooks/useCollectionAvailabi
 import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
 import { getMapProximityHint } from '../utils/proximityExperience'
 import { startFigureExploration } from '../utils/startFigureExploration'
-import { ActiveAlbumSelector } from '../components/album/ActiveAlbumSelector'
 import { syncAlbumUniverse } from '../utils/albumUniverseSync'
 
 const STATUS_LABELS = {
@@ -47,13 +44,12 @@ function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
     <div className="album-sticky-bar safe-x shrink-0">
       <div className="px-5 py-3.5 sm:px-6">
         <div className="mx-auto w-full max-w-[720px]">
-          <ActiveAlbumSelector className="mb-3" />
           <div className="flex items-center justify-between gap-3">
             <p className="text-[13px] font-bold tabular-nums text-ink">
               {mainProgress.obtained}
               <span className="font-normal text-muted"> / {mainProgress.total}</span>
             </p>
-            <span className="shrink-0 rounded-full bg-black/[0.04] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted">
+            <span className="shrink-0 rounded-full bg-progress/12 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-progress-dark">
               {STATUS_LABELS[albumStatus] ?? albumStatus}
             </span>
           </div>
@@ -83,7 +79,7 @@ function AlbumStickyBar({ mainProgress, albumStatus, missionLine }) {
   )
 }
 
-function AlbumSlotCard({ figure, isNew, onSelect }) {
+function AlbumSlotCard({ figure, onSelect }) {
   if (!figure?.id || !figure?.nombre) {
     albumTraceWarn('figure render skipped — invalid slot', {
       figureId: figure?.id ?? null,
@@ -92,7 +88,6 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
     return null
   }
 
-  const rarity = getRarity(figure?.rareza)
   const obtained = Boolean(figure.obtenida)
   const isBonus = Boolean(figure.is_bonus)
   const photo = figure.foto
@@ -103,76 +98,55 @@ function AlbumSlotCard({ figure, isNew, onSelect }) {
       layout={false}
       whileTap={{ scale: 0.97 }}
       onClick={() => onSelect(figure.id)}
-      className={`album-slot-card ${obtained ? 'album-slot-obtained' : 'album-slot-locked'} ${
+      className={`album-slot-card ${obtained ? 'album-slot-obtained border-progress' : 'album-slot-locked border-[#DADDE3]'} ${
         isBonus ? 'album-slot-bonus' : ''
-      } relative overflow-hidden rounded-[1.35rem] border-2 text-left ${rarity.tailwind.border}`}
-      style={{
-        boxShadow: obtained
-          ? `0 12px 28px rgba(17,17,19,0.14), ${rarity.cssGlow}`
-          : undefined,
-      }}
+      } relative block w-full overflow-hidden rounded-[1.35rem] border-2 p-0 text-left`}
     >
-      <div className={`h-1 w-full ${rarity.tailwind.accent}`} />
-
       {obtained ? (
         <>
-          <div className={`relative bg-gradient-to-b ${rarity.tailwind.gradient}`}>
-            <div className="absolute left-2 top-2 z-20">
-              <RarityBadge rareza={figure.rareza} size="sm" />
-            </div>
-            {isNew && (
-              <span className="absolute right-2 top-2 z-20">
-                <NewBadge />
-              </span>
+          <div className="album-slot-media">
+            {photo ? (
+              <img
+                src={photo}
+                alt={figure.nombre}
+                loading="lazy"
+                decoding="async"
+                className="album-slot-media-image"
+                onError={(event) => {
+                  myFiguresLog.warn('missing photo fallback', {
+                    figureId: figure.id,
+                    reason: 'grid-image-load-error',
+                    src: photo,
+                  })
+                  event.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="album-slot-media-fallback">{figure.emoji}</div>
             )}
-            <div className="relative aspect-[3/4] p-2.5">
-              <div className={`h-full overflow-hidden rounded-2xl border ${rarity.tailwind.border} bg-black/25 p-1`}>
-                {photo ? (
-                  <img
-                    src={photo}
-                    alt={figure.nombre}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full rounded-xl object-cover"
-                    onError={(event) => {
-                      myFiguresLog.warn('missing photo fallback', {
-                        figureId: figure.id,
-                        reason: 'grid-image-load-error',
-                        src: photo,
-                      })
-                      event.currentTarget.style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center rounded-xl bg-charcoal text-4xl">
-                    {figure.emoji}
-                  </div>
-                )}
-              </div>
+            <div className="album-slot-badges">
+              <RarityBadge rareza={figure.rareza} size="sm" variant="album" />
             </div>
           </div>
-          <div className="bg-white/95 px-3 pb-3 pt-2">
-            <p className="line-clamp-2 min-h-[2rem] font-display text-sm font-black leading-tight text-ink">
+          <div className="album-slot-footer border-t border-[#DADDE3] bg-white px-3 pb-3 pt-2">
+            <p className="line-clamp-2 min-h-[2rem] font-display text-sm font-black leading-tight text-[#111827]">
               {figure.nombre}
             </p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-muted">
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-progress">
               Descubierta
             </p>
           </div>
         </>
       ) : (
         <>
-          <LockedFigureCard figure={figure} variant="thumb" className="rounded-none" />
-          <div className="bg-charcoal px-3 pb-3 pt-2">
-            <p className="line-clamp-2 font-display text-sm font-black leading-tight text-white/90">
+          <LockedFigureCard figure={figure} variant="thumb" className="rounded-none border-0" />
+          <div className="border-t border-[#DADDE3] bg-[#F3F4F6] px-3 pb-3 pt-2">
+            <p className="line-clamp-2 font-display text-sm font-black leading-tight text-[#111827]">
               {figure.nombre}
             </p>
-            <p className="mt-1 text-[10px] leading-4 text-white/45">
+            <p className="mt-1 text-[10px] leading-4 text-muted">
               {isBonus ? 'Bonus · sin capturar' : 'Sin capturar'}
             </p>
-            <div className="mt-2 opacity-75">
-              <RarityBadge rareza={figure.rareza} size="sm" />
-            </div>
           </div>
         </>
       )}
@@ -502,7 +476,6 @@ export function MyFiguresScreenInner() {
               <AlbumSlotCard
                 key={String(figure.id)}
                 figure={figure}
-                isNew={figure.obtenida && figure.id === lastObtenidaFigureId}
                 onSelect={handleSelect}
               />
             ))}

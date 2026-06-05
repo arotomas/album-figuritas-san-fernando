@@ -1103,6 +1103,7 @@ export function useCaptureFlow({
     })
     captureLog.processingStart({ figureId: figureSnapshot.id, source: 'video' })
     vibrateCapture()
+    playGameSound('CAMERA_SHUTTER')
 
     startProcessingGuard((timeoutError) => {
       handleRecoverableError(timeoutError, { figureId: figureSnapshot?.id, source: 'timeout' })
@@ -1214,6 +1215,7 @@ export function useCaptureFlow({
         size: file.size,
       })
       vibrateCapture()
+      playGameSound('CAMERA_SHUTTER')
 
       startProcessingGuard((timeoutError) => {
         handleRecoverableError(timeoutError, {

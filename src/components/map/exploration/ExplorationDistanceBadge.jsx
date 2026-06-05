@@ -18,7 +18,7 @@ function ExplorationDistanceBadgeInner({
     <AnimatePresence>
       {visible && (
         <m.div
-          className="safe-top pointer-events-none absolute inset-x-0 top-[4.5rem] z-[600] flex justify-center px-5"
+          className="safe-top pointer-events-none absolute inset-x-0 top-[5.75rem] z-[600] flex justify-center px-5"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
@@ -26,21 +26,23 @@ function ExplorationDistanceBadgeInner({
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex max-w-sm items-center gap-3 rounded-full border border-progress/30 bg-zinc-950/82 px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="pointer-events-auto flex max-w-sm items-center gap-3 rounded-2xl border border-progress/30 bg-zinc-950/88 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md">
             <div className="min-w-0 flex-1 text-center sm:text-left">
-              <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-progress/90">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-progress/90">
                 Modo exploración
               </p>
+              {targetName && (
+                <p className="mt-1 line-clamp-2 font-display text-base font-black uppercase leading-tight tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)] sm:text-lg">
+                  {targetName}
+                </p>
+              )}
               <p
-                className={`mt-0.5 font-display text-sm font-bold leading-snug ${
-                  hasUserLocation ? 'text-white' : 'text-amber-100'
+                className={`mt-1 text-xs font-semibold ${
+                  hasUserLocation ? 'text-white/75' : 'text-amber-100'
                 }`}
               >
                 {distanceLabel}
               </p>
-              {targetName && (
-                <p className="truncate text-[11px] text-white/55">{targetName}</p>
-              )}
             </div>
             <button
               type="button"

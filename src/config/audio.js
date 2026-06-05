@@ -23,6 +23,13 @@ export const SOUND_CATALOG = {
     volume: 0.55,
     description: 'Entrada al radio de detección de una figurita.',
   },
+  camera_shutter: {
+    id: 'camera_shutter',
+    src: '/assets/sounds/camera-shutter.mp3',
+    preload: true,
+    volume: 0.85,
+    description: 'Disparo de cámara al capturar la foto.',
+  },
   captura_exitosa: {
     id: 'captura_exitosa',
     src: '/sounds/captura-exitosa.mp3',
@@ -77,6 +84,7 @@ export const SOUND_CATALOG = {
 /** Eventos de juego → id de sonido en SOUND_CATALOG. */
 export const GAME_SOUND_EVENTS = {
   FIGURITA_DETECTADA: 'figurita_detectada',
+  CAMERA_SHUTTER: 'camera_shutter',
   CAPTURA_EXITOSA: 'captura_exitosa',
   FIGURITA_NUEVA_EN_ALBUM: 'figurita_nueva_en_album',
   LLEGADA_A_DESTINO: 'llegada_a_destino',

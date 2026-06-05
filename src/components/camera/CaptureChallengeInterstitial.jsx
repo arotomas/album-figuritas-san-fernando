@@ -34,10 +34,15 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
           transition={{ duration: 0.28 }}
           className="mx-auto w-full max-w-md"
         >
-          <p className={`${typeClasses.micro} text-progress`}>📸 Cómo capturar esta figurita</p>
-          <h1 className={`${typeClasses.display} text-app mt-3 text-3xl leading-tight`}>
-            {challenge.title}
+          <h1 className="font-display text-3xl font-black uppercase leading-[1.05] tracking-tight text-ink drop-shadow-sm sm:text-4xl">
+            {figure.nombre}
           </h1>
+          <p className={`${typeClasses.micro} mt-4 text-progress`}>
+            📸 Cómo capturar esta figurita
+          </p>
+          <h2 className="mt-3 text-2xl font-bold leading-tight text-ink sm:text-[1.65rem]">
+            {challenge.title}
+          </h2>
           <p className="text-app-muted mt-4 font-body text-base leading-7">
             {challenge.description}
           </p>

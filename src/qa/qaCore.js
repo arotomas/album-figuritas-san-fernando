@@ -19,6 +19,7 @@ export const QA_URL_PARAMS = {
   mockLocation: 'mockLocation',
   debugUniverse: 'debugUniverse',
   debugReveal: 'debugReveal',
+  rewardDebug: 'qa_reward',
 }
 
 const STORAGE_SESSION_QA = 'album-qa-mode'
@@ -40,6 +41,7 @@ let urlFlags = {
   mockLocation: false,
   debugUniverse: false,
   debugReveal: false,
+  qaReward: false,
 }
 
 function notifyUrlFlagChange() {
@@ -105,6 +107,7 @@ function clearQaSessionForNonStaff() {
     mockLocation: false,
     debugUniverse: false,
     debugReveal: false,
+    qaReward: false,
   }
 
   try {
@@ -198,6 +201,7 @@ const QA_MASTER_FLAGS = {
   mockLocation: true,
   debugUniverse: true,
   debugReveal: true,
+  qaReward: true,
 }
 
 function applyParamFlags(params) {
@@ -236,6 +240,9 @@ function applyParamFlags(params) {
         debugReveal:
           staffOrDev &&
           (readFlag(QA_URL_PARAMS.debugReveal) || Boolean(persisted?.debugReveal)),
+        qaReward:
+          staffOrDev &&
+          (readFlag(QA_URL_PARAMS.rewardDebug) || Boolean(persisted?.qaReward)),
       }
 
       if (JSON.stringify(next) !== JSON.stringify(urlFlags)) {
@@ -360,6 +367,12 @@ export function isDebugRevealEnabled() {
   return urlFlags.debugReveal || urlFlags.qa
 }
 
+/** Muestra chrome QA durante la pantalla de recompensa post-captura. */
+export function isQaRewardDebugActive() {
+  if (!isQaShellActive()) return false
+  return urlFlags.qaReward || urlFlags.qa
+}
+
 export function setDebugRevealOverride(value) {
   if (!isQaShellActive()) return false
   setQaRuntimeFlag('debugRevealOverride', value)
@@ -452,6 +465,7 @@ export function resetQaAll({ clearStorage = true } = {}) {
     mockLocation: false,
     debugUniverse: false,
     debugReveal: false,
+    qaReward: false,
   }
 
   if (clearStorage && typeof window !== 'undefined') {

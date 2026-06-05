@@ -67,7 +67,7 @@ export function CameraView({
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70" />
 
-      <div className="safe-top relative z-10 flex items-center justify-between px-5 py-4">
+      <div className="safe-top relative z-10 px-5 pt-3">
         <button
           type="button"
           onClick={onClose}
@@ -77,15 +77,22 @@ export function CameraView({
           <FaXmark size={18} />
         </button>
 
-        <div className="rounded-full bg-black/40 px-4 py-1.5 backdrop-blur-sm">
-          <p className="text-xs font-medium text-white/90">{figure?.nombre}</p>
-        </div>
-
-        <div className="w-10" />
+        {figure?.nombre ? (
+          <div className="mt-3 flex justify-center px-2">
+            <div className="max-w-[min(100%,18rem)] rounded-full bg-black/40 px-4 py-1.5 backdrop-blur-sm">
+              <p className="truncate text-center text-xs font-semibold text-white/90">
+                {figure.nombre}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {useNativeFallback && fallbackMessage && (
-        <div className="safe-top pointer-events-none absolute inset-x-0 top-[4.5rem] z-20 flex justify-center px-4">
+        <div
+          className="pointer-events-none absolute inset-x-0 z-20 flex justify-center px-4"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 5.75rem)' }}
+        >
           <p className="rounded-full bg-black/55 px-4 py-2 text-center text-[11px] leading-relaxed text-white/75 backdrop-blur-sm">
             {fallbackMessage}
           </p>

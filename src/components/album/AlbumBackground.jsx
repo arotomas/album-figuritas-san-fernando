@@ -32,7 +32,7 @@ function AlbumBackgroundInner({ rareza, className = '' }) {
       <div
         className="absolute inset-0"
         style={{
-          background: `radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(17,17,19,${album.background.vignetteStrength}) 100%)`,
+          background: `radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(17,17,19,0.03) 100%)`,
         }}
       />
 

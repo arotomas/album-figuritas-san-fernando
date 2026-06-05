@@ -1,8 +1,8 @@
-import { CardRevealSequence } from './CardRevealSequence'
+import { FullScreenCaptureReward } from './FullScreenCaptureReward'
 
 export function RewardAnimation({ figure, photoUrl, onComplete }) {
   return (
-    <CardRevealSequence
+    <FullScreenCaptureReward
       figure={figure}
       photoUrl={photoUrl}
       onComplete={onComplete}

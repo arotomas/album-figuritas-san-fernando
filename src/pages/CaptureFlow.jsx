@@ -49,14 +49,6 @@ const RewardAnimation = lazyRewardModule(
   'RewardAnimation',
 )
 
-const UnlockAnimation = lazyRewardModule(
-  () =>
-    import('../components/reward/UnlockAnimation').then((m) => ({
-      default: m.UnlockAnimation,
-    })),
-  'UnlockAnimation',
-)
-
 const PhotoUpdatedAnimation = lazyRewardModule(
   () =>
     import('../components/reward/PhotoUpdatedAnimation').then((m) => ({
@@ -67,8 +59,8 @@ const PhotoUpdatedAnimation = lazyRewardModule(
 
 function RewardSkeleton() {
   return (
-    <div className="bg-app safe-top safe-bottom flex h-full items-center justify-center">
-      <div className="map-skeleton-pulse h-64 w-48 rounded-2xl bg-border/80" />
+    <div className="safe-top safe-bottom flex h-full items-center justify-center bg-warm-white">
+      <div className="map-skeleton-pulse h-full w-full bg-neutral-200/80" />
     </div>
   )
 }
@@ -84,6 +76,7 @@ export function CaptureFlow() {
   const clearActiveTargetFigure = useAppStore((state) => state.clearActiveTargetFigure)
   const clearQaTestFigure = useAppStore((state) => state.clearQaTestFigure)
   const clearCaptureSession = useAppStore((state) => state.clearCaptureSession)
+  const setCaptureRewardUiActive = useAppStore((state) => state.setCaptureRewardUiActive)
   const obtainFigureWithPhoto = useAppStore((state) => state.obtainFigureWithPhoto)
   const obtainFigureWithPhotoSynced = useAppStore((state) => state.obtainFigureWithPhotoSynced)
   const replaceFigurePhotoSynced = useAppStore((state) => state.replaceFigurePhotoSynced)
@@ -155,7 +148,6 @@ export function CaptureFlow() {
     distanceMeters,
     retryCapture,
     clearPendingCapture,
-    showRewardComplete,
     finalizeCapturePending,
     isUnlockSubmitted,
   } = useCaptureFlow({
@@ -184,7 +176,6 @@ export function CaptureFlow() {
 
   const isRewardPhase =
     phase === CAPTURE_PHASES.REWARD ||
-    phase === CAPTURE_PHASES.UNLOCK ||
     phase === CAPTURE_PHASES.PHOTO_UPDATED ||
     phase === CAPTURE_PHASES.DONE
 
@@ -543,12 +534,17 @@ export function CaptureFlow() {
   }, [handleComplete, rewardFigure?.id])
 
   useEffect(() => {
+    const celebrationActive =
+      phase === CAPTURE_PHASES.REWARD || phase === CAPTURE_PHASES.PHOTO_UPDATED
+    setCaptureRewardUiActive(celebrationActive)
+    return () => setCaptureRewardUiActive(false)
+  }, [phase, setCaptureRewardUiActive])
+
+  useEffect(() => {
     if (phase === CAPTURE_PHASES.REWARD && rewardFigure) {
       traceRender('RewardAnimation', { figureId: rewardFigure.id })
     } else if (phase === CAPTURE_PHASES.PHOTO_UPDATED && rewardFigure) {
       traceRender('PhotoUpdatedAnimation', { figureId: rewardFigure.id })
-    } else if (phase === CAPTURE_PHASES.UNLOCK) {
-      traceRender('UnlockAnimation')
     }
   }, [phase, rewardFigure?.id])
 
@@ -585,7 +581,7 @@ export function CaptureFlow() {
           <RewardAnimation
             figure={rewardFigure}
             photoUrl={compressedPhoto}
-            onComplete={showRewardComplete}
+            onComplete={handleComplete}
           />
         </Suspense>
       </CaptureRewardErrorBoundary>
@@ -604,16 +600,6 @@ export function CaptureFlow() {
             photoUrl={compressedPhoto}
             onComplete={handlePhotoUpdatedComplete}
           />
-        </Suspense>
-      </CaptureRewardErrorBoundary>
-    )
-  }
-
-  if (phase === CAPTURE_PHASES.UNLOCK) {
-    return (
-      <CaptureRewardErrorBoundary degradeReason="unlock-animation" onDegrade={handleComplete}>
-        <Suspense fallback={<RewardSkeleton />}>
-          <UnlockAnimation onComplete={handleComplete} />
         </Suspense>
       </CaptureRewardErrorBoundary>
     )
@@ -666,7 +652,12 @@ export function CaptureFlow() {
     camera.isLoading ||
     camera.isReady ||
     camera.useNativeFallback ||
-    phase === CAPTURE_PHASES.CAMERA
+    phase === CAPTURE_PHASES.CAMERA ||
+    phase === CAPTURE_PHASES.CAPTURING ||
+    phase === CAPTURE_PHASES.COMPRESSING
+
+  const showCaptureFlash =
+    phase === CAPTURE_PHASES.CAPTURING || phase === CAPTURE_PHASES.COMPRESSING
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -678,6 +669,13 @@ export function CaptureFlow() {
           </p>
         </div>
       </div>
+
+      {showCaptureFlash && (
+        <div
+          className="capture-flash-overlay pointer-events-none absolute inset-0 z-[45] bg-white"
+          aria-hidden
+        />
+      )}
 
       {showCamera && (
         <CameraView
@@ -708,7 +706,10 @@ export function CaptureFlow() {
       )}
 
       {isApproximateGps && inCaptureRange && (
-        <div className="safe-top pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
+        <div
+          className="pointer-events-none absolute inset-x-0 z-40 flex justify-center px-4"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 5.75rem)' }}
+        >
           <p className="rounded-full bg-black/75 px-4 py-2 text-xs text-amber-100/90">
             Tu ubicación es aproximada. La foto será usada como comprobante.
           </p>
@@ -716,7 +717,10 @@ export function CaptureFlow() {
       )}
 
       {!isCameraPhase && !inCaptureRange && mapPosition && (
-        <div className="safe-top pointer-events-none absolute inset-x-0 top-16 z-30 flex justify-start px-4">
+        <div
+          className="pointer-events-none absolute inset-x-0 z-30 flex justify-start px-4"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 5.75rem)' }}
+        >
           <p className="max-w-[11rem] rounded-full bg-black/60 px-3 py-1.5 text-[10px] leading-snug text-white/75">
             {gpsStatusLabel}
           </p>
@@ -724,7 +728,10 @@ export function CaptureFlow() {
       )}
 
       {geoLoading && !mapPosition && (
-        <div className="safe-top safe-bottom pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
+        <div
+          className="pointer-events-none absolute inset-x-0 z-40 flex justify-center px-4"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 5.75rem)' }}
+        >
           <p className="rounded-full bg-black/70 px-4 py-2 text-xs text-white/80">
             Validando ubicación…
           </p>

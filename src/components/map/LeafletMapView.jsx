@@ -1125,7 +1125,7 @@ function LeafletMapViewInner({
         <RouteMetricsBadge
           visible={Boolean(routeMetrics)}
           metrics={routeMetrics}
-          className="safe-top top-[4.25rem]"
+          className="safe-top top-[5.5rem]"
         />
       ) : null}
 

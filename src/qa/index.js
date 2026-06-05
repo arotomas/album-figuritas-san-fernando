@@ -16,6 +16,7 @@ export {
   isQaMasterActive,
   isQaMode,
   readQaModeFromSearch,
+  isQaRewardDebugActive,
   isQaShellActive,
   isQaStaffUser,
   isUniverseDiagnosticsEnabled,

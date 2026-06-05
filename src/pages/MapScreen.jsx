@@ -18,7 +18,6 @@ import { useExplorationStore } from '../store/explorationStore'
 import { ExplorationDistanceBadge } from '../components/map/exploration/ExplorationDistanceBadge'
 import { NAVIGATION_UX_EXPERIMENT } from '../config/navigationUx'
 import { STREET_ROUTING_OSRM_EXPERIMENT } from '../config/streetRoutingOsrmExperiment'
-import { ActiveAlbumLabel } from '../components/album/ActiveAlbumLabel'
 
 export function MapScreen() {
   const navigate = useNavigate()
@@ -84,8 +83,8 @@ export function MapScreen() {
     (explorationActive || Boolean(activeTargetFigureId))
 
   const navigationMetricsTopClass = explorationActive
-    ? 'safe-top top-[8.5rem]'
-    : 'safe-top top-[4.25rem]'
+    ? 'safe-top top-[9.75rem]'
+    : 'safe-top top-[5.5rem]'
 
   const handleBonusDiscovered = useCallback((figure) => {
     if (!figure?.id) return
@@ -145,10 +144,6 @@ export function MapScreen() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[520] flex justify-end px-3 pt-2 safe-top">
-        <ActiveAlbumLabel />
-      </div>
-
       <ExplorationDistanceBadge
         visible={explorationActive}
         targetName={explorationTargetName}
@@ -169,7 +164,7 @@ export function MapScreen() {
         <RouteMetricsBadge
           visible={Boolean(routeMetrics)}
           metrics={routeMetrics}
-          className="safe-top top-[8.5rem]"
+          className="safe-top top-[9.75rem]"
         />
       ) : null}
 

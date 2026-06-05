@@ -4,9 +4,9 @@ import { albumClasses } from '../../theme/album'
 function NewBadgeInner({ className = '' }) {
   return (
     <span
-      className={`new-badge-pulse inline-flex items-center rounded-full bg-ink px-2 py-0.5 font-body text-[8px] font-bold uppercase tracking-[0.14em] text-warm-white shadow-sm ${className}`}
+      className={`inline-flex items-center rounded-md bg-ink/85 px-1.5 py-px font-body text-[7px] font-bold uppercase tracking-[0.1em] text-white shadow-sm ${className}`}
     >
-      New
+      Nuevo
     </span>
   )
 }

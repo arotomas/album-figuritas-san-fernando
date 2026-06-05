@@ -2,17 +2,21 @@ import { memo } from 'react'
 import { getRarity } from '../../theme/rarity'
 import { typeClasses } from '../../theme/typography'
 
-function RarityBadgeInner({ rareza, size = 'md', className = '' }) {
+function RarityBadgeInner({ rareza, size = 'md', variant = 'default', className = '' }) {
   const rarity = getRarity(rareza)
   const sizes = {
     sm: 'px-1.5 py-px text-[8px]',
     md: 'px-2.5 py-1 text-[10px]',
     lg: 'px-3 py-1 text-xs',
   }
+  const badgeClass =
+    variant === 'album' && rarity.id === 'común'
+      ? 'bg-gradient-to-r from-progress to-progress-dark'
+      : rarity.tailwind.badge
 
   return (
     <span
-      className={`inline-flex items-center rounded-md font-bold uppercase tracking-widest text-white shadow-sm ${rarity.tailwind.badge} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center rounded-md font-bold uppercase tracking-widest text-white shadow-sm ${badgeClass} ${sizes[size]} ${className}`}
     >
       {rarity.label}
     </span>

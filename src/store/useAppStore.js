@@ -67,6 +67,39 @@ function collectFigureProgressRecords(state) {
   return [...progressById.values()]
 }
 
+function snapshotFigureProgress(figure) {
+  if (figure?.id == null) return null
+  return {
+    id: String(figure.id),
+    slug: figure.slug ?? null,
+    obtenida: Boolean(figure.obtenida),
+    foto: figure.foto ?? null,
+    fotoSizeBytes: figure.fotoSizeBytes ?? null,
+    obtenidaEn: figure.obtenidaEn ?? null,
+    captureMeta: figure.captureMeta ?? null,
+  }
+}
+
+/** Conserva progreso/fotos de todos los álbumes al reemplazar el catálogo activo. */
+function buildCrossAlbumProgressRecords(progressSources, mergedFigures) {
+  const progressById = new Map()
+
+  for (const record of progressSources) {
+    const snapshot = snapshotFigureProgress(record)
+    if (snapshot) progressById.set(snapshot.id, snapshot)
+  }
+
+  for (const figure of mergedFigures) {
+    const snapshot = snapshotFigureProgress(figure)
+    if (!snapshot) continue
+    if (snapshot.obtenida || snapshot.foto) {
+      progressById.set(snapshot.id, snapshot)
+    }
+  }
+
+  return [...progressById.values()]
+}
+
 function clearAllFigureProgress(figures) {
   const source = Array.isArray(figures) ? figures : []
   return source.map((figure) => ({
@@ -265,6 +298,7 @@ export const useAppStore = create(
     nearFigure: null,
     qaTestFigure: null,
       captureSession: null,
+      captureRewardUiActive: false,
       activeTargetFigureId: null,
       authBootstrapped: false,
       albumStatus: ALBUM_STATUS.EN_PROGRESO,
@@ -383,6 +417,7 @@ export const useAppStore = create(
           }
 
           const figures = mergeCatalogWithProgress(remote, progressSources)
+          const crossAlbumProgress = buildCrossAlbumProgressRecords(progressSources, figures)
           const ids = figures.map((figure) => String(figure.id))
           const validIds = new Set(ids)
           const lastViewedFigureId = validIds.has(String(state.lastViewedFigureId))
@@ -396,11 +431,12 @@ export const useAppStore = create(
             source: 'remote',
             count: figures.length,
             ids,
+            progressKept: crossAlbumProgress.length,
           })
 
           return {
             figures,
-            _figureProgressRecords: [],
+            _figureProgressRecords: crossAlbumProgress,
             lastViewedFigureId,
             lastObtenidaFigureId,
             albumStatus: computeAlbumStatus(figures, lastViewedFigureId),
@@ -838,6 +874,8 @@ export const useAppStore = create(
       },
 
       setNearFigure: (figure) => set({ nearFigure: figure }),
+
+      setCaptureRewardUiActive: (active) => set({ captureRewardUiActive: Boolean(active) }),
 
       setActiveTargetFigureId: (figureId) =>
         set({
