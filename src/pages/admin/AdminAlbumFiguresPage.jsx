@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getFiguresAdmin } from '../../services/supabase/adminDashboard'
 import { fetchAlbumAdminById } from '../../services/supabase/albumsAdmin'
-import { getCollectionsForAlbumAdmin } from '../../services/supabase/collections'
 import {
   addFigureToAlbumAdmin,
   countActiveAlbumFiguresAdmin,
@@ -21,8 +20,6 @@ function normalizeSearch(value) {
 
 function MembershipEditRow({
   row,
-  collectionOptions,
-  albumCollectionIds,
   onSave,
   onToggleActive,
   onRemove,
@@ -31,7 +28,6 @@ function MembershipEditRow({
   removing,
 }) {
   const [draft, setDraft] = useState({
-    collectionId: row.membership.collectionId ?? '',
     sortOrder: row.membership.sortOrder,
     slotNumber: row.membership.slotNumber ?? '',
   })
@@ -39,21 +35,16 @@ function MembershipEditRow({
 
   useEffect(() => {
     setDraft({
-      collectionId: row.membership.collectionId ?? '',
       sortOrder: row.membership.sortOrder,
       slotNumber: row.membership.slotNumber ?? '',
     })
   }, [row.membership])
 
   const handleSave = async () => {
-    const validationError = validateAlbumFigureMembership(
-      {
-        collectionId: draft.collectionId,
-        sortOrder: draft.sortOrder,
-        slotNumber: draft.slotNumber,
-      },
-      { albumCollectionIds },
-    )
+    const validationError = validateAlbumFigureMembership({
+      sortOrder: draft.sortOrder,
+      slotNumber: draft.slotNumber,
+    })
     if (validationError) {
       setRowError(validationError)
       return
@@ -61,7 +52,6 @@ function MembershipEditRow({
 
     setRowError(null)
     await onSave(row.membership.figureId, {
-      collectionId: draft.collectionId,
       sortOrder: draft.sortOrder,
       slotNumber: draft.slotNumber,
     })
@@ -74,20 +64,6 @@ function MembershipEditRow({
         <p className="text-xs text-muted">{row.figure.id}</p>
       </td>
       <td className="px-4 py-4 capitalize">{row.figure.rarity ?? '—'}</td>
-      <td className="px-4 py-4">
-        <select
-          value={draft.collectionId}
-          onChange={(event) => setDraft((current) => ({ ...current, collectionId: event.target.value }))}
-          className="w-full min-w-[140px] rounded-lg border border-border bg-white px-2 py-1.5 text-xs"
-        >
-          <option value="">Sin capítulo</option>
-          {collectionOptions.map((collection) => (
-            <option key={collection.id} value={collection.id}>
-              {collection.label}
-            </option>
-          ))}
-        </select>
-      </td>
       <td className="px-4 py-4">
         <input
           type="number"
@@ -155,7 +131,6 @@ export function AdminAlbumFiguresPage() {
   const [album, setAlbum] = useState(null)
   const [memberships, setMemberships] = useState([])
   const [figures, setFigures] = useState([])
-  const [collections, setCollections] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
@@ -163,11 +138,6 @@ export function AdminAlbumFiguresPage() {
   const [togglingFigureId, setTogglingFigureId] = useState(null)
   const [removingFigureId, setRemovingFigureId] = useState(null)
   const [addingFigureId, setAddingFigureId] = useState(null)
-
-  const albumCollectionIds = useMemo(
-    () => collections.map((collection) => collection.id),
-    [collections],
-  )
 
   const membershipByFigureId = useMemo(
     () => new Map(memberships.map((membership) => [membership.figureId, membership])),
@@ -185,11 +155,10 @@ export function AdminAlbumFiguresPage() {
     setError(null)
 
     try {
-      const [albumRow, membershipRows, figureRows, collectionRows] = await Promise.all([
+      const [albumRow, membershipRows, figureRows] = await Promise.all([
         fetchAlbumAdminById(albumId),
         fetchAlbumFiguresAdmin(albumId),
         getFiguresAdmin(),
-        getCollectionsForAlbumAdmin(albumId),
       ])
 
       if (!albumRow) {
@@ -201,7 +170,6 @@ export function AdminAlbumFiguresPage() {
       setAlbum(albumRow)
       setMemberships(membershipRows)
       setFigures(figureRows)
-      setCollections(collectionRows)
     } catch (loadError) {
       setError(loadError?.message ?? 'No pudimos cargar las figuritas del álbum.')
     } finally {
@@ -366,19 +334,18 @@ export function AdminAlbumFiguresPage() {
           <div>
             <h4 className="text-lg font-black">Asignadas ({assignedRows.length})</h4>
             <p className="mt-1 text-sm text-muted">
-              Editá capítulo, orden y visibilidad dentro de este álbum. Quitar solo afecta{' '}
+              Gestioná orden, slot y visibilidad dentro de este álbum. Quitar solo afecta{' '}
               <code className="text-xs">album_figures</code>.
             </p>
           </div>
         </div>
 
         <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-white">
-          <table className="min-w-[980px] w-full text-left text-sm">
+          <table className="min-w-[820px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Figurita</th>
                 <th className="px-4 py-3">Rareza</th>
-                <th className="px-4 py-3">Capítulo</th>
                 <th className="px-4 py-3">Orden</th>
                 <th className="px-4 py-3">Slot</th>
                 <th className="px-4 py-3">Activa</th>
@@ -390,8 +357,6 @@ export function AdminAlbumFiguresPage() {
                 <MembershipEditRow
                   key={row.membership.figureId}
                   row={row}
-                  collectionOptions={collections}
-                  albumCollectionIds={albumCollectionIds}
                   onSave={handleSaveMembership}
                   onToggleActive={handleToggleActive}
                   onRemove={handleRemove}
@@ -402,7 +367,7 @@ export function AdminAlbumFiguresPage() {
               ))}
               {!loading && assignedRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
                     Todavía no hay figuritas en este álbum. Agregalas desde el catálogo abajo.
                   </td>
                 </tr>
