@@ -164,6 +164,13 @@ export const SOUND_CATALOG = {
     volume: 1,
     description: 'Celebración al completar 10/10 figuritas normales del álbum activo.',
   },
+  notificacion_push: {
+    id: 'notificacion_push',
+    src: '/sounds/notificacion-push.mp3',
+    preload: true,
+    volume: 0.52,
+    description: 'Aviso suave de descubrimiento por proximidad (foreground).',
+  },
 }
 
 /** Eventos de juego → id de sonido en SOUND_CATALOG. */
@@ -189,4 +196,5 @@ export const GAME_SOUND_EVENTS = {
   UI_ALBUM: 'ui_album',
   UI_MAP: 'ui_map',
   COMPLETAR_ALBUM: 'completar_album',
+  NOTIFICACION_PUSH: 'notificacion_push',
 }

@@ -7,6 +7,8 @@ import { navTrace } from '../utils/capturePipelineTrace'
 import { useExplorationRouteCleanup } from '../hooks/useExplorationRouteCleanup'
 import { PlayerPointsBadge } from '../components/points/PlayerPointsBadge'
 import { ActiveAlbumSelector } from '../components/album/ActiveAlbumSelector'
+import { GeolocationProvider } from '../context/GeolocationProvider'
+import { LaunchDiscoveryController } from '../components/launch/LaunchDiscoveryController'
 
 export function AppLayout() {
   const location = useLocation()
@@ -24,7 +26,9 @@ export function AppLayout() {
   }, [location.pathname])
 
   return (
+    <GeolocationProvider>
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+      <LaunchDiscoveryController />
       <header className="safe-top safe-x shrink-0 border-b border-border/60 bg-warm-white">
         <div className="px-4 pb-1 pt-2">
           <AuthBrandHeader variant="app" />
@@ -42,5 +46,6 @@ export function AppLayout() {
 
       <BottomNav />
     </div>
+    </GeolocationProvider>
   )
 }

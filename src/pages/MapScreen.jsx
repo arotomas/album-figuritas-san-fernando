@@ -4,7 +4,7 @@ import { LazyMap } from '../components/performance/LazyMap'
 import { ProgressBar } from '../components/ProgressBar'
 import { NavigationMetricsPanel } from '../components/map/routing/NavigationMetricsPanel'
 import { RouteMetricsBadge } from '../components/map/routing/RouteMetricsBadge'
-import { useGeolocation } from '../hooks/useGeolocation'
+import { useAppGeolocation } from '../hooks/useAppGeolocation'
 import { useQaTestFigure } from '../hooks/useQaTestFigure'
 import { useAppStore } from '../store/useAppStore'
 import {
@@ -36,7 +36,7 @@ export function MapScreen() {
     playGameSound('CANCELAR_NAVEGACION')
     stopExploration()
   }, [stopExploration])
-  const { mapPosition } = useGeolocation()
+  const { mapPosition } = useAppGeolocation()
   const [routeMetrics, setRouteMetrics] = useState(null)
   const [captureOverlayVisible, setCaptureOverlayVisible] = useState(false)
   const [discoveredBonusIds, setDiscoveredBonusIds] = useState(() => new Set())

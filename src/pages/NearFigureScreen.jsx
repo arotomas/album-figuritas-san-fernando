@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { FaLocationDot } from 'react-icons/fa6'
 import { PremiumButton } from '../components/ui/PremiumButton'
 import { ProgressBar } from '../components/ProgressBar'
-import { useGeolocation } from '../hooks/useGeolocation'
+import { useAppGeolocation } from '../hooks/useAppGeolocation'
 import { useAppStore } from '../store/useAppStore'
 import { getDistanceMeters } from '../utils/geo'
 import { loadLastKnownPosition } from '../utils/lastKnownPosition'
@@ -13,7 +13,7 @@ export function NearFigureScreen() {
   const nearFigure = useAppStore((state) => state.nearFigure)
   const setNearFigure = useAppStore((state) => state.setNearFigure)
   const startCaptureSession = useAppStore((state) => state.startCaptureSession)
-  const { proximityPosition, mapPosition } = useGeolocation()
+  const { proximityPosition, mapPosition } = useAppGeolocation()
 
   const handleOpenCamera = () => {
     if (!nearFigure) return

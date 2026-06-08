@@ -62,6 +62,10 @@ function isAcceptedPosition(position) {
  * Lecturas >80m se muestran en mapa (preview) pero no se aceptan para proximidad/captura.
  */
 export function useGeolocation(options = {}) {
+  return useGeolocationInternal(options)
+}
+
+export function useGeolocationInternal(options = {}) {
   const geoOptionsRef = useRef({ ...GPS_HIGH_ACCURACY_OPTIONS, ...options })
   const captureModeRef = useRef(Boolean(options.captureMode))
   captureModeRef.current = Boolean(options.captureMode)

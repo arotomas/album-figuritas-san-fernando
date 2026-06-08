@@ -132,3 +132,12 @@ export function stopVibration() {
 export function resetFigureProximityAlerts() {
   figureAlertCooldowns.clear()
 }
+
+const LAUNCH_DISCOVERY_PATTERN = [36, 48, 36]
+
+/** Pulso breve al descubrir una figurita cercana (evento lanzamiento). */
+export function vibrateLaunchDiscovery() {
+  if (!canVibrate() || shouldSkipHaptics()) return false
+  navigator.vibrate(LAUNCH_DISCOVERY_PATTERN)
+  return true
+}

@@ -15,7 +15,7 @@ import {
   USER_ZOOM,
 } from '../../config/map'
 import { GPS_PRECISE_LOCATION_HELP } from '../../config/gps'
-import { useGeolocation } from '../../hooks/useGeolocation'
+import { useAppGeolocation } from '../../hooks/useAppGeolocation'
 import { useGpsReadySound } from '../../hooks/useGpsReadySound'
 import { useDebouncedLocation } from '../../hooks/useDebouncedLocation'
 import { useThrottledMapCenter } from '../../hooks/useThrottledMapCenter'
@@ -48,6 +48,9 @@ import { GeoPolicyBanner } from './GeoPolicyBanner'
 import { MapQaOverlay } from '../qa/MapQaOverlay'
 import { findNearestPendingFigure } from '../../utils/gpsDiagnosticReport'
 import { getDistanceMeters } from '../../utils/geo'
+import { LAUNCH_DISCOVERY_ENABLED } from '../../config/launchDiscovery'
+import { useLaunchDiscoveryStore } from '../../store/launchDiscoveryStore'
+import { buildProximitySnapshot } from '../../utils/proximityExperience'
 import { MAP_ROUTE_HIDE_DIRECT_M } from '../../config/mapNavigation'
 import { useAppStore } from '../../store/useAppStore'
 import { ActiveTargetPill } from './ActiveTargetPill'
@@ -511,7 +514,7 @@ function LeafletMapViewInner({
     requestSingleFix,
     startTracking,
     stopTracking,
-  } = useGeolocation()
+  } = useAppGeolocation()
 
   useGpsReadySound(gpsPhase, Boolean(mapPosition))
 
@@ -524,6 +527,7 @@ function LeafletMapViewInner({
     nearFigure,
     isNearFigure,
     nearFigures,
+    figuresWithDistance,
     nearestFigure,
     nearestDistance,
     nearestCapturableFigure,
@@ -532,6 +536,53 @@ function LeafletMapViewInner({
     activeTargetStale,
     localFocusOverride,
   } = useFigureProximity(debouncedProximity, proximityFigures, { activeTargetFigureId })
+
+  const mapFocusFigureId = useLaunchDiscoveryStore((state) => state.mapFocusFigureId)
+  const clearMapFocus = useLaunchDiscoveryStore((state) => state.clearMapFocus)
+  const storeNearFigure = useAppStore((state) => state.nearFigure)
+
+  const launchFocusFigure = useMemo(() => {
+    if (!LAUNCH_DISCOVERY_ENABLED || !mapFocusFigureId) return null
+
+    const fromNear = nearFigures.find((figure) => String(figure.id) === mapFocusFigureId)
+    if (fromNear) return fromNear
+
+    const fromDistance = figuresWithDistance.find(
+      (figure) => String(figure.id) === mapFocusFigureId,
+    )
+    if (fromDistance) return fromDistance
+
+    const catalog = proximityFigures.find((figure) => String(figure.id) === mapFocusFigureId)
+    if (catalog && mapPosition) {
+      const distanceMeters = getDistanceMeters(
+        mapPosition.lat,
+        mapPosition.lng,
+        catalog.lat,
+        catalog.lng,
+      )
+      return {
+        ...catalog,
+        distanceMeters,
+        proximity: buildProximitySnapshot(catalog, distanceMeters),
+      }
+    }
+
+    if (storeNearFigure && String(storeNearFigure.id) === mapFocusFigureId) {
+      return storeNearFigure
+    }
+
+    return null
+  }, [
+    figuresWithDistance,
+    mapFocusFigureId,
+    mapPosition,
+    nearFigures,
+    proximityFigures,
+    storeNearFigure,
+  ])
+
+  const overlayFigure = nearFigure
+  const overlayFocusActive = isFocusNear
 
   const activeTargetFigure = useMemo(() => {
     if (!activeTargetFigureId) return null
@@ -673,7 +724,7 @@ function LeafletMapViewInner({
 
   const markerUsesCounterBearing = !explorationActive
 
-  const showFocusOverlay = useStableBoolean(isFocusNear, {
+  const showFocusOverlay = useStableBoolean(overlayFocusActive, {
     enterMs: TARGET_LOCK_FOCUS_NEAR_ENTER_MS,
     holdOffMs: TARGET_LOCK_FOCUS_NEAR_HOLD_MS,
   })
@@ -682,7 +733,7 @@ function LeafletMapViewInner({
     holdOffMs: TARGET_LOCK_SECONDARY_HINT_HOLD_MS,
   })
 
-  const captureOverlayVisible = showFocusOverlay && Boolean(nearFigure)
+  const captureOverlayVisible = showFocusOverlay && Boolean(overlayFigure)
 
   useEffect(() => {
     onCaptureOverlayVisibleChange?.(captureOverlayVisible)
@@ -740,20 +791,40 @@ function LeafletMapViewInner({
   )
 
   const handleOpenCamera = useCallback(() => {
+    if (LAUNCH_DISCOVERY_ENABLED) {
+      clearMapFocus()
+    }
     const capturePosition = proximityPosition ?? mapPosition ?? position
-    const captureFigure = nearestCapturableFigure ?? nearFigure
+    const captureFigure = nearestCapturableFigure ?? overlayFigure ?? nearFigure
     onOpenCamera?.({
       figure: captureFigure,
       position: capturePosition,
     })
   }, [
+    clearMapFocus,
     mapPosition,
     nearFigure,
     nearestCapturableFigure,
     onOpenCamera,
+    overlayFigure,
     position,
     proximityPosition,
   ])
+
+  useEffect(() => () => clearMapFocus(), [clearMapFocus])
+
+  useEffect(() => {
+    if (!LAUNCH_DISCOVERY_ENABLED || !launchFocusFigure || !mapRef.current) return
+
+    mapRef.current.flyTo(
+      [launchFocusFigure.lat, launchFocusFigure.lng],
+      Math.max(mapRef.current.getZoom(), 17),
+      {
+        animate: !reducedMotion,
+        duration: reducedMotion ? 0 : 0.65,
+      },
+    )
+  }, [launchFocusFigure, reducedMotion])
 
   const handleRecenter = useCallback(() => {
     if (!mapRef.current || !mapPosition) return
@@ -1141,9 +1212,9 @@ function LeafletMapViewInner({
             Hay otra figurita cerca…
           </p>
         )}
-        {showFocusOverlay && nearFigure && (
+        {showFocusOverlay && overlayFigure && (
           <NearFigureOverlay
-            nearFigure={nearFigure}
+            nearFigure={overlayFigure}
             onOpenCamera={handleOpenCamera}
           />
         )}
