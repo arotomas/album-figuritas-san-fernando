@@ -1,5 +1,7 @@
 /** Push + notificationclick — debe cargarse antes que Workbox (sin deps async). */
 
+import { writePushDiagRecord } from '../services/push/pushDiag.js'
+
 const DEFAULT_TITLE = 'Album Figuritas SF'
 const DEFAULT_URL = '/map'
 const PUSH_MESSAGE_TYPE = 'PUSH_RECEIVED'
@@ -69,7 +71,8 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('push', (event) => {
-  console.log('[PUSH_SW] push event received', { hasData: Boolean(event.data) })
+  const hasData = Boolean(event.data)
+  console.log('[PUSH_SW] push event received', { hasData })
 
   const payload = parsePushPayload(event)
   const tag = payload.data?.tag || `album-push-${Date.now()}`
@@ -83,16 +86,48 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    notifyOpenClients(payload)
+    writePushDiagRecord({
+      stage: 'push_event_received',
+      hasData,
+      title: payload.title,
+      tag,
+    })
+      .then(() => notifyOpenClients(payload))
       .then((clientCount) => {
         console.log('[PUSH_SW] foreground clients notified', { clientCount })
+        return writePushDiagRecord({
+          stage: 'notify_clients_done',
+          clientCount,
+          title: payload.title,
+          tag,
+        }).then(() => clientCount)
+      })
+      .then((clientCount) => {
+        console.log('[PUSH_SW] showNotification start', { title: payload.title, tag, clientCount })
         return self.registration.showNotification(payload.title, options)
       })
-      .then(() => {
-        console.log('[PUSH_SW] showNotification called', { title: payload.title, tag })
+      .then(async () => {
+        const pending = await self.registration.getNotifications()
+        console.log('[PUSH_SW] showNotification called', {
+          title: payload.title,
+          tag,
+          pendingNotificationCount: pending.length,
+        })
+        await writePushDiagRecord({
+          stage: 'showNotification_ok',
+          title: payload.title,
+          tag,
+          pendingNotificationCount: pending.length,
+        })
       })
-      .catch((error) => {
+      .catch(async (error) => {
         console.error('[PUSH_SW] showNotification failed', error)
+        await writePushDiagRecord({
+          stage: 'showNotification_fail',
+          title: payload.title,
+          tag,
+          error: error?.message ?? String(error),
+        }).catch(() => {})
       }),
   )
 })

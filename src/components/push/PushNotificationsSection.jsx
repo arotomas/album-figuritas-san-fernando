@@ -7,6 +7,7 @@ import {
   isPushSupported,
   subscribeToPushNotifications,
 } from '../../services/push/pushSubscription'
+import { PushDiagnosticPanel } from './PushDiagnosticPanel'
 
 export function PushNotificationsSection() {
   const supported = isPushSupported()
@@ -162,6 +163,8 @@ export function PushNotificationsSection() {
           {error}
         </p>
       )}
+
+      <PushDiagnosticPanel />
     </section>
   )
 }
