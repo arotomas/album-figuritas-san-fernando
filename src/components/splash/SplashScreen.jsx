@@ -3,6 +3,7 @@ import { LazyMotion, domAnimation, m } from 'framer-motion'
 import { SPLASH_EXIT_FADE_MS, SPLASH_MIN_DISPLAY_MS } from '../../config/splash'
 import { dismissStaticSplash } from '../../utils/staticSplash'
 import { motion as motionTokens } from '../../theme/motion'
+import { playUiButtonSound } from '../../services/audio/playUiButtonSound'
 
 /** Arte institucional completo (diseño BASE) — sin overlays ni logos extra. */
 const SPLASH_ARTWORK = '/assets/splash/splash-screen.png'
@@ -25,6 +26,7 @@ export function SplashScreen({ onComplete }) {
 
   const handleBegin = useCallback(() => {
     if (!canContinue || completedRef.current || isExiting) return
+    playUiButtonSound()
     completedRef.current = true
     setIsExiting(true)
   }, [canContinue, isExiting])

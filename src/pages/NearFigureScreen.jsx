@@ -46,6 +46,7 @@ export function NearFigureScreen() {
         <PremiumButton
           variant="outline"
           className="mt-6 w-full max-w-xs"
+          uiSound={false}
           onClick={() => navigate('/map')}
         >
           Ir al mapa
@@ -73,7 +74,7 @@ export function NearFigureScreen() {
         <p className="mb-2 text-sm text-muted">{nearFigure.nombre}</p>
 
         <div className="w-full max-w-sm">
-          <PremiumButton variant="lime" className="w-full" onClick={handleOpenCamera}>
+          <PremiumButton variant="lime" className="w-full" uiSound={false} onClick={handleOpenCamera}>
             Abrí la cámara
           </PremiumButton>
         </div>

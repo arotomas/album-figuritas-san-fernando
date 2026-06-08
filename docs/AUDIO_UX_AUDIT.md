@@ -1,14 +1,15 @@
 # Audio UX — auditoría e integración
 
-Infraestructura inicial de sonido para el Álbum de Figuritas de San Fernando.  
-Sin archivos de audio asignados todavía: las llamadas son no-op hasta configurar `src` en el catálogo.
+Infraestructura de sonido para el Álbum de Figuritas de San Fernando.
 
-> **Actualización:** ocho SFX en `public/sounds/` (capa 1 + capa 2). Ver `docs/AUDIO_ASSETS.md`.
+> **Biblioteca e intención funcional:** [`docs/SOUND_LIBRARY.md`](./SOUND_LIBRARY.md) (fuente de verdad).  
+> **Inventario técnico:** [`docs/AUDIO_ASSETS.md`](./AUDIO_ASSETS.md).
 
 ## Principios
 
-- Sonidos solo en momentos significativos (detección, captura, álbum, llegada, error de rango).
-- Sin SFX en clicks genéricos.
+- Reutilizar la biblioteca oficial antes de agregar SFX nuevos (ver `SOUND_LIBRARY.md`).
+- Sonidos de **UI** (botón, cerrar) separados de **exploración**, **captura** y **logros**.
+- Sonidos solo en momentos significativos; el botón de interfaz no debe usarse en capturas ni recompensas.
 - Toggle de usuario en **Opciones → Sonido**.
 - Kill switch de desarrollo: `SOUNDS_ENABLED` en `src/config/audio.js`.
 - En iOS/Android el interruptor de silencio del dispositivo suele mutar `<audio>` automáticamente; no hay API fiable para leerlo en web.
@@ -74,11 +75,12 @@ figurita_detectada: {
 
 ## Cómo agregar un sonido nuevo
 
-1. Añadir entrada en `SOUND_CATALOG` con `id`, `src`, `preload`.
-2. Añadir clave en `GAME_SOUND_EVENTS`.
-3. Llamar `playGameSound('NUEVO_EVENTO')` en el punto de UX deseado (idealmente junto al háptico equivalente en `vibration.js`).
-4. Documentar la fila en esta tabla.
-5. Opcional: cooldown por id en `SoundService` si el evento puede repetirse muy seguido.
+1. Revisar `docs/SOUND_LIBRARY.md` — ¿un asset existente cubre el caso?
+2. Añadir entrada en `SOUND_CATALOG` con `id`, `src`, `preload`.
+3. Añadir clave en `GAME_SOUND_EVENTS`.
+4. Llamar `playGameSound('NUEVO_EVENTO')` en el punto de UX deseado (idealmente junto al háptico equivalente en `vibration.js`).
+5. Actualizar `SOUND_LIBRARY.md` (intención) y `AUDIO_ASSETS.md` (inventario).
+6. Opcional: cooldown por id en `SoundService` si el evento puede repetirse muy seguido.
 
 ## Configuración
 
@@ -98,8 +100,12 @@ UI: **Opciones → Sonido y experiencia**.
 - Mismo `soundId` no se superpone: segunda llamada se ignora mientras suena.
 - Sin archivos = sin instancias `Audio` creadas.
 
-## Fuera de alcance (esta fase)
+## Pendiente / fuera de alcance actual
 
+- `recompensa.mp3` → evento cámara habilitada en zona (antes de captura).
+- `ganar-puntos.mp3` → burst de puntos post-captura.
+- `notificacion-push.mp3` → push con app en foreground.
+- Sonido de botón en splash, tabs y apertura de pantallas (UI general).
+- `nivel-desbloqueado.mp3`, `completar-album.mp3` → logros futuros.
+- `CAMERA_SHUTTER` usa botón hoy — deuda vs. `SOUND_LIBRARY.md`; falta asset de disparo o silenciar.
 - Música ambiental de mapa.
-- Sonidos de UI (tabs, botones).
-- Cambios visuales o de flujo de captura/navegación.

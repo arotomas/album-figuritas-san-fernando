@@ -3,7 +3,11 @@ import { m } from 'framer-motion'
 import { getRarity } from '../../theme/rarity'
 import { motion as motionTokens } from '../../theme/motion'
 import { typeClasses } from '../../theme/typography'
-import { FULLSCREEN_REWARD_MS } from '../../config/captureFeel'
+import {
+  FULLSCREEN_REWARD_MS,
+  POINTS_BURST_REVEAL_DELAY_MS,
+} from '../../config/captureFeel'
+import { playGameSound } from '../../services/audio'
 import { ParticleLayer } from '../ui/ParticleLayer'
 import { prefersReducedMotion } from '../../utils/performance'
 import { rewardLog } from '../../utils/devLog'
@@ -31,6 +35,7 @@ export function FullScreenCaptureReward({ figure, photoUrl, onComplete }) {
   const onCompleteRef = useRef(onComplete)
   const mountedRef = useRef(true)
   const pointsBurstTriggeredRef = useRef(false)
+  const ganarPuntosSoundPlayedRef = useRef(false)
 
   const pointsEarned = useMemo(
     () => resolveFigurePointsFromCatalog(figure),
@@ -85,10 +90,29 @@ export function FullScreenCaptureReward({ figure, photoUrl, onComplete }) {
 
   useEffect(() => {
     pointsBurstTriggeredRef.current = false
+    ganarPuntosSoundPlayedRef.current = false
     setVisible(false)
     const revealTimer = window.setTimeout(() => setVisible(true), 60)
     return () => window.clearTimeout(revealTimer)
   }, [figure?.id])
+
+  useEffect(() => {
+    if (!visible || !showPoints || ganarPuntosSoundPlayedRef.current) {
+      return undefined
+    }
+
+    const delayMs = reduced
+      ? POINTS_BURST_REVEAL_DELAY_MS.reduced
+      : POINTS_BURST_REVEAL_DELAY_MS.full
+
+    const soundTimer = window.setTimeout(() => {
+      if (!mountedRef.current || ganarPuntosSoundPlayedRef.current) return
+      ganarPuntosSoundPlayedRef.current = true
+      playGameSound('GANAR_PUNTOS')
+    }, delayMs)
+
+    return () => window.clearTimeout(soundTimer)
+  }, [figure?.id, reduced, showPoints, visible])
 
   useEffect(() => {
     if (!visible) return undefined
@@ -172,7 +196,14 @@ export function FullScreenCaptureReward({ figure, photoUrl, onComplete }) {
           <m.div
             initial={{ opacity: 0, scale: 0.92 }}
             animate={visible ? { opacity: 1, scale: 1 } : {}}
-            transition={{ duration: 0.4, delay: reduced ? 0.08 : 0.22, ease: motionTokens.ease.premium }}
+            transition={{
+              duration: 0.4,
+              delay:
+                (reduced
+                  ? POINTS_BURST_REVEAL_DELAY_MS.reduced
+                  : POINTS_BURST_REVEAL_DELAY_MS.full) / 1000,
+              ease: motionTokens.ease.premium,
+            }}
             className="mt-6"
           >
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/85 drop-shadow-md">

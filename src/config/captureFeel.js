@@ -18,6 +18,12 @@ export const FULLSCREEN_REWARD_MS = {
   reduced: { hold: 1800 },
 }
 
+/** Delay del bloque "¡Ganaste! +X pts" tras `visible` (sincroniza animación y SFX). */
+export const POINTS_BURST_REVEAL_DELAY_MS = {
+  full: 220,
+  reduced: 80,
+}
+
 /** Card reveal — stagger cinematográfico (ms desde inicio). */
 export const REWARD_TIMINGS = {
   full: {

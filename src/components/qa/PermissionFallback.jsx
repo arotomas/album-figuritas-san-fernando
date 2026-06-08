@@ -73,7 +73,7 @@ export function PermissionFallback({
         )}
 
         <div className="mt-10 space-y-3">
-          <PremiumButton variant="lime" onClick={onRetry} className="w-full">
+          <PremiumButton variant="lime" uiSound={false} onClick={onRetry} className="w-full">
             <span className="inline-flex items-center justify-center gap-2">
               <FaRotateRight size={14} aria-hidden />
               Reintentar

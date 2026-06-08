@@ -40,7 +40,7 @@ function NearFigureOverlayInner({ nearFigure, onOpenCamera }) {
         </div>
 
         <div className="p-4">
-          <PremiumButton variant="lime" size="md" onClick={onOpenCamera}>
+          <PremiumButton variant="lime" size="md" uiSound={false} onClick={onOpenCamera}>
             {isBonus ? 'Intentar agregarla' : 'Estoy acá'}
           </PremiumButton>
         </div>

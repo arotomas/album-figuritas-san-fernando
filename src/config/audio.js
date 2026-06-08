@@ -12,8 +12,9 @@ export const DEFAULT_USER_MUSIC_ENABLED = false
 export const DEFAULT_SOUND_VOLUME = 0.75
 
 /**
- * Catálogo de assets. `src: null` = sin archivo aún; SoundService no reproduce ni precarga.
- * Cuando existan los archivos, colocarlos en `public/sounds/` y asignar la ruta aquí.
+ * Catálogo de assets en `public/sounds/`.
+ * Intención funcional (cuándo usar cada sonido): docs/SOUND_LIBRARY.md
+ * `src: null` = sin archivo; SoundService no reproduce ni precarga.
  */
 export const SOUND_CATALOG = {
   figurita_detectada: {
@@ -25,7 +26,7 @@ export const SOUND_CATALOG = {
   },
   camera_shutter: {
     id: 'camera_shutter',
-    src: '/assets/sounds/camera-shutter.mp3',
+    src: '/sounds/camera-shutter.mp3',
     preload: true,
     volume: 0.85,
     description: 'Disparo de cámara al capturar la foto.',
@@ -79,6 +80,27 @@ export const SOUND_CATALOG = {
     volume: 0.28,
     description: 'Primera señal GPS usable en la sesión.',
   },
+  ganar_puntos: {
+    id: 'ganar_puntos',
+    src: '/sounds/ganar-puntos.mp3',
+    preload: true,
+    volume: 0.82,
+    description: 'Mensaje "¡Ganaste! +X pts" en recompensa post-captura.',
+  },
+  camara_habilitada: {
+    id: 'camara_habilitada',
+    src: '/sounds/recompensa.mp3',
+    preload: true,
+    volume: 0.76,
+    description: 'Zona válida + cámara lista — listo para capturar.',
+  },
+  ui_boton: {
+    id: 'ui_boton',
+    src: '/sounds/sonido-boton.mp3',
+    preload: true,
+    volume: 0.52,
+    description: 'Feedback corto de botones y navegación UI.',
+  },
 }
 
 /** Eventos de juego → id de sonido en SOUND_CATALOG. */
@@ -92,4 +114,7 @@ export const GAME_SOUND_EVENTS = {
   INICIO_NAVEGACION: 'inicio_navegacion',
   CANCELAR_NAVEGACION: 'cancelar_navegacion',
   GPS_ENCONTRADO: 'gps_encontrado',
+  GANAR_PUNTOS: 'ganar_puntos',
+  CAMARA_HABILITADA: 'camara_habilitada',
+  UI_BOTON: 'ui_boton',
 }

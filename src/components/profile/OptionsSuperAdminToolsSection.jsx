@@ -59,11 +59,11 @@ export function OptionsSuperAdminToolsSection() {
       ) : null}
       {qaMessage ? <p className="mt-2 text-xs text-cyan-950">{qaMessage}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="outline" disabled={qaLoading} onClick={() => void handleCreateQaFigure()}>
+        <Button variant="outline" disabled={qaLoading} uiSound={false} onClick={() => void handleCreateQaFigure()}>
           {qaLoading ? 'Obteniendo ubicación…' : 'Crear figurita de prueba cerca mío'}
         </Button>
         {qaTestFigure ? (
-          <Button variant="ghost" onClick={handleClearQaFigure}>
+          <Button variant="ghost" uiSound={false} onClick={handleClearQaFigure}>
             Eliminar figurita QA
           </Button>
         ) : null}

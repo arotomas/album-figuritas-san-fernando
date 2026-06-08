@@ -35,12 +35,13 @@ export function CameraAccessGate({
 
         <div className="mt-10 space-y-3">
           {!isDenied && (
-            <PremiumButton variant="lime" onClick={onOpenCamera} className="w-full">
+            <PremiumButton variant="lime" uiSound={false} onClick={onOpenCamera} className="w-full">
               Abrir cámara
             </PremiumButton>
           )}
           <PremiumButton
             variant={isDenied ? 'lime' : 'outline'}
+            uiSound={false}
             onClick={onUseNative}
             className="w-full"
           >

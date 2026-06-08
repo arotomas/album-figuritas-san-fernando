@@ -1,8 +1,9 @@
-import { memo, useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
+import { memo, useCallback, useEffect } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { FaMapMarkedAlt, FaImages, FaCog } from 'react-icons/fa'
 import { useQaMode } from '../utils/qaMode'
 import { navTrace } from '../utils/capturePipelineTrace'
+import { playUiButtonSound } from '../services/audio/playUiButtonSound'
 
 const tabs = [
   { to: '/my-figures', label: 'Mis figuritas', icon: FaImages },
@@ -12,6 +13,7 @@ const tabs = [
 
 function BottomNavInner() {
   const { withQa } = useQaMode()
+  const location = useLocation()
 
   useEffect(() => {
     navTrace('BottomNav mount')
@@ -19,6 +21,15 @@ function BottomNavInner() {
       navTrace('BottomNav unmount')
     }
   }, [])
+
+  const handleTabClick = useCallback(
+    (to) => () => {
+      if (location.pathname !== to) {
+        playUiButtonSound()
+      }
+    },
+    [location.pathname],
+  )
 
   return (
     <nav className="bottom-nav safe-bottom safe-x z-20 shrink-0 border-t border-border bg-white/95 backdrop-blur-md">
@@ -28,6 +39,7 @@ function BottomNavInner() {
             key={to}
             to={withQa(to)}
             end
+            onClick={handleTabClick(to)}
             className={({ isActive }) =>
               `flex min-h-[52px] flex-col items-center justify-center gap-1 px-2 py-1.5 transition-colors ${
                 isActive ? 'text-ink' : 'text-muted'

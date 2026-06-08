@@ -1,6 +1,7 @@
-import { memo } from 'react'
+import { memo, useCallback } from 'react'
 import { m } from 'framer-motion'
 import { motion as motionTokens } from '../../theme/motion'
+import { playUiButtonSound } from '../../services/audio/playUiButtonSound'
 
 const variants = {
   primary:
@@ -25,8 +26,18 @@ function PremiumButtonInner({
   size = 'md',
   className = '',
   type = 'button',
+  uiSound = true,
+  onClick,
   ...props
 }) {
+  const handleClick = useCallback(
+    (event) => {
+      if (uiSound) playUiButtonSound()
+      onClick?.(event)
+    },
+    [onClick, uiSound],
+  )
+
   return (
     <m.button
       whileTap={motionTokens.tap}
@@ -34,6 +45,7 @@ function PremiumButtonInner({
       transition={motionTokens.spring.soft}
       type={type}
       className={`font-display inline-flex w-full items-center justify-center rounded-xl font-semibold uppercase tracking-wide transition-colors ${variants[variant]} ${sizes[size]} ${className}`}
+      onClick={handleClick}
       {...props}
     >
       {children}

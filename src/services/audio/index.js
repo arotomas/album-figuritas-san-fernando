@@ -6,3 +6,4 @@ export {
   stopAllGameSounds,
   stopGameSound,
 } from './playGameSound'
+export { playUiButtonSound } from './playUiButtonSound'

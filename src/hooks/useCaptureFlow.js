@@ -623,6 +623,7 @@ export function useCaptureFlow({
     if (isReady && !hasVibratedReadyRef.current) {
       if (vibrateReady()) {
         hasVibratedReadyRef.current = true
+        playGameSound('CAMARA_HABILITADA')
         if (import.meta.env.DEV) {
           console.info('[CAPTURE-READY]', {
             figureId: resolvedFigure?.id ?? null,
