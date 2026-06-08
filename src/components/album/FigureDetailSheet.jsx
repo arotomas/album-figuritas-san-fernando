@@ -8,6 +8,7 @@ import { FigureChallengeCard } from './FigureChallengeCard'
 import { LockedFigureCard } from './LockedFigureCard'
 import { canExploreFigure, resolveFigureCoordinates } from '../../utils/startFigureExploration'
 import { useAppStore } from '../../store/useAppStore'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 function formatCapturedAt(value) {
   if (!value) return null
@@ -30,6 +31,7 @@ export function FigureDetailSheet({
   const hasPhoto = Boolean(figure?.foto)
 
   const handleClose = () => {
+    playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
     setPreviewOpen(false)
     setConfirmDelete(false)
     onClose?.()
@@ -76,7 +78,10 @@ export function FigureDetailSheet({
                     {hasPhoto ? (
                       <button
                         type="button"
-                        onClick={() => setPreviewOpen(true)}
+                        onClick={() => {
+                          playUiSound(UI_SOUND_EVENTS.UI_OPEN)
+                          setPreviewOpen(true)
+                        }}
                         className="group relative block w-full overflow-hidden rounded-xl"
                         aria-label="Ver foto en pantalla completa"
                       >
@@ -191,7 +196,10 @@ export function FigureDetailSheet({
         photo={figure?.foto}
         title={figure?.nombre}
         open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
+        onClose={() => {
+          playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+          setPreviewOpen(false)
+        }}
       />
     </>
   )

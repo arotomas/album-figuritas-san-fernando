@@ -6,6 +6,7 @@ import {
   COLLECTION_STATUS_LABELS,
   getCollectionStatusTheme,
 } from '../../theme/collectionStatus'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 function CollectionSectionHeaderInner({
   progress,
@@ -182,7 +183,10 @@ function CollectionSectionHeaderInner({
     return (
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          playUiSound(UI_SOUND_EVENTS.UI_ALBUM)
+          onOpen?.()
+        }}
         className={`${className} w-full text-left`}
         style={style}
         aria-label={`Abrir colección ${collection.label}`}

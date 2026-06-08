@@ -46,7 +46,7 @@ export function NearFigureScreen() {
         <PremiumButton
           variant="outline"
           className="mt-6 w-full max-w-xs"
-          uiSound={false}
+          uiSound="UI_MAP"
           onClick={() => navigate('/map')}
         >
           Ir al mapa

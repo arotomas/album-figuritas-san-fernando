@@ -58,7 +58,7 @@ export class AlbumScreenErrorBoundary extends Component {
             </pre>
           )}
           <div className="mt-8 w-full max-w-xs">
-            <PremiumButton variant="lime" onClick={this.handleGoMap}>
+            <PremiumButton variant="lime" uiSound="UI_MAP" onClick={this.handleGoMap}>
               Volver al mapa
             </PremiumButton>
           </div>

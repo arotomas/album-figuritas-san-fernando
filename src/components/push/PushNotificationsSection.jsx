@@ -9,6 +9,7 @@ import {
 } from '../../services/push/pushSubscription'
 import { useAuth } from '../../hooks/useAuth'
 import { isSuperAdminProfile } from '../../utils/roles'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 import { PushDiagnosticPanel } from './PushDiagnosticPanel'
 
 export function PushNotificationsSection() {
@@ -40,6 +41,7 @@ export function PushNotificationsSection() {
   }, [refreshState])
 
   const handleEnable = async () => {
+    playUiSound(UI_SOUND_EVENTS.UI_SWITCH)
     setBusy(true)
     setMessage(null)
     setError(null)
@@ -64,6 +66,7 @@ export function PushNotificationsSection() {
   }
 
   const handleDisable = async () => {
+    playUiSound(UI_SOUND_EVENTS.UI_SWITCH)
     setBusy(true)
     setMessage(null)
     setError(null)
@@ -80,6 +83,7 @@ export function PushNotificationsSection() {
   }
 
   const handleForceResubscribe = async () => {
+    playUiSound(UI_SOUND_EVENTS.UI_SWITCH)
     setBusy(true)
     setMessage(null)
     setError(null)

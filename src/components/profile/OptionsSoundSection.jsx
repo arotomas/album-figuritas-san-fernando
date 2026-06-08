@@ -1,4 +1,5 @@
 import { MUSIC_ENABLED } from '../../config/audio'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 import { useAppStore } from '../../store/useAppStore'
 import { OptionsSectionCard } from './OptionsSectionCard'
 
@@ -15,7 +16,10 @@ export function OptionsSoundSection() {
         <input
           type="checkbox"
           checked={soundsEnabled !== false}
-          onChange={(event) => setSoundsEnabled(event.target.checked)}
+          onChange={(event) => {
+            playUiSound(UI_SOUND_EVENTS.UI_SWITCH)
+            setSoundsEnabled(event.target.checked)
+          }}
           className="h-5 w-5 accent-progress"
         />
       </label>
@@ -29,7 +33,10 @@ export function OptionsSoundSection() {
           type="checkbox"
           checked={musicEnabled === true}
           disabled={!MUSIC_ENABLED}
-          onChange={(event) => setMusicEnabled(event.target.checked)}
+          onChange={(event) => {
+            playUiSound(UI_SOUND_EVENTS.UI_SWITCH)
+            setMusicEnabled(event.target.checked)
+          }}
           className="h-5 w-5 accent-progress disabled:opacity-40"
         />
       </label>

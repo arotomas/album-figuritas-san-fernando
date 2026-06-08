@@ -1,6 +1,7 @@
 import { m } from 'framer-motion'
 import { getFigureChallenge } from '../../utils/figureChallenges'
 import { typeClasses } from '../../theme/typography'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
   const challenge = getFigureChallenge(figure)
@@ -17,7 +18,10 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
       <header className="relative z-10 flex items-center justify-between px-5 pt-4">
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+            onClose?.()
+          }}
           className="rounded-full border border-border bg-warm-white/80 px-4 py-2 text-xs font-bold text-ink dark:border-white/15 dark:bg-white/5 dark:text-warm-white"
         >
           Volver
@@ -70,7 +74,10 @@ export function CaptureChallengeInterstitial({ figure, onContinue, onClose }) {
       <div className="relative z-10 px-5 pb-6">
         <button
           type="button"
-          onClick={onContinue}
+          onClick={() => {
+            playUiSound(UI_SOUND_EVENTS.UI_CONFIRM)
+            onContinue?.()
+          }}
           className="w-full rounded-2xl bg-progress px-5 py-4 text-base font-black text-ink shadow-[0_0_28px_rgba(140,198,63,0.24)]"
         >
           Entendido

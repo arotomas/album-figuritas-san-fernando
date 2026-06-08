@@ -1,5 +1,6 @@
 import { FaCamera, FaLocationDot, FaRotateRight } from 'react-icons/fa6'
 import { PremiumButton } from '../ui/PremiumButton'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 import { classifyCameraError } from '../../utils/recovery'
 
 export function PermissionFallback({
@@ -81,7 +82,10 @@ export function PermissionFallback({
           </PremiumButton>
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => {
+              playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+              onBack?.()
+            }}
             className="w-full min-h-[44px] py-3 text-sm font-medium text-zinc-500"
           >
             Volver al mapa

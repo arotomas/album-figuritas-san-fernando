@@ -90,7 +90,12 @@ export function OptionsScreen() {
               <p className="mt-1 text-xs text-muted">
                 El álbum quedó vacío. ¡A explorar de nuevo!
               </p>
-              <Button variant="ghost" className="mt-3" onClick={handleResetCancel}>
+              <Button
+                variant="ghost"
+                className="mt-3"
+                uiSound="UI_CONFIRM"
+                onClick={handleResetCancel}
+              >
                 Entendido
               </Button>
             </div>
@@ -102,10 +107,10 @@ export function OptionsScreen() {
                 no se puede deshacer.
               </p>
               <div className="mt-4 flex flex-col gap-2">
-                <Button variant="outline" onClick={handleResetConfirm}>
+                <Button variant="outline" uiSound="UI_CONFIRM" onClick={handleResetConfirm}>
                   Sí, reiniciar todo
                 </Button>
-                <Button variant="ghost" onClick={handleResetCancel}>
+                <Button variant="ghost" uiSound="UI_CLOSE" onClick={handleResetCancel}>
                   Cancelar
                 </Button>
               </div>
@@ -114,6 +119,7 @@ export function OptionsScreen() {
             <>
               <Button
                 variant="outline"
+                uiSound="UI_CLICK"
                 disabled={resetPhase === 'loading'}
                 onClick={handleResetRequest}
               >
@@ -126,7 +132,7 @@ export function OptionsScreen() {
               ) : null}
             </>
           )}
-          <Button variant="ghost" onClick={logout}>
+          <Button variant="ghost" uiSound="UI_CLICK" onClick={logout}>
             Cerrar sesión
           </Button>
           <LegalNotice className="pt-4" />

@@ -109,7 +109,7 @@ export function ProfileSetupScreen() {
         )}
 
         <motion.div variants={staggerItem}>
-          <Button type="submit" variant="progress" disabled={isSubmitting}>
+          <Button type="submit" variant="progress" uiSound="UI_CONFIRM" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando perfil…' : 'Empezar a explorar'}
           </Button>
         </motion.div>

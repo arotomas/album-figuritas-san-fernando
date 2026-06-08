@@ -86,7 +86,12 @@ export function ProfileOptionsSection() {
           <p>
             <span className="text-muted">Dirección:</span> {supabaseProfile?.direccion_texto ?? '-'}
           </p>
-          <Button variant="outline" className="mt-2" onClick={() => setEditingProfile(true)}>
+          <Button
+            variant="outline"
+            className="mt-2"
+            uiSound="UI_CLICK"
+            onClick={() => setEditingProfile(true)}
+          >
             Editar perfil
           </Button>
         </div>
@@ -128,10 +133,10 @@ export function ProfileOptionsSection() {
           {profileError && <p className="text-xs font-medium text-red-600">{profileError}</p>}
           {profileMessage && <p className="text-xs font-medium text-progress">{profileMessage}</p>}
           <div className="flex flex-wrap gap-2">
-            <Button disabled={isSubmitting} onClick={handleSaveProfile}>
+            <Button uiSound="UI_CONFIRM" disabled={isSubmitting} onClick={handleSaveProfile}>
               {isSubmitting ? 'Guardando…' : 'Guardar cambios'}
             </Button>
-            <Button variant="ghost" onClick={() => setEditingProfile(false)}>
+            <Button variant="ghost" uiSound="UI_CLOSE" onClick={() => setEditingProfile(false)}>
               Cancelar
             </Button>
           </div>

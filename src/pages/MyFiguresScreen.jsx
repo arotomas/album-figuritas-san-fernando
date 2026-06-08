@@ -29,6 +29,7 @@ import { logAlbumAvailabilitySnapshot } from '../utils/universeDiagnostics'
 import { getMapProximityHint } from '../utils/proximityExperience'
 import { startFigureExploration } from '../utils/startFigureExploration'
 import { syncAlbumUniverse } from '../utils/albumUniverseSync'
+import { playUiSound, UI_SOUND_EVENTS } from '../services/audio/playUiSound'
 
 const STATUS_LABELS = {
   [ALBUM_STATUS.EN_PROGRESO]: 'En progreso',
@@ -320,6 +321,7 @@ export function MyFiguresScreenInner() {
       }
 
       vibrateAlbumSwipe()
+      playUiSound(UI_SOUND_EVENTS.UI_ALBUM)
       setLastViewedFigure(figureId)
 
       if (selected.obtenida) {

@@ -95,7 +95,11 @@ export function PwaInstallBanner() {
           />
         </div>
         {!isIos && canPromptInstall && (
-          <Button className="mx-auto mt-3 w-full max-w-xs" onClick={handleInstall}>
+          <Button
+            className="mx-auto mt-3 w-full max-w-xs"
+            uiSound="UI_CONFIRM"
+            onClick={handleInstall}
+          >
             Instalar ahora
           </Button>
         )}

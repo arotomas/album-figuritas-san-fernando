@@ -17,6 +17,7 @@ import { delay } from '../utils/recovery'
 import { useQaMode } from '../utils/qaMode'
 import { captureSyncLog } from '../utils/captureSyncLog'
 import { captureFlowLog } from '../utils/captureFlowLog'
+import { playUiSound, UI_SOUND_EVENTS } from '../services/audio/playUiSound'
 import {
   capturePipelineTrace,
   prefetchMyFiguresChunk,
@@ -744,14 +745,20 @@ export function CaptureFlow() {
           <div className="mt-3 flex flex-col gap-2">
             <button
               type="button"
-              onClick={retryCapture}
+              onClick={() => {
+                playUiSound(UI_SOUND_EVENTS.UI_CLICK)
+                retryCapture()
+              }}
               className="min-h-[44px] rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase text-white"
             >
               Volver a intentar
             </button>
             <button
               type="button"
-              onClick={handleClose}
+              onClick={() => {
+                playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+                handleClose()
+              }}
               className="min-h-[44px] text-xs font-semibold text-white/75 underline"
             >
               Volver al mapa

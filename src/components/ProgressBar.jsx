@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/useAppStore'
 import { getMainProgressState, getRevealedNormalFigures } from '../utils/figureGameRules'
+import { playUiSound, UI_SOUND_EVENTS } from '../services/audio/playUiSound'
 
 function ProgressBarInner({
   className = '',
@@ -61,6 +62,7 @@ function ProgressBarInner({
           onClick={() => {
             const next = visibleFigures.find((f) => !f.obtenida)
             if (!next) return
+            playUiSound(UI_SOUND_EVENTS.UI_MAP)
             setNearFigure({ ...next, distanceMeters: 12 })
             navigate('/near')
           }}

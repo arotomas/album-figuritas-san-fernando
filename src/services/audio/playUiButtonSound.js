@@ -1,6 +1,9 @@
-import { playGameSound } from './playGameSound'
+import { playUiSound, UI_SOUND_EVENTS } from './playUiSound'
 
-/** SFX de interfaz — no usar en captura, recompensas ni gameplay. */
+/**
+ * @deprecated Usar playUiSound(UI_SOUND_EVENTS.UI_CLICK).
+ * Mantiene compatibilidad temporal; ya no reproduce UI_BOTON legacy.
+ */
 export function playUiButtonSound() {
-  return playGameSound('UI_BOTON')
+  return playUiSound(UI_SOUND_EVENTS.UI_CLICK)
 }

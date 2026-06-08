@@ -7,6 +7,7 @@ import { RarityBadge } from '../ui/RarityBadge'
 import { FigureChallengeCard } from './FigureChallengeCard'
 import { RarityAmbience, getRarityFrameStyle } from './RarityAmbience'
 import { vibrateAlbumSwipe } from '../../utils/vibration'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 const DISMISS_THRESHOLD = 96
 
@@ -47,6 +48,7 @@ function FigureSlideContent({
       dragElastic={0.18}
       onDragEnd={(_, info) => {
         if (info.offset.y > DISMISS_THRESHOLD || info.velocity.y > 520) {
+          playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
           onClose?.()
         }
       }}
@@ -164,6 +166,11 @@ export function FigureCollectionViewer({
     getCollectionLabel?.(figure) ??
     (figure?.is_bonus ? 'Colección bonus' : 'Colección principal')
 
+  const handleClose = useCallback(() => {
+    playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+    onClose?.()
+  }, [onClose])
+
   const goTo = useCallback(
     (nextIndex, nextDirection) => {
       if (nextIndex < 0 || nextIndex >= figures.length) return
@@ -181,14 +188,14 @@ export function FigureCollectionViewer({
     if (!open) return undefined
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose?.()
+      if (event.key === 'Escape') handleClose()
       if (event.key === 'ArrowLeft') goPrev()
       if (event.key === 'ArrowRight') goNext()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [goNext, goPrev, onClose, open])
+  }, [goNext, goPrev, handleClose, open])
 
   const slideVariants = {
     enter: (dir) => ({ opacity: 0, x: dir >= 0 ? 48 : -48, scale: 0.96 }),
@@ -205,14 +212,14 @@ export function FigureCollectionViewer({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut' }}
-          onClick={onClose}
+          onClick={handleClose}
           role="dialog"
           aria-modal="true"
           aria-label={`Figurita ${figure.nombre}`}
         >
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Cerrar"
             className="absolute right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
           >
@@ -278,7 +285,7 @@ export function FigureCollectionViewer({
                   collectionLabel={collectionLabel}
                   onRetakePhoto={onRetakePhoto}
                   onDeletePhoto={onDeletePhoto}
-                  onClose={onClose}
+                  onClose={handleClose}
                 />
               </m.div>
             </AnimatePresence>

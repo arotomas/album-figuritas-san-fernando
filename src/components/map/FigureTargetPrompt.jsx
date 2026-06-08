@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { PremiumButton } from '../ui/PremiumButton'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 function FigureTargetPromptInner({ figure, onConfirm, onDismiss }) {
   if (!figure) return null
@@ -21,7 +22,10 @@ function FigureTargetPromptInner({ figure, onConfirm, onDismiss }) {
             size="md"
             className="flex-1 border border-white/25 bg-white/10 text-white hover:bg-white/20"
             uiSound={false}
-            onClick={onDismiss}
+            onClick={() => {
+              playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+              onDismiss?.()
+            }}
           >
             Cancelar
           </PremiumButton>

@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react'
 import { m } from 'framer-motion'
 import { motion as motionTokens } from '../../theme/motion'
-import { playUiButtonSound } from '../../services/audio/playUiButtonSound'
+import { playUiSound, resolveUiSoundEvent } from '../../services/audio/playUiSound'
 
 const variants = {
   primary:
@@ -26,13 +26,14 @@ function PremiumButtonInner({
   size = 'md',
   className = '',
   type = 'button',
-  uiSound = true,
+  uiSound = 'UI_CLICK',
   onClick,
   ...props
 }) {
   const handleClick = useCallback(
     (event) => {
-      if (uiSound) playUiButtonSound()
+      const soundEvent = resolveUiSoundEvent(uiSound)
+      if (soundEvent) playUiSound(soundEvent)
       onClick?.(event)
     },
     [onClick, uiSound],

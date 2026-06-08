@@ -87,6 +87,7 @@ export function LoginScreen() {
           <Button
             type="submit"
             variant="progress"
+            uiSound="UI_CONFIRM"
             disabled={isSubmitting || !email.trim() || !password}
           >
             {isSubmitting ? 'Ingresando…' : 'Ingresar'}
@@ -94,7 +95,13 @@ export function LoginScreen() {
         </motion.form>
 
         <motion.div variants={staggerItem}>
-          <Button type="button" variant="outline" disabled={isSubmitting} onClick={handleGoogle}>
+          <Button
+            type="button"
+            variant="outline"
+            uiSound="UI_CONFIRM"
+            disabled={isSubmitting}
+            onClick={handleGoogle}
+          >
             <span className="inline-flex items-center gap-2">
               <FaGoogle />
               Continuar con Google

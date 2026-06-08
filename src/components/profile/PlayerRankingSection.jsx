@@ -235,6 +235,7 @@ export function PlayerRankingSection() {
             <Button
               variant="outline"
               className="border-white/40 bg-white/10 text-white hover:bg-white/20"
+              uiSound="UI_CLICK"
               onClick={() => void reload()}
             >
               Reintentar

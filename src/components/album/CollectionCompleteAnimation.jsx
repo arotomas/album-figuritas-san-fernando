@@ -4,6 +4,7 @@ import { FaXmark } from 'react-icons/fa6'
 import { typeClasses } from '../../theme/typography'
 import { motion as motionTokens } from '../../theme/motion'
 import { vibrateCollectionComplete } from '../../utils/vibration'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 export function CollectionCompleteAnimation({ progress, open, onComplete }) {
   const onCompleteRef = useRef(onComplete)
@@ -38,7 +39,10 @@ export function CollectionCompleteAnimation({ progress, open, onComplete }) {
         >
           <button
             type="button"
-            onClick={() => onCompleteRef.current?.()}
+            onClick={() => {
+              playUiSound(UI_SOUND_EVENTS.UI_CLOSE)
+              onCompleteRef.current?.()
+            }}
             aria-label="Cerrar"
             className="absolute right-4 top-[calc(0.75rem+env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
           >

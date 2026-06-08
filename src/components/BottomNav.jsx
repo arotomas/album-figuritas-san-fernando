@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { FaMapMarkedAlt, FaImages, FaCog } from 'react-icons/fa'
 import { useQaMode } from '../utils/qaMode'
 import { navTrace } from '../utils/capturePipelineTrace'
-import { playUiButtonSound } from '../services/audio/playUiButtonSound'
+import { playUiSound, UI_SOUND_EVENTS } from '../services/audio/playUiSound'
 
 const tabs = [
   { to: '/my-figures', label: 'Mis figuritas', icon: FaImages },
@@ -25,7 +25,7 @@ function BottomNavInner() {
   const handleTabClick = useCallback(
     (to) => () => {
       if (location.pathname !== to) {
-        playUiButtonSound()
+        playUiSound(UI_SOUND_EVENTS.UI_TAB)
       }
     },
     [location.pathname],

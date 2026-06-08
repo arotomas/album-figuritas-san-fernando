@@ -60,7 +60,12 @@ export function ForgotPasswordScreen() {
           </p>
         )}
 
-        <Button type="submit" variant="progress" disabled={isSubmitting || !email.trim()}>
+        <Button
+          type="submit"
+          variant="progress"
+          uiSound="UI_CONFIRM"
+          disabled={isSubmitting || !email.trim()}
+        >
           {isSubmitting ? 'Enviando…' : 'Enviar link'}
         </Button>
 

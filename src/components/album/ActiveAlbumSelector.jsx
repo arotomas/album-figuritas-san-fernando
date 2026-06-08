@@ -1,4 +1,5 @@
 import { useActiveAlbum } from '../../hooks/useActiveAlbum'
+import { playUiSound, UI_SOUND_EVENTS } from '../../services/audio/playUiSound'
 
 const VARIANTS = {
   card: {
@@ -49,6 +50,7 @@ export function ActiveAlbumSelector({ className = '', variant = 'card' }) {
           value={activeAlbumId ?? ''}
           disabled={albumUniverseLoading}
           onChange={(event) => {
+            playUiSound(UI_SOUND_EVENTS.UI_ALBUM)
             void switchActiveAlbum(event.target.value, { acknowledgeSession: true })
           }}
           className={styles.select}

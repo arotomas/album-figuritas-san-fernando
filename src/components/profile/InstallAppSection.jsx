@@ -71,7 +71,7 @@ export function InstallAppSection() {
 
       {!isIos && !isInAppBrowser ? (
         <div className="mt-4">
-          <Button disabled={!canPromptInstall} onClick={handleInstall}>
+          <Button uiSound="UI_CONFIRM" disabled={!canPromptInstall} onClick={handleInstall}>
             Instalar app
           </Button>
           {!canPromptInstall ? (

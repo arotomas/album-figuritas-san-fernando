@@ -57,6 +57,7 @@ export function ResetPasswordScreen() {
         <Button
           type="submit"
           variant="progress"
+          uiSound="UI_CONFIRM"
           disabled={isSubmitting || !password || !confirmPassword}
         >
           {isSubmitting ? 'Guardando…' : 'Actualizar contraseña'}
