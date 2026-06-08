@@ -3,6 +3,7 @@ import { Button } from '../Button'
 import { InstallAppInstructions } from '../pwa/InstallAppInstructions'
 import { usePwaInstall } from '../../hooks/usePwaInstall'
 import { pwaLog } from '../../utils/pwaLog'
+import { OptionsSectionCard } from './OptionsSectionCard'
 
 export function InstallAppSection() {
   const {
@@ -56,12 +57,10 @@ export function InstallAppSection() {
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
-      <p className="text-xs uppercase tracking-wide text-muted">Aplicación</p>
-      <p className="mt-2 text-sm leading-relaxed text-ink">
-        Instalá el álbum en tu celular para una experiencia más fluida al caminar y capturar.
-      </p>
-
+    <OptionsSectionCard
+      title="Instalar app"
+      description="Instalá el álbum en tu celular para una experiencia más fluida al caminar y capturar."
+    >
       <div className="mt-4">
         <InstallAppInstructions
           isIos={isIos}
@@ -70,20 +69,20 @@ export function InstallAppSection() {
         />
       </div>
 
-      {!isIos && !isInAppBrowser && (
+      {!isIos && !isInAppBrowser ? (
         <div className="mt-4">
           <Button disabled={!canPromptInstall} onClick={handleInstall}>
             Instalar app
           </Button>
-          {!canPromptInstall && (
+          {!canPromptInstall ? (
             <p className="mt-2 text-xs leading-relaxed text-muted">
               Si el botón no se activa, usá el menú del navegador como se indica arriba.
             </p>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
 
-      {message && <p className="mt-3 text-xs text-progress">{message}</p>}
-    </div>
+      {message ? <p className="mt-3 text-xs text-progress">{message}</p> : null}
+    </OptionsSectionCard>
   )
 }

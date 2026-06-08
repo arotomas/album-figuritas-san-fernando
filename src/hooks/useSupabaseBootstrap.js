@@ -15,6 +15,10 @@ import { supabaseLog } from '../utils/supabaseLog'
 import { authLog } from '../utils/authLog'
 import { authRestoreLog } from '../utils/authRestoreLog'
 import { isProfileComplete } from '../utils/profileValidation'
+import {
+  VISUAL_PREVIEW_ENABLED,
+  seedVisualPreviewAuth,
+} from '../dev/visualPreview'
 
 async function syncRemoteUniverse(replaceCatalogFromRemote, getState, setAlbumState) {
   const preferredAlbumId = getState?.()?.activeAlbumId ?? null
@@ -116,6 +120,17 @@ export function useSupabaseBootstrap(enabled) {
 
   useEffect(() => {
     if (!enabled) return
+
+    if (VISUAL_PREVIEW_ENABLED) {
+      replaceCatalogFromRemote([])
+      seedVisualPreviewAuth({
+        setSupabaseAuth,
+        login,
+        setAuthBootstrapped,
+        setAlbumState,
+      })
+      return undefined
+    }
 
     let cancelled = false
 

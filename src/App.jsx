@@ -15,12 +15,17 @@ import { useAppBootGate } from './hooks/useAppBootGate'
 import { isAdminExperiencePath } from './utils/postAuthRedirect'
 import { dismissStaticSplash } from './utils/staticSplash'
 import { useAppStore } from './store/useAppStore'
+import { VISUAL_PREVIEW_ENABLED } from './dev/visualPreview'
 
 function App() {
   const location = useLocation()
   const isAdminExperience = isAdminExperiencePath(location.pathname, location.search)
-  const { isBooting, bootPhase } = useAppBootGate({ skipReadyHold: isAdminExperience })
-  const [splashComplete, setSplashComplete] = useState(() => isAdminExperience)
+  const { isBooting, bootPhase } = useAppBootGate({
+    skipReadyHold: isAdminExperience || VISUAL_PREVIEW_ENABLED,
+  })
+  const [splashComplete, setSplashComplete] = useState(
+    () => isAdminExperience || VISUAL_PREVIEW_ENABLED,
+  )
   const handleSplashComplete = useCallback(() => {
     setSplashComplete(true)
   }, [])
@@ -33,7 +38,7 @@ function App() {
   const isAdminRoute = location.pathname.startsWith('/admin')
 
   useEffect(() => {
-    if (isAdminExperience) {
+    if (isAdminExperience || VISUAL_PREVIEW_ENABLED) {
       setSplashComplete(true)
       dismissStaticSplash()
     }

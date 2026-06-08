@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchPlayerRanking } from '../services/supabase/ranking'
 import { PLAYER_PROGRESS_RESET_EVENT } from '../utils/playerProgressReset'
+import { VISUAL_PREVIEW_ENABLED, VISUAL_PREVIEW_RANKING } from '../dev/visualPreview'
 
 function getErrorMessage(error) {
   if (error?.message === 'UNAUTHENTICATED') {
@@ -33,8 +34,16 @@ export function usePlayerRanking(limit = 20) {
   }, [limit])
 
   useEffect(() => {
+    if (VISUAL_PREVIEW_ENABLED) {
+      setLeaderboard(VISUAL_PREVIEW_RANKING.leaderboard.slice(0, limit))
+      setMe(VISUAL_PREVIEW_RANKING.me)
+      setLoading(false)
+      setError(null)
+      return undefined
+    }
+
     void reload()
-  }, [reload])
+  }, [reload, limit])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined

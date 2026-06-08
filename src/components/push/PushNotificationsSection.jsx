@@ -7,9 +7,13 @@ import {
   isPushSupported,
   subscribeToPushNotifications,
 } from '../../services/push/pushSubscription'
+import { useAuth } from '../../hooks/useAuth'
+import { isSuperAdminProfile } from '../../utils/roles'
 import { PushDiagnosticPanel } from './PushDiagnosticPanel'
 
 export function PushNotificationsSection() {
+  const { supabaseProfile } = useAuth()
+  const showDiagnostics = isSuperAdminProfile(supabaseProfile)
   const supported = isPushSupported()
   const [permission, setPermission] = useState(() => getPushPermissionState())
   const [subscribed, setSubscribed] = useState(false)
@@ -164,7 +168,7 @@ export function PushNotificationsSection() {
         </p>
       )}
 
-      <PushDiagnosticPanel />
+      {showDiagnostics ? <PushDiagnosticPanel /> : null}
     </section>
   )
 }
