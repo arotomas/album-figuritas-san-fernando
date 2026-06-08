@@ -49,8 +49,13 @@ type WebPushClient = {
   sendNotification: (
     subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
     payload: string,
-    options?: { TTL?: number },
+    options?: { TTL?: number; urgency?: 'very-low' | 'low' | 'normal' | 'high' },
   ) => Promise<unknown>
+}
+
+const WEB_PUSH_DELIVERY_OPTIONS = {
+  TTL: 86400,
+  urgency: 'high' as const,
 }
 
 export async function deliverPushNotification(
@@ -68,13 +73,15 @@ export async function deliverPushNotification(
   }
 
   try {
+    console.log(`[${logPrefix}] webpush options`, WEB_PUSH_DELIVERY_OPTIONS)
+
     await webpushLib.sendNotification(
       {
         endpoint: row.endpoint,
         keys: { p256dh: row.p256dh, auth: row.auth },
       },
       payload,
-      { TTL: 86400 },
+      WEB_PUSH_DELIVERY_OPTIONS,
     )
 
     console.log(`[${logPrefix}] webpush OK`, {
