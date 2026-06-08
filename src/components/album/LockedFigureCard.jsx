@@ -20,11 +20,6 @@ function LockedFigureCardInner({
     >
       <LockedFigurePlaceholder className="absolute inset-0" />
 
-      <div
-        className={`absolute inset-x-0 top-0 h-0.5 ${isBonus ? 'bg-amber-300/70' : 'bg-[#DADDE3]'}`}
-        aria-hidden
-      />
-
       {isFeatured && (
         <div
           className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#F3F4F6] via-[#F3F4F6]/88 to-transparent px-4 pb-5 pt-16 text-center"
