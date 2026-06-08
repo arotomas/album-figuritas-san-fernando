@@ -101,6 +101,13 @@ export const SOUND_CATALOG = {
     volume: 0.52,
     description: 'Feedback corto de botones y navegación UI.',
   },
+  completar_album: {
+    id: 'completar_album',
+    src: '/sounds/completar-album.mp3',
+    preload: true,
+    volume: 1,
+    description: 'Celebración al completar 10/10 figuritas normales del álbum activo.',
+  },
 }
 
 /** Eventos de juego → id de sonido en SOUND_CATALOG. */
@@ -117,4 +124,5 @@ export const GAME_SOUND_EVENTS = {
   GANAR_PUNTOS: 'ganar_puntos',
   CAMARA_HABILITADA: 'camara_habilitada',
   UI_BOTON: 'ui_boton',
+  COMPLETAR_ALBUM: 'completar_album',
 }

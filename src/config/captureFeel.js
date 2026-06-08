@@ -24,6 +24,12 @@ export const POINTS_BURST_REVEAL_DELAY_MS = {
   reduced: 80,
 }
 
+/** Pausa tras GANAR_PUNTOS antes de COMPLETAR_ALBUM (ms). */
+export const COMPLETAR_ALBUM_AFTER_GANAR_PUNTOS_MS = {
+  full: 420,
+  reduced: 200,
+}
+
 /** Card reveal — stagger cinematográfico (ms desde inicio). */
 export const REWARD_TIMINGS = {
   full: {

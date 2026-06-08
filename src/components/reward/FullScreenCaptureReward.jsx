@@ -4,10 +4,12 @@ import { getRarity } from '../../theme/rarity'
 import { motion as motionTokens } from '../../theme/motion'
 import { typeClasses } from '../../theme/typography'
 import {
+  COMPLETAR_ALBUM_AFTER_GANAR_PUNTOS_MS,
   FULLSCREEN_REWARD_MS,
   POINTS_BURST_REVEAL_DELAY_MS,
 } from '../../config/captureFeel'
 import { playGameSound } from '../../services/audio'
+import { useAppStore } from '../../store/useAppStore'
 import { ParticleLayer } from '../ui/ParticleLayer'
 import { prefersReducedMotion } from '../../utils/performance'
 import { rewardLog } from '../../utils/devLog'
@@ -36,6 +38,17 @@ export function FullScreenCaptureReward({ figure, photoUrl, onComplete }) {
   const mountedRef = useRef(true)
   const pointsBurstTriggeredRef = useRef(false)
   const ganarPuntosSoundPlayedRef = useRef(false)
+  const completarAlbumSoundPlayedRef = useRef(false)
+  const pendingMainAlbumCompleteSoundAlbumId = useAppStore(
+    (state) => state.pendingMainAlbumCompleteSoundAlbumId,
+  )
+  const celebratedMainAlbumIds = useAppStore((state) => state.celebratedMainAlbumIds)
+  const acknowledgeMainAlbumCelebration = useAppStore(
+    (state) => state.acknowledgeMainAlbumCelebration,
+  )
+  const clearPendingMainAlbumCompleteSound = useAppStore(
+    (state) => state.clearPendingMainAlbumCompleteSound,
+  )
 
   const pointsEarned = useMemo(
     () => resolveFigurePointsFromCatalog(figure),
@@ -91,6 +104,7 @@ export function FullScreenCaptureReward({ figure, photoUrl, onComplete }) {
   useEffect(() => {
     pointsBurstTriggeredRef.current = false
     ganarPuntosSoundPlayedRef.current = false
+    completarAlbumSoundPlayedRef.current = false
     setVisible(false)
     const revealTimer = window.setTimeout(() => setVisible(true), 60)
     return () => window.clearTimeout(revealTimer)
@@ -113,6 +127,61 @@ export function FullScreenCaptureReward({ figure, photoUrl, onComplete }) {
 
     return () => window.clearTimeout(soundTimer)
   }, [figure?.id, reduced, showPoints, visible])
+
+  useEffect(() => {
+    if (!visible || completarAlbumSoundPlayedRef.current) {
+      return undefined
+    }
+
+    const albumId = pendingMainAlbumCompleteSoundAlbumId
+      ? String(pendingMainAlbumCompleteSoundAlbumId)
+      : null
+    if (!albumId) return undefined
+
+    const celebrated = Array.isArray(celebratedMainAlbumIds)
+      ? celebratedMainAlbumIds.map(String)
+      : []
+    if (celebrated.includes(albumId)) {
+      clearPendingMainAlbumCompleteSound()
+      return undefined
+    }
+
+    const ganarPuntosDelay = reduced
+      ? POINTS_BURST_REVEAL_DELAY_MS.reduced
+      : POINTS_BURST_REVEAL_DELAY_MS.full
+    const afterGanarPuntos = reduced
+      ? COMPLETAR_ALBUM_AFTER_GANAR_PUNTOS_MS.reduced
+      : COMPLETAR_ALBUM_AFTER_GANAR_PUNTOS_MS.full
+    const delayMs = ganarPuntosDelay + afterGanarPuntos
+
+    const albumSoundTimer = window.setTimeout(() => {
+      if (!mountedRef.current || completarAlbumSoundPlayedRef.current) return
+
+      const latestCelebrated = useAppStore.getState().celebratedMainAlbumIds ?? []
+      if (latestCelebrated.map(String).includes(albumId)) {
+        clearPendingMainAlbumCompleteSound()
+        return
+      }
+
+      completarAlbumSoundPlayedRef.current = true
+      playGameSound('COMPLETAR_ALBUM')
+      acknowledgeMainAlbumCelebration(albumId)
+      rewardLog.info('main album complete sound played', {
+        figureId: figure?.id ?? null,
+        albumId,
+      })
+    }, delayMs)
+
+    return () => window.clearTimeout(albumSoundTimer)
+  }, [
+    acknowledgeMainAlbumCelebration,
+    celebratedMainAlbumIds,
+    clearPendingMainAlbumCompleteSound,
+    figure?.id,
+    pendingMainAlbumCompleteSoundAlbumId,
+    reduced,
+    visible,
+  ])
 
   useEffect(() => {
     if (!visible) return undefined

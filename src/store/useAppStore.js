@@ -120,8 +120,10 @@ function buildLocalProgressResetPatch(state) {
     lastViewedFigureId: null,
     lastSavedAt: Date.now(),
     celebratedCollectionIds: [],
+    celebratedMainAlbumIds: [],
     discoveredCollectionIds: [],
     acknowledgedDiscoveryCollectionIds: [],
+    pendingMainAlbumCompleteSoundAlbumId: null,
     nearFigure: null,
     qaTestFigure: null,
     captureSession: null,
@@ -172,8 +174,10 @@ function resetStoreToDefaults() {
     lastViewedFigureId: null,
     lastSavedAt: null,
     celebratedCollectionIds: [],
+    celebratedMainAlbumIds: [],
     discoveredCollectionIds: [],
     acknowledgedDiscoveryCollectionIds: [],
+    pendingMainAlbumCompleteSoundAlbumId: null,
     isAuthenticated: false,
     user: null,
     nearFigure: null,
@@ -220,6 +224,9 @@ function buildPersistedSnapshot(state) {
     lastSavedAt: state.lastSavedAt,
     celebratedCollectionIds: Array.isArray(state.celebratedCollectionIds)
       ? state.celebratedCollectionIds
+      : [],
+    celebratedMainAlbumIds: Array.isArray(state.celebratedMainAlbumIds)
+      ? state.celebratedMainAlbumIds
       : [],
     discoveredCollectionIds: Array.isArray(state.discoveredCollectionIds)
       ? state.discoveredCollectionIds
@@ -306,8 +313,10 @@ export const useAppStore = create(
       lastViewedFigureId: null,
       lastSavedAt: null,
       celebratedCollectionIds: [],
-    discoveredCollectionIds: [],
-    acknowledgedDiscoveryCollectionIds: [],
+      celebratedMainAlbumIds: [],
+      pendingMainAlbumCompleteSoundAlbumId: null,
+      discoveredCollectionIds: [],
+      acknowledgedDiscoveryCollectionIds: [],
       supabaseUserId: null,
       supabaseReady: false,
       isSupabaseAdmin: false,
@@ -992,6 +1001,28 @@ export const useAppStore = create(
             lastSavedAt: Date.now(),
           }
         }),
+
+      acknowledgeMainAlbumCelebration: (albumId) =>
+        set((state) => {
+          const id = String(albumId)
+          const current = Array.isArray(state.celebratedMainAlbumIds)
+            ? state.celebratedMainAlbumIds
+            : []
+          if (current.includes(id)) {
+            return {
+              pendingMainAlbumCompleteSoundAlbumId: null,
+              lastSavedAt: Date.now(),
+            }
+          }
+          return {
+            celebratedMainAlbumIds: [...current, id],
+            pendingMainAlbumCompleteSoundAlbumId: null,
+            lastSavedAt: Date.now(),
+          }
+        }),
+
+      clearPendingMainAlbumCompleteSound: () =>
+        set({ pendingMainAlbumCompleteSoundAlbumId: null }),
 
       acknowledgeCollectionDiscovery: (collectionId) =>
         set((state) => {

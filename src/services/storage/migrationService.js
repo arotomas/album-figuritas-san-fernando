@@ -36,6 +36,9 @@ export function sanitizePersistedState(raw) {
     celebratedCollectionIds: Array.isArray(source.celebratedCollectionIds)
       ? source.celebratedCollectionIds.filter((id) => typeof id === 'string')
       : [],
+    celebratedMainAlbumIds: Array.isArray(source.celebratedMainAlbumIds)
+      ? source.celebratedMainAlbumIds.filter((id) => typeof id === 'string')
+      : [],
     discoveredCollectionIds: Array.isArray(source.discoveredCollectionIds)
       ? source.discoveredCollectionIds.filter((id) => typeof id === 'string')
       : [],
@@ -146,6 +149,7 @@ export function migratePersistedState(raw) {
         lastViewedFigureId: sanitized.lastViewedFigureId ?? null,
         lastSavedAt: sanitized.lastSavedAt ?? null,
         celebratedCollectionIds: sanitized.celebratedCollectionIds ?? [],
+        celebratedMainAlbumIds: sanitized.celebratedMainAlbumIds ?? [],
         discoveredCollectionIds,
         acknowledgedDiscoveryCollectionIds,
       },

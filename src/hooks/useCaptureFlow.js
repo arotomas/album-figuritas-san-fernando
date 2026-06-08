@@ -50,6 +50,8 @@ import {
 } from '../utils/capturePipelineTrace'
 import { mobilePhotoLog } from '../utils/mobilePhotoLog'
 import { hasCaptureChallenge } from '../utils/figureChallenges'
+import { detectMainAlbumCompletionTransition } from '../utils/figureGameRules'
+import { useAppStore } from '../store/useAppStore'
 
 export const CAPTURE_PHASES = {
   CHALLENGE: 'challenge',
@@ -716,6 +718,37 @@ export function useCaptureFlow({
           new Error(isMobilePhoto ? MOBILE_PHOTO_RECOVERABLE_ERROR : CAPTURE_RECOVERABLE_ERROR),
         )
         return false
+      }
+
+      const storeState = useAppStore.getState()
+      const mainAlbumTransition = detectMainAlbumCompletionTransition(
+        storeState.figures,
+        figureSnapshot.id,
+      )
+      const activeAlbumId = storeState.activeAlbumId
+        ? String(storeState.activeAlbumId)
+        : null
+      const celebratedMainAlbumIds = Array.isArray(storeState.celebratedMainAlbumIds)
+        ? storeState.celebratedMainAlbumIds.map(String)
+        : []
+      const shouldCelebrateMainAlbum =
+        Boolean(mainAlbumTransition) &&
+        Boolean(activeAlbumId) &&
+        !celebratedMainAlbumIds.includes(activeAlbumId)
+
+      useAppStore.setState({
+        pendingMainAlbumCompleteSoundAlbumId: shouldCelebrateMainAlbum
+          ? activeAlbumId
+          : null,
+      })
+
+      if (shouldCelebrateMainAlbum) {
+        rewardLog.info('main album completion transition', {
+          figureId: figureSnapshot.id,
+          albumId: activeAlbumId,
+          obtained: mainAlbumTransition.obtained,
+          total: mainAlbumTransition.total,
+        })
       }
 
       setCapturedFigure(figureSnapshot)

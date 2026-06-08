@@ -59,6 +59,29 @@ export function getMainProgressState(figures) {
   }
 }
 
+/**
+ * Detecta la captura que completa el álbum principal (10/10 normales del álbum activo).
+ * Solo dispara en transición real: antes incompleto → después completo.
+ */
+export function detectMainAlbumCompletionTransition(figures, figureId) {
+  if (!figureId) return null
+
+  const list = Array.isArray(figures) ? figures : []
+  const figure = list.find((item) => String(item.id) === String(figureId))
+  if (!figure?.obtenida) return null
+
+  const after = getMainProgressState(list)
+  if (!after.completed) return null
+
+  const beforeFigures = list.map((item) =>
+    String(item.id) === String(figureId) ? { ...item, obtenida: false } : item,
+  )
+  const before = getMainProgressState(beforeFigures)
+  if (before.completed) return null
+
+  return after
+}
+
 export function isNormalFigureRevealed(figure, obtainedNormalCount, visibleNormalTotal) {
   if (!figure || isBonusFigure(figure)) return false
   if (figure.obtenida) return true
